@@ -494,12 +494,24 @@ export function runForeground(
 /**
  * 生成 OpenCode 配置文件
  * 调用 config-generator 生成 .opencode/opencode.json
+ * @deprecated 使用 generateAllConfigs 代替
  */
 export async function generateOpencodeConfig(): Promise<boolean> {
+  return generateAllConfigs();
+}
+
+/**
+ * 生成所有平台的配置文件
+ * 调用 config-generator 生成：
+ * - .opencode/opencode.json (OpenCode)
+ * - .cursor/mcp.json + .cursorrules (Cursor)
+ * - claude.json (Claude SDK)
+ */
+export async function generateAllConfigs(): Promise<boolean> {
   return new Promise((resolve) => {
     const configGeneratorPath = pathResolve(PROJECT_ROOT, "packages/config-generator/src/index.ts");
 
-    const proc = spawn("bun", ["run", configGeneratorPath, "--target", "opencode"], {
+    const proc = spawn("bun", ["run", configGeneratorPath, "--target", "all"], {
       cwd: PROJECT_ROOT,
       stdio: "pipe",
     });
