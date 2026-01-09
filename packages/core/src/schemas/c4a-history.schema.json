@@ -1,0 +1,180 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://c4a.dev/schema/c4a-history.schema.json",
+  "title": "C4A History Schema",
+  "description": "C4A 版本演进和变更记录定义",
+
+  "type": "object",
+  "required": ["schema", "type"],
+  "additionalProperties": false,
+
+  "properties": {
+    "schema": {
+      "const": "c4a/v1",
+      "description": "Schema 版本"
+    },
+
+    "type": {
+      "const": "history",
+      "description": "实体类型"
+    },
+
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "element_type": {
+          "type": "string",
+          "enum": ["system", "container"],
+          "description": "目标元素类型"
+        },
+        "element_id": {
+          "type": "string",
+          "description": "目标元素 ID"
+        }
+      },
+      "description": "历史记录目标"
+    },
+
+    "versions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["version", "date", "title", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "type": "string",
+            "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$",
+            "description": "版本号，如 v2.0.0"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "发布日期"
+          },
+          "title": {
+            "type": "string",
+            "description": "版本标题"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["current", "supported", "deprecated", "archived"],
+            "description": "版本状态"
+          },
+          "breaking_changes": {
+            "type": "boolean",
+            "default": false,
+            "description": "是否包含破坏性变更"
+          },
+          "highlights": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "版本亮点"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["type", "description"],
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": ["feature", "enhancement", "bugfix", "architecture", "deprecation", "security"],
+                  "description": "变更类型"
+                },
+                "component": {
+                  "type": "string",
+                  "description": "受影响的组件"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "变更描述"
+                }
+              }
+            },
+            "description": "变更列表"
+          },
+          "related_adrs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^ADR-[0-9]{3,4}$"
+            },
+            "description": "相关 ADR"
+          },
+          "migration_guide": {
+            "type": "string",
+            "description": "迁移指南（Markdown）"
+          }
+        }
+      },
+      "description": "版本列表（按时间倒序）"
+    },
+
+    "milestones": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["date", "event"],
+        "additionalProperties": false,
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "里程碑日期"
+          },
+          "event": {
+            "type": "string",
+            "description": "里程碑事件"
+          },
+          "description": {
+            "type": "string",
+            "description": "详细描述"
+          },
+          "impact": {
+            "type": "string",
+            "enum": ["major", "minor"],
+            "description": "影响程度"
+          }
+        }
+      },
+      "description": "重要里程碑"
+    },
+
+    "deprecation_notices": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["feature", "deprecated_at"],
+        "additionalProperties": false,
+        "properties": {
+          "feature": {
+            "type": "string",
+            "description": "废弃的功能"
+          },
+          "deprecated_at": {
+            "type": "string",
+            "format": "date",
+            "description": "废弃日期"
+          },
+          "removal_date": {
+            "type": "string",
+            "format": "date",
+            "description": "计划移除日期"
+          },
+          "replacement": {
+            "type": "string",
+            "description": "替代方案"
+          },
+          "migration_guide": {
+            "type": "string",
+            "description": "迁移指南"
+          }
+        }
+      },
+      "description": "废弃通知"
+    }
+  }
+}

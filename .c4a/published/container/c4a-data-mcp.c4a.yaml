@@ -1,0 +1,59 @@
+schema: c4a/v1
+type: container
+
+container:
+  id: c4a-data-mcp
+  name: C4A Data MCP Server
+  description: |
+    统一数据服务 MCP Server，封装 MongoDB/Neo4j/Milvus 三库操作，
+    提供文档存储、图查询、语义搜索能力。
+
+  technology:
+    language: Python
+    framework: mcp + FastAPI
+    runtime: Python 3.11+
+    protocol: MCP (Stdio/HTTP)
+
+  ports:
+    - port: 8050
+      protocol: HTTP
+      description: MCP Streamable HTTP 端口
+
+relationships:
+  - to: mongodb
+    description: 主存储，存放 DSL 文档和元数据
+    technology: MongoDB Driver
+  - to: neo4j
+    description: 图索引，存放依赖关系和调用链
+    technology: Neo4j Bolt Protocol
+  - to: milvus
+    description: 向量索引，支持语义搜索
+    technology: gRPC
+
+knowledge:
+  how:
+    description: |
+      提供的 MCP 工具:
+
+      高层工具（Agent 首选）:
+      - c4a_db_save_entity: 保存文档（自动同步三库）
+      - c4a_db_get_entity: 获取文档
+      - c4a_db_delete_entity: 删除文档（级联清理）
+      - c4a_db_search_semantic: 语义搜索
+      - c4a_db_query_deps: 依赖查询
+      - c4a_db_query_impact: 影响分析
+      - c4a_db_sync_local: 批量同步本地 DSL
+
+      低层工具:
+      - c4a_db_exec_cypher: 原生 Cypher 查询
+
+      Embedding 服务:
+      - 优先使用 OpenAI API（需配置 OPENAI_API_KEY）
+      - 备选使用本地 Ollama（nomic-embed-text）
+  links:
+    - type: repository
+      url: ./packages/mcp-data
+      description: 源码目录
+    - type: documentation
+      url: ./rfc2/11-embedding-service.md
+      description: Embedding 服务设计

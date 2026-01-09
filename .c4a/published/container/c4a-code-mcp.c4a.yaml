@@ -1,0 +1,37 @@
+schema: c4a/v1
+type: container
+
+container:
+  id: c4a-code-mcp
+  name: C4A Code MCP Server
+  description: |
+    代码分析 MCP Server，提供代码模块提取、依赖分析、契约生成能力。
+
+  technology:
+    language: TypeScript
+    framework: "@modelcontextprotocol/sdk"
+    runtime: Bun
+    protocol: MCP (Stdio/HTTP)
+
+  ports:
+    - port: 8052
+      protocol: HTTP
+      description: MCP Streamable HTTP 端口（仅 Docker 模式）
+
+relationships:
+  - to: c4a-core
+    description: 使用共享的类型定义
+    technology: TypeScript Import
+
+knowledge:
+  how:
+    description: |
+      提供的 MCP 工具:
+      - c4a_code_extract_modules: 提取代码模块信息
+      - c4a_code_analyze_deps: 分析依赖关系
+      - c4a_code_generate_contract: 生成 API 契约
+      - c4a_code_parse_ast: 解析 AST
+  links:
+    - type: repository
+      url: ./packages/mcp-code
+      description: 源码目录

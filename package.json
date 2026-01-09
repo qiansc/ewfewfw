@@ -1,0 +1,22 @@
+{
+  "name": "c4a",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "postinstall": "ln -sf ../opencode-ai/bin/opencode node_modules/.bin/opencode 2>/dev/null || true",
+    "dev": "bun run --filter '*' dev",
+    "build": "bun run --filter '*' build",
+    "test": "bun run --filter '*' test",
+    "lint": "bun run --filter '*' lint",
+    "config:generate": "bun run ./packages/config-generator/src/index.ts generate",
+    "config:validate": "bun run ./packages/config-generator/src/index.ts validate"
+  },
+  "dependencies": {
+    "opencode-ai": "^1.1.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/bun": "latest"
+  }
+}

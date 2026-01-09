@@ -1,0 +1,229 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://c4a.dev/schema/c4a-common.schema.json",
+  "title": "C4A Common Definitions",
+  "description": "C4A DSL 共享类型定义",
+
+  "$defs": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "c4a/v1",
+      "description": "Schema 版本标识"
+    },
+
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "唯一标识符，推荐 kebab-case 格式"
+    },
+
+    "owner": {
+      "type": "object",
+      "properties": {
+        "team": {
+          "type": "string",
+          "description": "负责团队"
+        },
+        "tech_lead": {
+          "type": "string",
+          "description": "技术负责人"
+        },
+        "product_owner": {
+          "type": "string",
+          "description": "产品负责人"
+        },
+        "contact": {
+          "type": "string",
+          "description": "联系方式（邮箱或群组）"
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true,
+      "description": "分类标签"
+    },
+
+    "criticality": {
+      "type": "string",
+      "enum": ["critical", "high", "medium", "low"],
+      "description": "关键程度"
+    },
+
+    "contractStatus": {
+      "type": "string",
+      "enum": ["draft", "approved", "implemented", "published", "deprecated"],
+      "description": "契约状态"
+    },
+
+    "contractType": {
+      "type": "string",
+      "enum": ["openapi", "protobuf", "asyncapi", "graphql"],
+      "description": "契约类型"
+    },
+
+    "externalInfo": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "外部系统名称"
+        },
+        "owner": {
+          "type": "string",
+          "description": "外部系统归属方"
+        },
+        "contact": {
+          "type": "string",
+          "description": "联系方式"
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+
+    "link": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["repository", "documentation", "dashboard", "wiki", "other"],
+          "description": "链接类型"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "链接地址"
+        },
+        "description": {
+          "type": "string",
+          "description": "链接说明"
+        }
+      },
+      "required": ["url"],
+      "additionalProperties": false
+    },
+
+    "example": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "示例标题"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["scenario", "code", "request", "response"],
+          "description": "示例类型"
+        },
+        "content": {
+          "type": "string",
+          "description": "示例内容"
+        },
+        "language": {
+          "type": "string",
+          "description": "代码语言（仅 type=code 时）"
+        }
+      },
+      "required": ["title", "content"],
+      "additionalProperties": false
+    },
+
+    "constraint": {
+      "type": "object",
+      "properties": {
+        "performance": {
+          "type": "object",
+          "properties": {
+            "qps": { "type": "string" },
+            "latency_p99": { "type": "string" },
+            "latency_p95": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "security": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "availability": {
+          "type": "object",
+          "properties": {
+            "sla": { "type": "string" },
+            "rto": { "type": "string" },
+            "rpo": { "type": "string" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "risk": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "风险 ID"
+        },
+        "description": {
+          "type": "string",
+          "description": "风险描述"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["critical", "high", "medium", "low"],
+          "description": "严重程度"
+        },
+        "mitigation": {
+          "type": "string",
+          "description": "缓解措施"
+        }
+      },
+      "required": ["description"],
+      "additionalProperties": false
+    },
+
+    "knowledge": {
+      "type": "object",
+      "description": "知识附加",
+      "properties": {
+        "examples": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/example" },
+          "description": "使用示例"
+        },
+        "how": {
+          "type": "object",
+          "properties": {
+            "architecture": { "type": "string" },
+            "description": { "type": "string" }
+          },
+          "additionalProperties": true,
+          "description": "实现说明"
+        },
+        "constraints": {
+          "$ref": "#/$defs/constraint",
+          "description": "约束条件"
+        },
+        "risks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/risk" },
+          "description": "已知风险"
+        },
+        "links": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/link" },
+          "description": "相关链接"
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

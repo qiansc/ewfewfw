@@ -1,0 +1,63 @@
+schema: c4a/v1
+type: software-system
+
+system:
+  id: c4a
+  name: C4A - Context For AI
+  description: |
+    基于 C4 模型扩展的架构知识管理平台，为 AI Agent 和企业开发团队提供架构知识的生产与消费能力。
+
+    核心能力:
+    - DSL 定义: 使用 C4A DSL 描述 System/Container/Component 及其关系
+    - ADR 管理: 架构决策记录的全生命周期管理
+    - 知识查询: 语义搜索、依赖分析、影响评估
+    - 代码分析: 从代码提取模块结构和 API 契约
+
+  owner:
+    team: C4A Team
+  tags:
+    - architecture
+    - knowledge-management
+    - ai-agent
+    - mcp
+
+relationships:
+  dependencies:
+    - id: mongodb
+      description: 主存储，存放 DSL 文档和元数据
+      technology: MongoDB Driver
+      external: true
+      criticality: critical
+    - id: neo4j
+      description: 图索引，存放依赖关系和调用链
+      technology: Neo4j Bolt Protocol
+      external: true
+      criticality: high
+    - id: milvus
+      description: 向量索引，支持语义搜索
+      technology: gRPC
+      external: true
+      criticality: high
+
+knowledge:
+  how:
+    description: |
+      架构概览:
+      - Agent 层: c4a, c4a-plan, c4a-dsl, c4a-query 等 Agent
+      - MCP 层: c4a-dsl-mcp, c4a-code-mcp, c4a-data-mcp
+      - 存储层: MongoDB + Neo4j + Milvus
+      - 本地存储: .c4a/ 目录（drafts/approved/published/archive）
+
+      启动方式:
+      - ./start.sh dev    本地开发
+      - ./start.sh docker 全容器化
+  links:
+    - type: repository
+      url: https://github.com/anthropics/c4a
+      description: GitHub 仓库
+    - type: documentation
+      url: ./CLAUDE.md
+      description: 项目说明
+    - type: documentation
+      url: ./rfc2/index.md
+      description: RFC v2 设计文档

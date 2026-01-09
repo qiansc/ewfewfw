@@ -1,0 +1,200 @@
+# C4A v2 Docker Compose 配置
+#
+# 使用方式:
+#   开发环境 (存储+Ollama): docker compose up mongodb neo4j milvus ollama
+#   全服务 (含 MCP):        docker compose --profile mcp up
+#   生产模式:               docker compose --profile prod up
+
+services:
+  # ==================== 存储服务 ====================
+  mongodb:
+    image: mongo:7.0
+    container_name: c4a-mongodb
+    ports:
+      - "${MONGODB_PORT:-27017}:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: c4a
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  neo4j:
+    image: neo4j:5-community
+    container_name: c4a-neo4j
+    ports:
+      - "${NEO4J_HTTP_PORT:-7474}:7474"
+      - "${NEO4J_BOLT_PORT:-7687}:7687"
+    volumes:
+      - neo4j_data:/data
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-c4a_password}
+      NEO4J_PLUGINS: '["apoc"]'
+    healthcheck:
+      test: wget -q --spider http://localhost:7474 || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  milvus:
+    image: milvusdb/milvus:v2.5.4
+    container_name: c4a-milvus
+    command: ["milvus", "run", "standalone"]
+    ports:
+      - "${MILVUS_PORT:-19530}:19530"
+      - "9091:9091"
+    volumes:
+      - milvus_data:/var/lib/milvus
+    environment:
+      ETCD_USE_EMBED: "true"
+      ETCD_DATA_DIR: /var/lib/milvus/etcd
+      COMMON_STORAGETYPE: local
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ==================== Embedding Service ====================
+
+  # Ollama for local embedding (default for dev)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: c4a-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Ollama model initialization (runs once to pull the embedding model)
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: c4a-ollama-init
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Checking if nomic-embed-text model exists..."
+        if ollama show nomic-embed-text 2>/dev/null; then
+          echo "Model already exists, skipping download"
+        else
+          echo "Pulling nomic-embed-text model..."
+          ollama pull nomic-embed-text
+          echo "Model download complete"
+        fi
+    restart: "no"
+
+  # ==================== MCP Servers ====================
+
+  # TypeScript DSL MCP Server
+  c4a-dsl-mcp:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.mcp-ts
+    container_name: c4a-dsl-mcp
+    ports:
+      - "${DSL_MCP_PORT:-8051}:8051"
+    environment:
+      MCP_SERVER: mcp-dsl
+      MCP_TRANSPORT: streamable-http
+      MCP_PORT: 8051
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8051/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    profiles:
+      - mcp
+      - prod
+
+  # TypeScript Code MCP Server
+  c4a-code-mcp:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.mcp-ts
+    container_name: c4a-code-mcp
+    ports:
+      - "${CODE_MCP_PORT:-8052}:8052"
+    environment:
+      MCP_SERVER: mcp-code
+      MCP_TRANSPORT: streamable-http
+      MCP_PORT: 8052
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8052/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    profiles:
+      - mcp
+      - prod
+
+  # Python Data MCP Server (MongoDB + Neo4j + Milvus)
+  c4a-data-mcp:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.data
+    container_name: c4a-data-mcp
+    ports:
+      - "${DATA_MCP_PORT:-8050}:8050"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      milvus:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    environment:
+      # MongoDB
+      MONGODB_URI: mongodb://mongodb:27017/c4a
+      # Neo4j
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-c4a_password}
+      # Milvus
+      MILVUS_URI: http://milvus:19530
+      # Embedding (Ollama default, OpenAI if API key provided)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
+      # Server
+      MCP_TRANSPORT: streamable-http
+      MCP_PORT: 8050
+      DEBUG: ${DEBUG:-false}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8050/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    profiles:
+      - mcp
+      - prod
+
+volumes:
+  mongodb_data:
+  neo4j_data:
+  milvus_data:
+  ollama_data:
+
+networks:
+  default:
+    name: c4a-network

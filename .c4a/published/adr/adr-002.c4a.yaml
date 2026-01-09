@@ -1,0 +1,111 @@
+schema: c4a/v1
+type: adr
+adr:
+  id: ADR-002
+  title: 多基座兼容设计 - 统一配置与配置生成器
+  status: published
+  date: 2026-01-07
+  authors:
+    - C4A Team
+  reviewers: []
+  approved_by: 用户
+context: |
+  C4A 需要支持多种 Agent 基座运行，包括 OpenCode、Claude Code SDK、Cursor 等。
+
+  各基座的配置格式不同：
+  - OpenCode: `.opencode/opencode.json`
+  - Claude Code: `.claude/settings.json` + `.claude/commands/*.md`
+  - Cursor: `.cursorrules`
+
+  需要解决：
+  1. 配置格式不统一，维护成本高
+  2. 切换基座需要手动转换配置
+  3. Prompt 文件需要在各基座间复用
+decision: |
+  采用「统一配置 + 生成器」模式：
+
+  1. **统一配置源**
+     - `c4a.config.yaml` 作为版本控制的源文件
+     - 定义所有 Agent、MCP Server、权限规则
+     - 使用 Zod Schema 验证配置正确性
+
+  2. **配置生成器**
+     - `packages/config-generator/` 实现适配器模式
+     - 支持三种目标：OpenCode、Claude SDK、Cursor
+     - 运行生成命令一键生成各基座配置
+
+  3. **Prompt 共享**
+     - 所有 Agent Prompt 存放在 `prompts/*.md`
+     - 各基座配置引用相同的 Prompt 文件
+     - 使用参数占位符传递参数（所有基座支持）
+
+  4. **适配转换规则**
+     - MCP 配置: stdio → local 类型, http → remote 类型
+     - 权限规则: 通配符模式 → 展开为显式工具列表
+     - Prompt 引用: 直接引用 vs 复制到 skills 目录
+
+  5. **工具名称解析器 (toolResolver)**
+     - 支持通配符展开：`c4a_dsl_*` → 展开为具体工具列表
+     - 维护 KNOWN_TOOLS 静态映射表，包含各 MCP Server 的工具列表
+     - Claude SDK 格式转换：`c4a_xxx` → `mcp__c4a_xxx`，系统工具首字母大写
+consequences:
+  positive:
+    - 单一配置源，减少维护成本
+    - 切换基座只需运行生成命令
+    - Prompt 文件复用，行为一致
+    - Schema 验证确保配置正确
+  negative:
+    - 需要为每个基座实现适配器
+    - 基座更新可能需要同步更新生成器
+    - KNOWN_TOOLS 需要与 MCP Server 工具列表保持同步
+  neutral:
+    - 生成的配置文件不应手动修改
+    - 部分基座特有功能可能无法利用
+alternatives:
+  - name: 每个基座独立维护配置
+    description: 为每个基座手动维护配置文件
+    pros:
+      - 可以利用各基座特有功能
+      - 无需开发生成器
+    cons:
+      - 维护成本高
+      - 配置不一致风险
+      - 切换基座工作量大
+  - name: 仅支持单一基座
+    description: 只支持 OpenCode，放弃多基座兼容
+    pros:
+      - 实现简单
+      - 无需适配层
+    cons:
+      - 用户被锁定在单一平台
+      - 无法利用其他基座的优势
+affects:
+  - element_type: container
+    element_id: config-generator
+    scope: 核心容器，实现配置生成逻辑和工具名称解析
+  - element_type: container
+    element_id: c4a-cli
+    scope: 集成配置生成命令
+  - element_type: container
+    element_id: c4a-core
+    scope: 提供 Zod Schema 验证能力
+related:
+  related_adrs: []
+content: >
+  ## 实现待办事项
+
+
+  ### 代码层面
+
+  1. **补充 KNOWN_TOOLS 工具组** (`packages/config-generator/src/toolResolver.ts`)
+     - [ ] 添加 `c4a_local` cal_init_repo`, `c4a_local_list_files`, `c4a_local_read_file`, `c4a_local_write_file`, `c4a_local_transition_status`
+     - [ ] 添加 `c4a_db` 工具组：`c4a_db_save_entity`, `c4a_db_get_entity`, `c4a_db_delete_entity`, `c4a_db_search_semantic`, `c4a_db_query_deps`, `c4a_db_query_impact`, `c4a_db_sync_file`, `c4a_db_sync_local`, `c4a_db_exec_cypher`
+
+  ### 知识库层��
+
+  2. **更新 config-generator 容器文档**
+  (`.c4a/published/container/config-generator.c4a.yaml`)
+     - [ ] 补充 toolResolver 模块说明
+     - [ ] 补充 KNOWN_TOOLS 通配符展开机制
+     - [ ] 补充适配器架构说明（BaseAdapter + 三个具体适配器）
+     - [ ] 补充与 c4a-core 的依赖关系

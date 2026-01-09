@@ -1,0 +1,23 @@
+{
+  "name": "@c4a/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.tsx",
+  "bin": {
+    "c4a": "./src/index.tsx"
+  },
+  "scripts": {
+    "dev": "bun --watch src/index.tsx",
+    "start": "bun run src/index.tsx",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ink": "^5.0.1",
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.0",
+    "typescript": "^5.4.0",
+    "@types/bun": "latest"
+  }
+}

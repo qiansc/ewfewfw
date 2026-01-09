@@ -1,0 +1,158 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://c4a.dev/schema/c4a-system.schema.json",
+  "title": "C4A System Schema",
+  "description": "C4A DSL System Context 层定义",
+
+  "type": "object",
+  "required": ["schema", "type", "system"],
+  "additionalProperties": false,
+
+  "properties": {
+    "schema": {
+      "const": "c4a/v1",
+      "description": "Schema 版本"
+    },
+
+    "type": {
+      "const": "software-system",
+      "description": "实体类型"
+    },
+
+    "system": {
+      "type": "object",
+      "required": ["id", "name", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "系统唯一标识"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "系统名称"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "系统描述，说明业务价值"
+        },
+        "owner": {
+          "$ref": "c4a-common.schema.json#/$defs/owner",
+          "description": "所有权信息"
+        },
+        "tags": {
+          "$ref": "c4a-common.schema.json#/$defs/tags",
+          "description": "分类标签"
+        }
+      }
+    },
+
+    "relationships": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "consumers": {
+          "type": "array",
+          "description": "上游依赖（调用本系统的）",
+          "items": {
+            "type": "object",
+            "required": ["id", "type"],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "调用方 ID"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["person", "software-system"],
+                "description": "调用方类型"
+              },
+              "description": {
+                "type": "string",
+                "description": "调用关系描述"
+              }
+            }
+          }
+        },
+        "dependencies": {
+          "type": "array",
+          "description": "下游依赖（本系统调用的）",
+          "items": {
+            "type": "object",
+            "required": ["id"],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "被依赖系统 ID"
+              },
+              "description": {
+                "type": "string",
+                "description": "为什么依赖该系统"
+              },
+              "technology": {
+                "type": "string",
+                "description": "调用协议（如 REST、gRPC）"
+              },
+              "criticality": {
+                "$ref": "c4a-common.schema.json#/$defs/criticality",
+                "description": "依赖关键程度"
+              },
+              "external": {
+                "type": "boolean",
+                "default": false,
+                "description": "是否为外部系统"
+              },
+              "external_info": {
+                "$ref": "c4a-common.schema.json#/$defs/externalInfo",
+                "description": "外部系统信息（仅 external=true 时）"
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "knowledge": {
+      "$ref": "c4a-common.schema.json#/$defs/knowledge",
+      "description": "系统级知识附加"
+    },
+
+    "containers": {
+      "type": "object",
+      "properties": {
+        "$ref": {
+          "type": "string",
+          "description": "容器引用路径"
+        }
+      },
+      "additionalProperties": false,
+      "description": "容器引用"
+    },
+
+    "deployment": {
+      "type": "object",
+      "properties": {
+        "regions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "部署区域"
+        },
+        "environments": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "部署环境"
+        }
+      },
+      "additionalProperties": true,
+      "description": "部署信息"
+    }
+  }
+}

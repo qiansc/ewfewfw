@@ -1,0 +1,209 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://c4a.dev/schema/c4a-container.schema.json",
+  "title": "C4A Container Schema",
+  "description": "C4A DSL Container 层定义",
+
+  "type": "object",
+  "required": ["schema", "type", "container"],
+  "additionalProperties": false,
+
+  "properties": {
+    "schema": {
+      "const": "c4a/v1",
+      "description": "Schema 版本"
+    },
+
+    "type": {
+      "const": "container",
+      "description": "实体类型"
+    },
+
+    "container": {
+      "type": "object",
+      "required": ["id", "name", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "容器唯一标识"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "容器名称"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "容器描述"
+        },
+        "external": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否为外部容器（仅有基本描述，无详细实现信息）"
+        },
+        "technology": {
+          "type": "object",
+          "required": ["language", "protocol"],
+          "additionalProperties": false,
+          "properties": {
+            "language": {
+              "type": "string",
+              "description": "编程语言及版本"
+            },
+            "framework": {
+              "type": "string",
+              "description": "使用的框架"
+            },
+            "runtime": {
+              "type": "string",
+              "description": "运行时环境"
+            },
+            "protocol": {
+              "type": "string",
+              "description": "对外通信协议类型"
+            }
+          }
+        },
+        "ports": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["port", "protocol"],
+            "additionalProperties": false,
+            "properties": {
+              "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535,
+                "description": "端口号"
+              },
+              "protocol": {
+                "type": "string",
+                "enum": ["HTTP", "gRPC", "TCP", "WebSocket"],
+                "description": "端口协议"
+              },
+              "description": {
+                "type": "string",
+                "description": "端口说明"
+              }
+            }
+          },
+          "description": "暴露的端口"
+        },
+        "repository": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "format": "uri",
+              "description": "仓库地址"
+            },
+            "path": {
+              "type": "string",
+              "description": "仓库内路径"
+            }
+          },
+          "additionalProperties": false,
+          "description": "代码仓库信息"
+        },
+        "apis": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "ref"],
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "$ref": "c4a-common.schema.json#/$defs/contractType",
+                "description": "契约类型"
+              },
+              "ref": {
+                "type": "string",
+                "description": "契约 ID（指向平台数据库中的 Contract 实体）"
+              },
+              "version": {
+                "type": "string",
+                "description": "契约版本"
+              },
+              "status": {
+                "$ref": "c4a-common.schema.json#/$defs/contractStatus",
+                "description": "契约状态"
+              }
+            }
+          },
+          "description": "API 契约引用"
+        },
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$",
+            "description": "组件 ID"
+          },
+          "description": "该容器包含的组件 ID 列表（引用 Component DSL）"
+        }
+      },
+      "if": {
+        "properties": {
+          "external": { "const": true }
+        },
+        "required": ["external"]
+      },
+      "then": {
+        "properties": {
+          "technology": {
+            "description": "外部容器的技术栈描述（可选，简化格式）"
+          }
+        }
+      },
+      "else": {
+        "required": ["technology"]
+      }
+    },
+
+    "relationships": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["to"],
+        "additionalProperties": false,
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "目标容器或系统 ID"
+          },
+          "description": {
+            "type": "string",
+            "description": "关系描述"
+          },
+          "technology": {
+            "type": "string",
+            "description": "调用技术/协议"
+          },
+          "async": {
+            "type": "boolean",
+            "default": false,
+            "description": "是否异步调用"
+          },
+          "external": {
+            "type": "boolean",
+            "default": false,
+            "description": "是否为外部容器（如 Redis、Kafka 等）"
+          }
+        }
+      },
+      "description": "容器间依赖关系"
+    },
+
+    "knowledge": {
+      "$ref": "c4a-common.schema.json#/$defs/knowledge",
+      "description": "容器级知识附加"
+    }
+  }
+}
