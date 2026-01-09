@@ -178,13 +178,16 @@ async function cmdDev(forceRestart = false) {
   }
   success("OpenCode 已安装");
 
-  // 2. 生成 OpenCode 配置
-  info("生成 OpenCode 配置...");
+  // 2. 生成所有平台配置
+  info("生成 Agent 配置...");
   const configGenerated = await generateOpencodeConfig();
   if (configGenerated) {
-    success("OpenCode 配置已生成 (.opencode/opencode.json)");
+    success("Agent 配置已生成:");
+    console.log("    - .opencode/opencode.json (OpenCode)");
+    console.log("    - .cursor/mcp.json + .cursorrules (Cursor)");
+    console.log("    - claude.json (Claude SDK)");
   } else {
-    warn("OpenCode 配置生成失败，使用已有配置");
+    warn("Agent 配置生成失败，使用已有配置");
   }
 
   // 3. 检查存储服务状态

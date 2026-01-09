@@ -160,24 +160,59 @@ export class ClaudeSdkAdapter extends BaseAdapter {
       }
       outputFiles.push(mcpJsonFile);
 
-      // 2. 生成 .claude/settings.json（权限配置）
-      const allAllowed = new Set<string>();
-      const allDenied = new Set<string>();
-
-      for (const agent of Object.values(config.agents)) {
-        const expanded = expandToolPatterns(agent.allowedTools);
-        const converted = toClaudeSdkToolNames(expanded);
-        converted.forEach((tool) => allAllowed.add(tool));
-
-        const deniedExpanded = expandToolPatterns(agent.deniedTools);
-        const deniedConverted = toClaudeSdkToolNames(deniedExpanded);
-        deniedConverted.forEach((tool) => allDenied.add(tool));
+      // 2. 生成 .claude/settings.json（权限配置 - 智能合并）
+      // 读取现有配置，保留用户的权限选择
+      let existingSettings: SettingsJsonConfig = { permissions: { allow: [], deny: [] } };
+      if (await fileExists(settingsFile)) {
+        try {
+          const existingContent = await readFileContent(settingsFile);
+          existingSettings = JSON.parse(existingContent);
+          if (!existingSettings.permissions) {
+            existingSettings.permissions = { allow: [], deny: [] };
+          }
+          logger.debug("读取现有 .claude/settings.json 配置");
+        } catch {
+          logger.warn("读取现有 .claude/settings.json 失败，将创建新文件");
+          existingSettings = { permissions: { allow: [], deny: [] } };
+        }
       }
+
+      // 只使用默认 agent 的权限配置（不合并其他 agent 的限制）
+      const defaultAgent = config.agents[config.defaultAgent];
+      if (!defaultAgent) {
+        logger.warn(`默认 agent '${config.defaultAgent}' 不存在，跳过权限配置`);
+      }
+
+      const c4aAllowed = new Set<string>();
+      const c4aDenied = new Set<string>();
+
+      if (defaultAgent) {
+        const expanded = expandToolPatterns(defaultAgent.allowedTools);
+        const converted = toClaudeSdkToolNames(expanded);
+        converted.forEach((tool) => c4aAllowed.add(tool));
+
+        const deniedExpanded = expandToolPatterns(defaultAgent.deniedTools);
+        const deniedConverted = toClaudeSdkToolNames(deniedExpanded);
+        deniedConverted.forEach((tool) => c4aDenied.add(tool));
+      }
+
+      // 智能合并策略：
+      // 1. 保留用户现有的非 c4a MCP 工具权限（不以 mcp__c4a- 开头的）
+      // 2. 用 c4a.config.yaml 的配置更新 c4a MCP 工具权限
+      const isC4aTool = (tool: string) => tool.startsWith("mcp__c4a-");
+
+      // 保留用户的非 c4a 工具权限
+      const userAllowed = existingSettings.permissions.allow.filter((t) => !isC4aTool(t));
+      const userDenied = existingSettings.permissions.deny.filter((t) => !isC4aTool(t));
+
+      // 合并：用户权限 + c4a 配置
+      const finalAllowed = new Set([...userAllowed, ...c4aAllowed]);
+      const finalDenied = new Set([...userDenied, ...c4aDenied]);
 
       const settingsConfig: SettingsJsonConfig = {
         permissions: {
-          allow: Array.from(allAllowed).sort(),
-          deny: Array.from(allDenied).sort(),
+          allow: Array.from(finalAllowed).sort(),
+          deny: Array.from(finalDenied).sort(),
         },
       };
 
@@ -185,7 +220,7 @@ export class ClaudeSdkAdapter extends BaseAdapter {
         await ensureDir(configDir);
         const settingsContent = JSON.stringify(settingsConfig, null, 2);
         await writeFileContent(settingsFile, settingsContent);
-        logger.success(`生成 Claude SDK 权限配置: ${settingsFile}`);
+        logger.success(`生成 Claude SDK 权限配置: ${settingsFile}（保留用户自定义权限）`);
       } else {
         logger.info("[Dry Run] 将生成:", settingsFile);
       }
