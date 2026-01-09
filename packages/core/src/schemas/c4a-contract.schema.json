@@ -1,0 +1,178 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://c4a.dev/schema/c4a-contract.schema.json",
+  "title": "C4A Contract Schema",
+  "description": "C4A API 契约定义",
+
+  "type": "object",
+  "required": ["schema", "type", "contract"],
+  "additionalProperties": false,
+
+  "properties": {
+    "schema": {
+      "const": "c4a/v1",
+      "description": "Schema 版本"
+    },
+
+    "type": {
+      "const": "contract",
+      "description": "实体类型"
+    },
+
+    "contract": {
+      "type": "object",
+      "required": ["id", "name", "contract_type", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "契约唯一标识"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "契约名称"
+        },
+        "description": {
+          "type": "string",
+          "description": "契约描述"
+        },
+        "container_id": {
+          "type": "string",
+          "description": "所属容器 ID"
+        },
+        "contract_type": {
+          "type": "string",
+          "enum": ["openapi", "asyncapi", "protobuf", "graphql"],
+          "description": "契约类型"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "approved", "implemented", "published", "deprecated"],
+          "description": "契约状态"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "description": "契约版本，如 v1.2.0"
+        }
+      }
+    },
+
+    "content": {
+      "type": "string",
+      "description": "契约内容（OpenAPI YAML/JSON、Proto、GraphQL SDL 等）"
+    },
+
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "创建时间"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "更新时间"
+        },
+        "created_by": {
+          "type": "string",
+          "description": "创建人"
+        },
+        "approved_by": {
+          "type": "string",
+          "description": "批准人"
+        },
+        "approved_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "批准时间"
+        }
+      }
+    },
+
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "last_validated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "最后验证时间"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "验证是否成功"
+        },
+        "errors": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "验证错误"
+        },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "验证警告"
+        }
+      },
+      "description": "验证信息"
+    },
+
+    "related": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "adr_id": {
+          "type": "string",
+          "pattern": "^ADR-[0-9]{3,4}$",
+          "description": "关联的 ADR ID"
+        },
+        "consumers": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "消费者容器 ID 列表"
+        },
+        "supersedes": {
+          "type": "string",
+          "description": "替代的契约 ID"
+        },
+        "superseded_by": {
+          "type": "string",
+          "description": "被哪个契约替代"
+        }
+      },
+      "description": "关联信息"
+    },
+
+    "breaking_changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["version", "description"],
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "type": "string",
+            "description": "引入破坏性变更的版本"
+          },
+          "description": {
+            "type": "string",
+            "description": "变更描述"
+          },
+          "migration_guide": {
+            "type": "string",
+            "description": "迁移指南"
+          }
+        }
+      },
+      "description": "破坏性变更记录"
+    }
+  }
+}

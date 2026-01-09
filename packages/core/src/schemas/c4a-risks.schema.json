@@ -1,0 +1,180 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://c4a.dev/schema/c4a-risks.schema.json",
+  "title": "C4A Risks Schema",
+  "description": "C4A 风险和技术债定义",
+
+  "type": "object",
+  "required": ["schema", "type"],
+  "additionalProperties": false,
+
+  "properties": {
+    "schema": {
+      "const": "c4a/v1",
+      "description": "Schema 版本"
+    },
+
+    "type": {
+      "const": "risks",
+      "description": "实体类型"
+    },
+
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "element_type": {
+          "type": "string",
+          "enum": ["system", "container"],
+          "description": "目标元素类型"
+        },
+        "element_id": {
+          "type": "string",
+          "description": "目标元素 ID"
+        }
+      },
+      "description": "风险目标"
+    },
+
+    "risks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "category", "severity", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^RISK-[0-9]{3,4}$",
+            "description": "风险 ID，如 RISK-001"
+          },
+          "title": {
+            "type": "string",
+            "description": "风险标题"
+          },
+          "category": {
+            "type": "string",
+            "enum": ["technical", "operational", "security", "business", "compliance"],
+            "description": "风险类别"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["critical", "high", "medium", "low"],
+            "description": "严重程度"
+          },
+          "probability": {
+            "type": "string",
+            "enum": ["very_likely", "likely", "possible", "unlikely", "rare"],
+            "description": "发生概率"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["open", "mitigating", "mitigated", "accepted", "closed"],
+            "description": "风险状态"
+          },
+          "description": {
+            "type": "string",
+            "description": "详细描述"
+          },
+          "impact": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "影响说明"
+          },
+          "mitigation_plan": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "status": {
+                "type": "string",
+                "description": "缓解计划状态"
+              },
+              "target_date": {
+                "type": "string",
+                "format": "date",
+                "description": "目标完成日期"
+              },
+              "owner": {
+                "type": "string",
+                "description": "负责人"
+              },
+              "actions": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "缓解措施"
+              }
+            }
+          },
+          "identified_at": {
+            "type": "string",
+            "format": "date",
+            "description": "识别日期"
+          },
+          "resolved_at": {
+            "type": "string",
+            "format": "date",
+            "description": "解决日期"
+          }
+        }
+      },
+      "description": "风险列表"
+    },
+
+    "tech_debt": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "severity"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^DEBT-[0-9]{3,4}$",
+            "description": "技术债 ID，如 DEBT-001"
+          },
+          "title": {
+            "type": "string",
+            "description": "技术债标题"
+          },
+          "description": {
+            "type": "string",
+            "description": "详细描述"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["critical", "high", "medium", "low"],
+            "description": "严重程度"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["code", "architecture", "documentation", "testing", "infrastructure"],
+            "description": "技术债类型"
+          },
+          "effort": {
+            "type": "string",
+            "description": "预估工作量，如 3 人天"
+          },
+          "interest": {
+            "type": "string",
+            "description": "不解决的代价（利息）"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["identified", "planned", "in_progress", "resolved"],
+            "description": "状态"
+          },
+          "planned_resolution": {
+            "type": "string",
+            "description": "计划解决时间，如 2024-Q2"
+          },
+          "related_adr": {
+            "type": "string",
+            "pattern": "^ADR-[0-9]{3,4}$",
+            "description": "相关 ADR"
+          }
+        }
+      },
+      "description": "技术债列表"
+    }
+  }
+}

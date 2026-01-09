@@ -1,0 +1,229 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://c4a.dev/schema/c4a-constraints.schema.json",
+  "title": "C4A Constraints Schema",
+  "description": "C4A 约束条件定义（SLA、限流、合规要求等）",
+
+  "type": "object",
+  "required": ["schema", "type"],
+  "additionalProperties": false,
+
+  "properties": {
+    "schema": {
+      "const": "c4a/v1",
+      "description": "Schema 版本"
+    },
+
+    "type": {
+      "const": "constraints",
+      "description": "实体类型"
+    },
+
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "element_type": {
+          "type": "string",
+          "enum": ["system", "container"],
+          "description": "目标元素类型"
+        },
+        "element_id": {
+          "type": "string",
+          "description": "目标元素 ID"
+        }
+      },
+      "description": "约束目标"
+    },
+
+    "sla": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "availability": {
+          "type": "object",
+          "properties": {
+            "target": {
+              "type": "string",
+              "description": "可用性目标，如 99.95%"
+            },
+            "calculation": {
+              "type": "string",
+              "description": "计算方式说明"
+            }
+          },
+          "additionalProperties": false
+        },
+        "latency": {
+          "type": "object",
+          "properties": {
+            "p50": { "type": "string" },
+            "p95": { "type": "string" },
+            "p99": { "type": "string" },
+            "p999": { "type": "string" }
+          },
+          "additionalProperties": false,
+          "description": "延迟指标"
+        },
+        "throughput": {
+          "type": "object",
+          "properties": {
+            "sustained": {
+              "type": "string",
+              "description": "持续吞吐量"
+            },
+            "peak": {
+              "type": "string",
+              "description": "峰值吞吐量"
+            }
+          },
+          "additionalProperties": false,
+          "description": "吞吐量指标"
+        },
+        "recovery": {
+          "type": "object",
+          "properties": {
+            "rto": {
+              "type": "string",
+              "description": "Recovery Time Objective"
+            },
+            "rpo": {
+              "type": "string",
+              "description": "Recovery Point Objective"
+            }
+          },
+          "additionalProperties": false,
+          "description": "恢复指标"
+        }
+      },
+      "description": "SLA 约束"
+    },
+
+    "limits": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "number" }
+          ]
+        }
+      },
+      "description": "业务限制（按领域分组）"
+    },
+
+    "compliance": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "合规标准名称，如 PCI-DSS、GDPR"
+          },
+          "requirements": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "具体要求"
+          },
+          "certification_date": {
+            "type": "string",
+            "format": "date",
+            "description": "认证日期"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date",
+            "description": "过期日期"
+          }
+        }
+      },
+      "description": "合规要求"
+    },
+
+    "security": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "authentication": {
+          "type": "object",
+          "properties": {
+            "methods": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "认证方式，如 JWT、API Key、OAuth2"
+            },
+            "required": {
+              "type": "boolean",
+              "description": "是否必须认证"
+            }
+          },
+          "additionalProperties": false
+        },
+        "authorization": {
+          "type": "object",
+          "properties": {
+            "model": {
+              "type": "string",
+              "description": "授权模型，如 RBAC、ABAC"
+            }
+          },
+          "additionalProperties": true
+        },
+        "encryption": {
+          "type": "object",
+          "properties": {
+            "at_rest": {
+              "type": "string",
+              "description": "静态加密，如 AES-256"
+            },
+            "in_transit": {
+              "type": "string",
+              "description": "传输加密，如 TLS 1.3"
+            }
+          },
+          "additionalProperties": false
+        },
+        "data_classification": {
+          "type": "string",
+          "enum": ["public", "internal", "confidential", "restricted"],
+          "description": "数据分类"
+        }
+      },
+      "description": "安全约束"
+    },
+
+    "operational": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "backup": {
+          "type": "object",
+          "properties": {
+            "frequency": { "type": "string" },
+            "retention": { "type": "string" }
+          },
+          "additionalProperties": false,
+          "description": "备份策略"
+        },
+        "monitoring": {
+          "type": "object",
+          "properties": {
+            "alerting_threshold": { "type": "string" },
+            "on_call_required": { "type": "boolean" }
+          },
+          "additionalProperties": true,
+          "description": "监控要求"
+        },
+        "maintenance_window": {
+          "type": "string",
+          "description": "维护窗口"
+        }
+      },
+      "description": "运维约束"
+    }
+  }
+}

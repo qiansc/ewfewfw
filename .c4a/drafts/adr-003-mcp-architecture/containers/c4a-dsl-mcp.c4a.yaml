@@ -1,0 +1,73 @@
+schema: c4a/v1
+type: container
+
+container:
+  id: c4a-dsl-mcp
+  name: C4A DSL MCP Server
+  description: |
+    DSL 解析验证与本地存储管理服务。
+    提供 DSL 文件的解析、验证、生成、模板管理功能，
+    以及本地 .c4a/ 目录的完整生命周期管理。
+  technology:
+    language: TypeScript
+    framework: "@modelcontextprotocol/sdk"
+    runtime: Bun
+    protocol: MCP (Stdio/HTTP)
+  ports:
+    - port: 8051
+      protocol: HTTP
+      description: MCP Streamable HTTP 端口（仅 Docker 模式）
+  repository:
+    path: packages/mcp-dsl
+
+relationships:
+  - to: c4a-core
+    description: 使用共享的 JSON Schema 和类型定义
+    technology: TypeScript Import
+
+knowledge:
+  what:
+    description: |
+      C4A DSL MCP Server 是架构知识管理的前端服务，负责：
+      - DSL 语法解析与 Schema 验证
+      - DSL 模板生成
+      - 本地 .c4a/ 目录的初始化、读写、状态流转
+  why:
+    description: |
+      选择 TypeScript 实现是因为：
+      - JSON Schema 处理生态成熟 (ajv)
+      - YAML 解析库完善 (yaml)
+      - 与前端工具链统一
+  how:
+    description: |
+      核心工具分为两类：
+      
+      DSL 工具：
+      - c4a_dsl_parse: 解析 YAML 为结构化对象
+      - c4a_dsl_validate: 验证 DSL 符合 Schema
+      - c4a_dsl_generate: 根据模板生成 DSL
+      - c4a_dsl_schema: 获取 Schema 定义
+      
+      本地存储工具：
+      - c4a_local_init_repo: 初始化 .c4a/ 目录
+      - c4a_local_list_files: 列出 DSL 文件
+      - c4a_local_read_file: 读取 DSL 文件
+      - c4a_local_write_file: 写入 DSL 文件
+      - c4a_local_transition_status: 状态流转
+    components:
+      - id: dsl-parser
+        source: src/tools/parse.ts
+      - id: dsl-validator
+        source: src/tools/validate.ts
+      - id: dsl-generator
+        source: src/tools/generate.ts
+      - id: template-manager
+        source: src/templates/index.ts
+      - id: schema-provider
+        source: src/tools/schema.ts
+      - id: local-storage
+        source: src/tools/storage/
+  links:
+    - type: repository
+      url: ./packages/mcp-dsl
+      description: 源码目录

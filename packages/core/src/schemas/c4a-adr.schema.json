@@ -1,0 +1,206 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://c4a.dev/schema/c4a-adr.schema.json",
+  "title": "C4A ADR Schema",
+  "description": "C4A 架构决策记录 (Architecture Decision Record) 定义",
+
+  "type": "object",
+  "required": ["schema", "type", "adr", "context", "decision"],
+  "additionalProperties": false,
+
+  "properties": {
+    "schema": {
+      "const": "c4a/v1",
+      "description": "Schema 版本"
+    },
+
+    "type": {
+      "const": "adr",
+      "description": "实体类型"
+    },
+
+    "adr": {
+      "type": "object",
+      "required": ["id", "title", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^ADR-[0-9]{3,4}$",
+          "description": "ADR 编号，如 ADR-001"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "决策标题"
+        },
+        "system_id": {
+          "type": "string",
+          "description": "所属系统 ID"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "approved", "implemented", "published", "deprecated", "superseded"],
+          "description": "ADR 状态"
+        },
+        "date": {
+          "type": "string",
+          "format": "date",
+          "description": "决策日期"
+        },
+        "authors": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "作者列表"
+        },
+        "reviewers": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "评审人列表"
+        },
+        "approved_by": {
+          "type": "string",
+          "description": "批准人"
+        },
+        "approved_at": {
+          "type": "string",
+          "format": "date",
+          "description": "批准日期"
+        }
+      }
+    },
+
+    "context": {
+      "type": "string",
+      "minLength": 1,
+      "description": "背景：为什么需要做这个决策"
+    },
+
+    "decision": {
+      "type": "string",
+      "minLength": 1,
+      "description": "决策：我们决定做什么"
+    },
+
+    "consequences": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "positive": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "正面影响"
+        },
+        "negative": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "负面影响"
+        },
+        "neutral": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "中性影响"
+        }
+      },
+      "description": "后果：决策带来的影响"
+    },
+
+    "alternatives": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "方案名称"
+          },
+          "description": {
+            "type": "string",
+            "description": "方案描述"
+          },
+          "pros": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "优点"
+          },
+          "cons": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "缺点"
+          },
+          "evaluation": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5,
+            "description": "评分 1-5"
+          }
+        }
+      },
+      "description": "考虑的备选方案"
+    },
+
+    "affects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["element_id", "element_type"],
+        "additionalProperties": false,
+        "properties": {
+          "element_type": {
+            "type": "string",
+            "enum": ["system", "container", "component"],
+            "description": "元素类型"
+          },
+          "element_id": {
+            "type": "string",
+            "description": "元素 ID"
+          },
+          "scope": {
+            "type": "string",
+            "description": "影响范围说明"
+          }
+        }
+      },
+      "description": "影响的架构元素"
+    },
+
+    "related": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "supersedes": {
+          "type": "string",
+          "pattern": "^ADR-[0-9]{3,4}$",
+          "description": "替代的 ADR ID"
+        },
+        "superseded_by": {
+          "type": "string",
+          "pattern": "^ADR-[0-9]{3,4}$",
+          "description": "被哪个 ADR 替代"
+        },
+        "related_adrs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^ADR-[0-9]{3,4}$"
+          },
+          "description": "相关 ADR 列表"
+        },
+        "related_contracts": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "相关契约 ID 列表"
+        }
+      },
+      "description": "关联信息"
+    },
+
+    "content": {
+      "type": "string",
+      "description": "完整 Markdown 内容（可选，用于富文本）"
+    }
+  }
+}

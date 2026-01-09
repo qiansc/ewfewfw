@@ -1,0 +1,43 @@
+schema: c4a/v1
+type: container
+
+container:
+  id: c4a-dsl-mcp
+  name: C4A DSL MCP Server
+  description: |
+    DSL 解析验证 MCP Server，提供 C4A DSL 文件的解析、验证、生成能力，
+    以及本地 `.c4a/` 目录的文件管理能力。
+
+  technology:
+    language: TypeScript
+    framework: "@modelcontextprotocol/sdk"
+    runtime: Bun
+    protocol: MCP (Stdio/HTTP)
+
+  ports:
+    - port: 8051
+      protocol: HTTP
+      description: MCP Streamable HTTP 端口（仅 Docker 模式）
+
+relationships:
+  - to: c4a-core
+    description: 使用共享的 JSON Schema 和类型定义
+    technology: TypeScript Import
+
+knowledge:
+  how:
+    description: |
+      提供的 MCP 工具:
+      - c4a_dsl_parse: 解析 YAML DSL 文件
+      - c4a_dsl_validate: 验证 DSL 符合 Schema
+      - c4a_dsl_generate: 生成 DSL 模板
+      - c4a_dsl_schema: 获取 JSON Schema
+      - c4a_local_init_repo: 初始化 .c4a/ 目录
+      - c4a_local_list_files: 列出 DSL 文件
+      - c4a_local_read_file: 读取 DSL 文件
+      - c4a_local_write_file: 写入 DSL 文件
+      - c4a_local_transition_status: 状态流转
+  links:
+    - type: repository
+      url: ./packages/mcp-dsl
+      description: 源码目录

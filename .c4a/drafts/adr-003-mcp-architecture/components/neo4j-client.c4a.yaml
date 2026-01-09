@@ -1,0 +1,22 @@
+schema: c4a/v1
+type: component
+
+component:
+  id: neo4j-client
+  name: Neo4j Client
+  description: Neo4j 客户端，负责图关系存储和遍历查询
+  technology: Python + neo4j-driver
+
+knowledge:
+  responsibility: 封装 Neo4j 操作，提供节点和关系管理，支持 Cypher 查询
+  interfaces:
+    - name: create_node
+      description: 创建或更新节点
+    - name: create_relationship
+      description: 创建关系
+    - name: query_upstream
+      description: 查询上游依赖
+    - name: query_downstream
+      description: 查询下游被依赖
+    - name: execute_cypher
+      description: 执行原生 Cypher 查询

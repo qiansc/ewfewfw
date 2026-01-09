@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Bash",
+      "mcp__c4a-dsl-mcp__c4a_dsl_parse",
+      "mcp__c4a-dsl-mcp__c4a_dsl_validate",
+      "mcp__c4a-dsl-mcp__c4a_dsl_generate",
+      "mcp__c4a-dsl-mcp__c4a_dsl_schema",
+      "mcp__c4a-dsl-mcp__c4a_local_init_repo",
+      "mcp__c4a-dsl-mcp__c4a_local_list_files",
+      "mcp__c4a-dsl-mcp__c4a_local_read_file",
+      "mcp__c4a-dsl-mcp__c4a_local_write_file",
+      "mcp__c4a-dsl-mcp__c4a_local_transition_status",
+      "mcp__c4a-data-mcp__c4a_db_get_entity",
+      "mcp__c4a-data-mcp__c4a_db_save_entity",
+      "mcp__c4a-data-mcp__c4a_db_delete_entity",
+      "mcp__c4a-data-mcp__c4a_db_search_semantic",
+      "mcp__c4a-data-mcp__c4a_db_query_deps",
+      "mcp__c4a-data-mcp__c4a_db_query_impact",
+      "mcp__c4a-data-mcp__c4a_db_exec_cypher",
+      "mcp__c4a-data-mcp__c4a_db_sync_file",
+      "mcp__c4a-data-mcp__c4a_db_sync_local",
+      "mcp__c4a-code-mcp__c4a_code_extract",
+      "mcp__c4a-code-mcp__c4a_code_analyze",
+      "mcp__c4a-code-mcp__c4a_code_ast",
+      "mcp__c4a-code-mcp__c4a_code_contract"
+    ],
+    "deny": [
+    ]
+  }
+}

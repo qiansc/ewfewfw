@@ -1,0 +1,21 @@
+schema: c4a/v1
+type: component
+
+component:
+  id: embedder
+  name: Embedder Service
+  description: Embedding 服务封装，将文本转换为向量表示
+  technology: Python + httpx
+
+knowledge:
+  responsibility: 调用外部 Embedding 服务，将文本转换为 1536 维向量
+  how:
+    description: |
+      支持两种模式：
+      1. 远程服务 - 调用部署的 embedding-service
+      2. 本地模型 - 使用 sentence-transformers
+  interfaces:
+    - name: embed
+      description: 将文本转换为向量
+    - name: batch_embed
+      description: 批量向量化

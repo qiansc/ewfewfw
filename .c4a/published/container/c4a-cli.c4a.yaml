@@ -1,0 +1,44 @@
+schema: c4a/v1
+type: container
+
+container:
+  id: c4a-cli
+  name: C4A CLI
+  description: |
+    交互式命令行工具，提供开发和运维操作的统一入口。
+
+  technology:
+    language: TypeScript
+    framework: Ink (React for CLI)
+    runtime: Bun
+    protocol: CLI
+
+relationships:
+  - to: c4a-dsl-mcp
+    description: 启动/停止 DSL MCP 服务
+    technology: Process Management
+  - to: c4a-code-mcp
+    description: 启动/停止 Code MCP 服务
+    technology: Process Management
+  - to: c4a-data-mcp
+    description: 启动/停止 Data MCP 服务
+    technology: Process Management / Docker
+
+knowledge:
+  how:
+    description: |
+      使用方法:
+      - ./start.sh          交互式菜单
+      - ./start.sh dev      开发模式
+      - ./start.sh docker   全 Docker 模式
+      - ./start.sh prod     生产模式
+      - ./start.sh debug:dsl   调试 DSL MCP
+      - ./start.sh status   查看服务状态
+      - ./start.sh stop     停止服务
+  links:
+    - type: repository
+      url: ./packages/cli
+      description: 源码目录
+    - type: documentation
+      url: ./rfc2/10-cli-upgrade.md
+      description: CLI 升级方案

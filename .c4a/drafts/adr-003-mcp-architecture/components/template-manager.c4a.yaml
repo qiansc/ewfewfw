@@ -1,0 +1,16 @@
+schema: c4a/v1
+type: component
+
+component:
+  id: template-manager
+  name: Template Manager
+  description: DSL 模板管理组件，提供各类型 DSL 的模板定义和渲染能力
+  technology: TypeScript
+
+knowledge:
+  responsibility: 管理 system/container/component/adr 模板，支持变量替换渲染
+  interfaces:
+    - name: getTemplate
+      description: 获取指定类型的模板内容
+    - name: renderTemplate
+      description: 将模板内容与变量合并渲染

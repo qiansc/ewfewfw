@@ -1,0 +1,86 @@
+schema: c4a/v1
+type: adr
+adr:
+  id: ADR-001
+  title: C4A v2 架构重构 - 基于 Agent + MCP 的架构设计
+  status: published
+  date: 2026-01-07
+  authors:
+    - C4A Team
+  reviewers:
+    - C4A ADR Reviewer
+  approved_by: C4A ADR Reviewer
+context: |
+  C4A (Context For AI) 是一个架构知识管理平台，为 AI Agent 和企业开发团队提供架构知识的生产与消费能力。
+
+  核心需求：
+  1. 支持多种 Agent 基座（OpenCode、Claude Code SDK、Cursor 等）
+  2. 核心能力需要可被任意 Agent 调用
+  3. 支持本地开发和容器化部署
+  4. 基于 C4 模型扩展的 DSL 定义架构知识
+decision: |
+  采用 Agent + MCP (Model Context Protocol) 架构：
+
+  1. **Agent 化**
+     - 将核心能力拆分为独立 Agent，通过 Agent Runtime 编排
+     - 支持 Primary Agent（用户交互）和 Subagent（专业领域）模式
+     - Agent 行为通过 Prompt 文件定义，便于维护和扩展
+
+  2. **MCP 优先**
+     - 所有工具能力通过 MCP Server 暴露，支持跨 Agent 复用
+     - 采用 Stdio（开发）和 Streamable HTTP（部署）双模式
+     - MCP Server 按领域分治：TypeScript 处理 DSL/代码，Python 处理数据存储
+
+  3. **配置驱动**
+     - 统一配置 `c4a.config.yaml` 作为所有基座配置的源
+     - 配置生成器按需输出各基座配置（OpenCode、Claude SDK、Cursor）
+
+  4. **本地优先 + 三库同步**
+     - DSL 文件存放在 `.c4a/` 目录，便于版本控制和人工审阅
+     - 发布后同步到 MongoDB（主存储）+ Neo4j（图索引）+ Milvus（向量索引）
+
+  5. **技术栈**
+     - 核心语言: TypeScript + Bun（生态成熟，类型安全）
+     - 数据服务: Python（Neo4j/Milvus SDK 更成熟）
+     - Agent 运行时: 多基座兼容，默认 OpenCode
+consequences:
+  positive:
+    - 核心能力可被任意支持 MCP 的 Agent 调用，不再绑定特定框架
+    - 支持本地开发（Stdio）和远程部署（HTTP）双模式
+    - DSL 文件本地存储，便于版本控制和 Code Review
+    - 配置驱动设计，切换 Agent 基座只需运行生成器
+  negative:
+    - 需要维护多个 MCP Server，增加运维复杂度
+    - 三库同步机制增加了数据一致性的复杂度
+  neutral:
+    - 采用 Monorepo 管理多个 package
+    - TypeScript 为主，Python 处理特殊领域
+alternatives:
+  - name: 全部使用 Python 实现 MCP Server
+    description: 统一使用 Python 实现所有 MCP Server
+    pros:
+      - 技术栈统一
+    cons:
+      - TypeScript/Bun 在 Agent 生态中更成熟
+      - JSON Schema 和 YAML 处理 TypeScript 更方便
+  - name: 使用 LangChain 替代 MCP
+    description: 使用 LangChain/LangGraph 生态
+    pros:
+      - 功能丰富
+      - 社区活跃
+    cons:
+      - 框架绑定
+      - MCP 是 Anthropic 官方协议，更适合 Claude 生态
+content: |
+  ## 实施步骤
+
+  1. Phase 1: 创建 Monorepo 结构，配置 Docker Compose
+  2. Phase 2: 实现三个 MCP Server（DSL 处理、代码分析、数据服务）
+  3. Phase 3: 创建 Agent Prompts，配置生成器
+  4. Phase 4: UC 验证（UC1-UC5）
+  5. Phase 5: 更新文档
+
+  ## 参考资料
+
+  - [RFC v2 设计文档索引](./rfc2/index.md)
+  - [架构总览](./rfc2/01-overview.md)

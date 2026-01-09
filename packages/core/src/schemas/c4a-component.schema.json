@@ -1,0 +1,117 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://c4a.dev/schema/c4a-component.schema.json",
+  "title": "C4A Component Schema",
+  "description": "C4A DSL Component 层定义",
+
+  "type": "object",
+  "required": ["schema", "type", "component"],
+  "additionalProperties": false,
+
+  "properties": {
+    "schema": {
+      "const": "c4a/v1",
+      "description": "Schema 版本"
+    },
+
+    "type": {
+      "const": "component",
+      "description": "实体类型"
+    },
+
+    "component": {
+      "type": "object",
+      "required": ["id", "name", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "组件唯一标识"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "组件名称（通常是类名）"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "组件描述"
+        },
+        "technology": {
+          "type": "string",
+          "description": "实现技术或设计模式"
+        }
+      }
+    },
+
+    "relationships": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["to"],
+        "additionalProperties": false,
+        "properties": {
+          "to": {
+            "type": "string",
+            "description": "目标组件 ID"
+          },
+          "description": {
+            "type": "string",
+            "description": "关系描述"
+          }
+        }
+      },
+      "description": "组件间依赖关系"
+    },
+
+    "knowledge": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "responsibility": {
+          "type": "string",
+          "description": "职责说明"
+        },
+        "api_tag": {
+          "type": "string",
+          "description": "对应 OpenAPI 的 tag"
+        },
+        "how": {
+          "type": "object",
+          "properties": {
+            "description": {
+              "type": "string",
+              "description": "实现说明"
+            }
+          },
+          "additionalProperties": true
+        },
+        "interfaces": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "方法名"
+              },
+              "description": {
+                "type": "string",
+                "description": "方法描述"
+              }
+            }
+          },
+          "description": "关键方法列表"
+        }
+      },
+      "description": "组件级知识附加（简化版）"
+    }
+  }
+}

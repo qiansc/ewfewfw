@@ -1,0 +1,29 @@
+schema: c4a/v1
+type: container
+
+container:
+  id: c4a-core
+  name: C4A Core Library
+  description: |
+    共享核心库，提供 DSL 类型定义、Schema 验证、工具函数。
+
+  technology:
+    language: TypeScript
+    framework: Zod + AJV
+    runtime: Bun
+    protocol: Library
+
+relationships: []
+
+knowledge:
+  how:
+    description: |
+      提供的能力:
+      - DSL TypeScript 类型定义
+      - JSON Schema 验证函数
+      - YAML 解析工具
+      - 类型转换工具
+  links:
+    - type: repository
+      url: ./packages/core
+      description: 源码目录

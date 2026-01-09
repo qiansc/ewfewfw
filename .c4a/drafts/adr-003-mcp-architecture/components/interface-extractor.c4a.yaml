@@ -1,0 +1,18 @@
+schema: c4a/v1
+type: component
+
+component:
+  id: interface-extractor
+  name: Interface Extractor
+  description: 接口提取工具，从代码中提取所有接口、类型定义
+  technology: TypeScript + fast-glob
+
+relationships:
+  - to: code-parser
+    description: 使用 parseFile 获取接口信息
+
+knowledge:
+  responsibility: 批量提取代码中的接口和类型定义，支持递归扫描
+  interfaces:
+    - name: extract
+      description: 提取目录下所有接口和类型定义

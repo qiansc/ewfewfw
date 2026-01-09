@@ -1,0 +1,49 @@
+/.idea
+/.tmp
+/archive
+.claude/commands/c4a
+/rfc2
+.cursor
+
+# TTADK Standard Patterns
+node_modules/
+vendor/
+dist/
+build/
+*.pyc
+__pycache__/
+.env
+.env.local
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+coverage/
+.nyc_output/
+sourcecode/
+
+# Bun
+bun.lockb
+
+# Python
+.venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# C4A 生成的配置 (由 c4a.config.yaml 生成)
+.opencode/
+.claude/commands/c4a
+.cursorrules
+.mcp.json
+
+# C4A 本地目录（不需要版本控制的）
+.c4a/logs/
+.c4a/cache/
+.c4a/research/
+

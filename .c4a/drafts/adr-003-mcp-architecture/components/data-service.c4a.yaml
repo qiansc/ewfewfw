@@ -1,0 +1,34 @@
+schema: c4a/v1
+type: component
+
+component:
+  id: data-service
+  name: Data Service
+  description: 数据服务核心，协调三库（MongoDB/Neo4j/Milvus）的统一操作
+  technology: Python + asyncio
+
+relationships:
+  - to: mongodb-client
+    description: 文档存储和查询
+  - to: neo4j-client
+    description: 图关系存储和遍历
+  - to: milvus-client
+    description: 向量存储和语义检索
+  - to: embedder
+    description: 获取文本向量
+
+knowledge:
+  responsibility: 提供实体 CRUD、语义搜索、依赖查询、影响分析等统一 API
+  interfaces:
+    - name: save_entity
+      description: 保存实体，自动同步三库
+    - name: get_entity
+      description: 查询实体
+    - name: delete_entity
+      description: 删除实体，级联清理三库
+    - name: search_semantic
+      description: 语义搜索
+    - name: query_deps
+      description: 查询依赖关系
+    - name: query_impact
+      description: 影响分析

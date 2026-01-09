@@ -1,0 +1,18 @@
+schema: c4a/v1
+type: component
+
+component:
+  id: ast-provider
+  name: AST Provider
+  description: AST 提供组件，返回代码的抽象语法树结构
+  technology: TypeScript
+
+relationships:
+  - to: code-parser
+    description: 使用 extractAST 获取 AST
+
+knowledge:
+  responsibility: 提供代码 AST，支持深度限制和节点类型过滤
+  interfaces:
+    - name: getAST
+      description: 获取文件 AST，支持 maxDepth 和 nodeTypes 过滤

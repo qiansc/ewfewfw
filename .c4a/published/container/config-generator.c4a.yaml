@@ -1,0 +1,75 @@
+schema: c4a/v1
+type: container
+
+container:
+  id: config-generator
+  name: C4A Config Generator
+  description: |
+    配置生成器，从统一配置 c4a.config.yaml 生成各 Agent 基座的配置文件。
+    
+    采用适配器模式，支持多平台配置生成，包含工具名称解析器处理通配符展开和格式转换。
+
+  technology:
+    language: TypeScript
+    framework: Zod
+    runtime: Bun
+    protocol: CLI
+
+relationships:
+  - to: c4a.config.yaml
+    description: 读取统一配置源文件
+    technology: YAML Parser
+  - to: c4a-core
+    description: 使用共享的 Zod Schema 验证能力
+    technology: TypeScript Import
+
+knowledge:
+  how:
+    description: |
+      ## 架构设计
+
+      采用适配器模式，核心模块：
+      - ConfigGenerator: 主生成器，协调各适配器
+      - BaseAdapter: 适配器抽象基类
+      - OpencodeAdapter: OpenCode 平台适配器
+      - ClaudeSdkAdapter: Claude Code SDK 适配器
+      - CursorAdapter: Cursor 平台适配器
+      - toolResolver: 工具名称解析器
+
+      ## 工具名称解析器 (toolResolver)
+
+      支持通配符展开和格式转换：
+
+      **KNOWN_TOOLS 静态映射表：**
+      - c4a_dsl: c4a_dsl_parse, c4a_dsl_validate, c4a_dsl_generate, c4a_dsl_schema
+      - c4a_code: c4a_code_extract, c4a_code_analyze, c4a_code_ast, c4a_code_contract
+      - c4a_local: c4a_local_init_repo, c4a_local_list_files, c4a_local_read_file, c4a_local_write_file, c4a_local_transition_status
+      - c4a_db: c4a_db_save_entity, c4a_db_get_entity, c4a_db_delete_entity, c4a_db_search_semantic, c4a_db_query_deps, c4a_db_query_impact, c4a_db_sync_file, c4a_db_sync_local, c4a_db_exec_cypher
+
+      **Claude SDK 格式转换：**
+      - 系统工具首字母大写: read → Read, edit → Edit, bash → Bash
+      - MCP 工具添加前缀: c4a_xxx → mcp__c4a_xxx
+
+      ## 支持的目标平台
+
+      - OpenCode: 生成 .opencode/opencode.json + .opencode/command/*.md
+      - Claude Code: 生成 .mcp.json + .claude/settings.json + .claude/commands/*.md
+      - Cursor: 生成 .cursorrules
+
+      ## 使用方法
+
+      - bun run config:generate                    生成所有平台配置
+      - bun run config:generate --target opencode 仅生成 OpenCode
+      - bun run config:generate --target claude-sdk 仅生成 Claude SDK
+      - bun run config:validate                   验证配置
+
+      ## 相关决策
+
+      参见 ADR-002: 多基座兼容设计
+  links:
+    - type: repository
+      url: ./packages/config-generator
+      description: 源码目录
+    - type: documentation
+      url: ./rfc2/04-config-portability.md
+      description: 配置可移植性设计
