@@ -1,0 +1,31 @@
+schema: c4a/v1
+type: component
+component:
+  id: cli-confirm-dialog
+  name: CLI Confirm Dialog
+  description: 确认对话框组件，用于危险操作前的用户确认
+  technology: TypeScript + React (Ink)
+relationships:
+  - to: cli-command-handler
+    description: 被 clean 等危险命令调用
+knowledge:
+  responsibility: 提供终端交互式确认对话框，支持键盘选择和快捷键
+  how:
+    description: |
+      源码位置: packages/cli/src/components/ConfirmDialog.tsx
+
+      功能特性:
+      - 显示操作标题、说明、影响项列表、警告信息
+      - 支持 ←→ 方向键切换 是/否
+      - 支持 Y/N 快捷键直接选择
+      - 默认选中"否"防止误操作
+
+      使用场景:
+      - clean:storage - 清理远程存储前确认
+      - clean:local - 清理本地文件前确认
+      - clean:all - 清理所有数据前确认
+  interfaces:
+    - name: confirm
+      description: 显示确认对话框并返回 Promise<boolean>
+    - name: ConfirmDialogComponent
+      description: React 对话框组件

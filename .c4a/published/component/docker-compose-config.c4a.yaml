@@ -1,0 +1,60 @@
+schema: c4a/v1
+type: component
+component:
+  id: docker-compose-config
+  name: Docker Compose Config
+  description: Docker Compose 编排配置，定义所有服务的容器化部署方式
+  technology: Docker Compose
+knowledge:
+  responsibility: 定义 C4A 平台的容器编排，包括存储服务、MCP 服务和网络配置
+  how:
+    description: |
+      源码位置: docker/docker-compose.yml
+
+      ## 服务分组
+
+      **存储服务（默认启动）:**
+      - mongodb: 文档存储 (mongo:7.0)
+      - neo4j: 图数据库 (neo4j:5-community)
+      - milvus: 向量数据库 (milvusdb/milvus:v2.5.4)
+      - ollama: Embedding 服务 (ollama/ollama:latest)
+      - ollama-init: 模型初始化（一次性）
+
+      **MCP 服务（profile: mcp/prod）:**
+      - c4a-dsl-mcp: DSL 解析服务 (端口 8051)
+      - c4a-code-mcp: 代码分析服务 (端口 8052)
+      - c4a-data-mcp: 数据服务 (端口 8050)
+
+      ## 启动模式
+
+      - 开发模式: docker compose up mongodb neo4j milvus ollama
+      - 全服务模式: docker compose --profile mcp up
+      - 生产模式: docker compose --profile prod up
+
+      ## 数据卷
+
+      - mongodb_data: MongoDB 数据
+      - neo4j_data: Neo4j 数据
+      - milvus_data: Milvus 数据和索引
+      - ollama_data: Ollama 模型缓存
+
+      ## 网络
+
+      网络名: c4a-network
+      所有服务在同一网络内，可通过容器名互访
+
+      ## Dockerfile
+
+      - Dockerfile.data: Python MCP 服务 (mcp-data)
+      - Dockerfile.mcp-ts: TypeScript MCP 服务 (mcp-dsl, mcp-code)
+  interfaces:
+    - name: services
+      description: 服务定义
+    - name: volumes
+      description: 数据卷定义
+    - name: profiles
+      description: 启动配置文件 (mcp, prod)
+  links:
+    - type: repository
+      url: ./docker/docker-compose.yml
+      description: Docker Compose 配置文件

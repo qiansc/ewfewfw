@@ -1,0 +1,27 @@
+schema: c4a/v1
+type: component
+component:
+  id: core-utils
+  name: Core Utils
+  description: 核心工具函数，提供 DSL 解析、序列化和通用工具
+  technology: TypeScript + yaml
+knowledge:
+  responsibility: 提供 DSL 解析、序列化、ID 生成、时间戳等通用工具函数
+  how:
+    description: |
+      源码位置: packages/core/src/utils/index.ts
+
+      提供的工具函数:
+      - parseDSL<T>(): 解析 YAML 字符串为 DSL 对象
+      - stringifyDSL(): 将 DSL 对象序列化为 YAML 字符串
+      - generateId(): 生成唯一 ID（格式: prefix-timestamp-random）
+      - now(): 获取当前 ISO 时间戳
+  interfaces:
+    - name: parseDSL
+      description: 解析 YAML 为 DSL 对象
+    - name: stringifyDSL
+      description: 序列化 DSL 为 YAML
+    - name: generateId
+      description: 生成唯一 ID
+    - name: now
+      description: 获取当前时间戳

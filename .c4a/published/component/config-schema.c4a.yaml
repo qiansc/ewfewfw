@@ -1,0 +1,27 @@
+schema: c4a/v1
+type: component
+component:
+  id: config-schema
+  name: Config Schema
+  description: 统一配置 Schema 定义，使用 Zod 定义 c4a.config.yaml 的类型约束
+  technology: TypeScript + Zod
+relationships:
+  - to: config-validator
+    description: 提供 Schema 供验证使用
+knowledge:
+  responsibility: 定义统一配置的 Zod Schema，包括 agents、mcpServers、instructions 等字段
+  how:
+    description: |
+      源码位置: packages/config-generator/src/schema.ts
+
+      定义 UnifiedConfigSchema，包含:
+      - version: 配置版本号
+      - instructions: 项目说明文件列表
+      - agents: Agent 定义映射
+      - mcpServers: MCP Server 配置
+      - defaultAgent: 默认 Agent
+  interfaces:
+    - name: UnifiedConfigSchema
+      description: Zod Schema 对象
+    - name: UnifiedConfig
+      description: TypeScript 类型定义

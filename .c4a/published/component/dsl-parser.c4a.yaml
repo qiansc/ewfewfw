@@ -1,0 +1,15 @@
+schema: c4a/v1
+type: component
+component:
+  id: dsl-parser
+  name: DSL Parser
+  description: DSL 解析组件，将 YAML 内容解析为结构化对象
+  technology: TypeScript + yaml
+relationships:
+  - to: c4a-core
+    description: 使用 parseDSL 函数
+knowledge:
+  responsibility: 解析 C4A DSL YAML 文件，返回结构化对象
+  interfaces:
+    - name: parseHandler
+      description: 解析 DSL 内容，支持 system/container/component/adr/contract 类型

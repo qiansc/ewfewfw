@@ -1,0 +1,41 @@
+schema: c4a/v1
+type: component
+component:
+  id: internal-types
+  name: Internal Types
+  description: 内部业务类型定义，与 DSL 文件类型不同，用于运行时业务逻辑
+  technology: TypeScript
+relationships:
+  - to: dsl-types
+    description: 与 DSL 类型对应，通过 converter 转换
+  - to: dsl-converter
+    description: 被转换器使用
+knowledge:
+  responsibility: 定义 C4A 运行时使用的内部数据类型
+  how:
+    description: |
+      源码位置: packages/core/src/types/index.ts
+
+      与 DSL 类型的区别:
+      - DSL 类型 (types/dsl.ts): 与 YAML 文件结构一致，用于解析
+      - 内部类型 (types/index.ts): 扁平化结构，用于业务逻辑
+
+      核心类型:
+      - C4ASystem, C4AContainer, C4AComponent: 实体类型
+      - C4AADR, C4AContract: ADR 和契约类型
+      - Relation: 关系定义
+      - Knowledge: 知识附加（examples, risks, constraints 等）
+
+      枚举类型:
+      - RelationType: uses, depends_on, calls, sends, receives, stores
+      - ADRStatus: draft, approved, deprecated
+      - ContractFormat: openapi, asyncapi, proto, graphql, custom
+  interfaces:
+    - name: C4ASystem
+      description: 系统内部类型
+    - name: C4AContainer
+      description: 容器内部类型
+    - name: C4AComponent
+      description: 组件内部类型
+    - name: Knowledge
+      description: 知识附加类型

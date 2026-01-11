@@ -1,0 +1,26 @@
+schema: c4a/v1
+type: component
+component:
+  id: embedding-service
+  name: Embedding Service
+  description: 向量嵌入服务抽象层，支持多种 Embedding 提供者（OpenAI、Ollama）
+  technology: Python + httpx
+relationships:
+  - to: milvus-client
+    description: 为向量存储提供 embedding 向量
+knowledge:
+  responsibility: |
+    提供文本向量化能力，支持多种后端：
+    - OpenAI (text-embedding-3-small, 1536 维)
+    - Ollama (nomic-embed-text, 768 维)
+    优先级: OPENAI_API_KEY > OLLAMA_HOST > None
+  how:
+    description: |
+      源码位置: clients/embedding_service.py
+  interfaces:
+    - name: embed
+      description: 将文本转换为向量
+    - name: embed_document
+      description: 将 C4A 文档转换为向量
+    - name: get_embedding_service
+      description: 工厂函数，根据环境变量选择合适的提供者

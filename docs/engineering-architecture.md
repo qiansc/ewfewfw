@@ -106,9 +106,15 @@ DSL 解析与验证服务。
 
 | 工具 | 功能 |
 |------|------|
-| `parse_dsl` | 解析 C4A DSL 文件 |
-| `validate_dsl` | 验证 DSL 语法和语义 |
-| `generate_schema` | 生成 JSON Schema |
+| `c4a_dsl_parse` | 解析 C4A DSL 文件 (YAML → Object) |
+| `c4a_dsl_validate` | 验证 DSL 正确性 |
+| `c4a_dsl_generate` | 生成 DSL 模板 |
+| `c4a_dsl_schema` | 获取 JSON Schema |
+| `c4a_local_init_repo` | 初始化 .c4a/ 目录结构 |
+| `c4a_local_list_files` | 列出本地架构知识文件 |
+| `c4a_local_read_file` | 读取本地 DSL 文件 |
+| `c4a_local_write_file` | 写入本地 DSL 文件 |
+| `c4a_local_transition_status` | 流转 DSL 状态 |
 
 **传输模式**：
 - stdio（开发调试）
@@ -120,9 +126,10 @@ DSL 解析与验证服务。
 
 | 工具 | 功能 |
 |------|------|
-| `extract_structure` | 提取代码结构 |
-| `find_dependencies` | 分析依赖关系 |
-| `match_contracts` | 匹配契约定义 |
+| `c4a_code_extract` | 从代码提取接口、类型、类定义 |
+| `c4a_code_analyze` | 分析代码结构和依赖关系 |
+| `c4a_code_ast` | 获取代码的 AST 结构 |
+| `c4a_code_contract` | 从代码生成 API 契约 (OpenAPI/AsyncAPI/Proto) |
 
 **传输模式**：
 - stdio（开发调试）
@@ -134,10 +141,15 @@ DSL 解析与验证服务。
 
 | 工具 | 功能 |
 |------|------|
-| `save_knowledge` | 保存知识到 MongoDB |
-| `query_graph` | 查询 Neo4j 关系图 |
-| `semantic_search` | Milvus 语义搜索 |
-| `sync_indexes` | 同步索引 |
+| `c4a_db_save_entity` | 保存/更新 C4A 文档，自动同步三库 |
+| `c4a_db_get_entity` | 从 MongoDB 查询 C4A 文档 |
+| `c4a_db_delete_entity` | 删除 C4A 文档，级联清理三库 |
+| `c4a_db_search_semantic` | 语义搜索 C4A 知识库 (Milvus) |
+| `c4a_db_query_deps` | 查询实体的依赖关系 (Neo4j) |
+| `c4a_db_query_impact` | 分析实体变更的影响范围 |
+| `c4a_db_exec_cypher` | 执行原生 Cypher 查询 |
+| `c4a_db_sync_file` | 同步单个 DSL 文件到三库 |
+| `c4a_db_sync_local` | 批量同步本地 .c4a/ 目录到三库 |
 
 **传输模式**：
 - stdio（开发调试）
@@ -161,6 +173,7 @@ packages/cli/
 │   │   ├── Header.tsx         # 标题栏
 │   │   ├── CascadeMenu.tsx    # 级联菜单
 │   │   ├── HelpPanel.tsx      # 帮助面板
+│   │   ├── ConfirmDialog.tsx  # 确认对话框
 │   │   └── index.ts           # 组件导出
 │   └── utils/
 │       ├── docker.ts          # Docker 操作
@@ -278,7 +291,7 @@ packages/cli/
 | 代码提取 | Tree-sitter | 多语言 AST 解析 |
 | 主存储 | MongoDB 7.0 | 文档存储 |
 | Graph 存储 | Neo4j 5.x | 架构关系 |
-| Vector 存储 | Milvus 2.4 | 语义索引 |
+| Vector 存储 | Milvus 2.5 | 语义索引 |
 
 ## MCP 传输协议
 

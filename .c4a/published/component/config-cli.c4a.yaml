@@ -1,0 +1,33 @@
+schema: c4a/v1
+type: component
+component:
+  id: config-cli
+  name: Config Generator CLI
+  description: 配置生成器命令行入口，解析参数并执行生成/验证命令
+  technology: TypeScript
+relationships:
+  - to: config-generator-core
+    description: 调用 ConfigGenerator 执行生成
+  - to: config-validator
+    description: 调用验证功能
+knowledge:
+  responsibility: 提供配置生成器的 CLI 接口，支持多种命令和选项
+  how:
+    description: |
+      源码位置: packages/config-generator/src/index.ts
+
+      命令:
+      - generate: 生成配置文件
+      - validate: 验证配置文件
+
+      选项:
+      - --target/-t: 目标平台 (opencode, claude-sdk, cursor, all)
+      - --config/-c: 配置文件路径 (默认 c4a.config.yaml)
+      - --output/-o: 输出目录
+      - --dry-run: 预览模式，不写入文件
+      - --verbose/-v: 详细日志
+  interfaces:
+    - name: parseArgs
+      description: 解析命令行参数
+    - name: main
+      description: CLI 主入口函数

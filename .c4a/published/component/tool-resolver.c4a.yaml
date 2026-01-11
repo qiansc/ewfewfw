@@ -1,0 +1,38 @@
+schema: c4a/v1
+type: component
+component:
+  id: tool-resolver
+  name: Tool Resolver
+  description: 工具名称解析器，处理通配符展开和格式转换
+  technology: TypeScript
+knowledge:
+  responsibility: 展开工具通配符（如 c4a_dsl_*），转换工具名称格式（如添加 mcp__ 前缀）
+  how:
+    description: >
+      源码位置: packages/config-generator/src/toolResolver.ts
+
+
+      KNOWN_TOOLS 静态映射表:
+
+      - c4a_dsl: c4a_dsl_parse, c4a_dsl_validate, c4a_dsl_generate,
+      c4a_dsl_schema
+
+      - c4a_code: c4a_code_extract, c4a_code_analyze, c4a_code_ast,
+      c4a_code_contract
+
+      - c4a_local: c4a_local_init_repo, c4a_local_list_files,
+      c4a_local_read_file, c4a_local_write_file, c4a_local_transition_status
+
+      - c4a_db: c4a_db_save_entity, c4a_db_get_entity, ...
+
+
+      格式转换规则:
+
+      - Claude SDK: c4a_xxx → mcp__c4a_xxx
+
+      - 系统工具: read → Read, edit → Edit
+  interfaces:
+    - name: expandWildcard
+      description: 展开通配符为具体工具列表
+    - name: formatToolName
+      description: 格式化工具名称

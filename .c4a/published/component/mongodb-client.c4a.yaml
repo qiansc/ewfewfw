@@ -1,0 +1,19 @@
+schema: c4a/v1
+type: component
+component:
+  id: mongodb-client
+  name: MongoDB Client
+  description: MongoDB 客户端，负责文档存储和查询
+  technology: Python + motor (async MongoDB driver)
+knowledge:
+  responsibility: 封装 MongoDB 异步操作，提供文档 CRUD
+  how:
+    description: |
+      源码位置: clients/mongodb_client.py
+  interfaces:
+    - name: save
+      description: 保存文档（upsert）
+    - name: find
+      description: 查询文档
+    - name: delete
+      description: 删除文档

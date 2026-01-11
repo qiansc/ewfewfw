@@ -1,0 +1,23 @@
+schema: c4a/v1
+type: component
+component:
+  id: ajv-validator
+  name: AJV Validator
+  description: AJV JSON Schema 验证器实例，提供 DSL 文件的结构验证能力
+  technology: TypeScript + AJV
+knowledge:
+  responsibility: 初始化 AJV 实例，加载 JSON Schema，提供 DSL 验证函数
+  how:
+    description: |
+      源码位置: packages/core/src/validator/ajvInstance.ts
+
+      功能:
+      - 创建配置好的 AJV 实例
+      - 加载 system/container/component/adr 的 JSON Schema
+      - 提供 validateDSL 函数进行验证
+      - 返回格式化的验证错误信息
+  interfaces:
+    - name: ajv
+      description: AJV 实例
+    - name: validateDSL
+      description: 验证 DSL 函数
