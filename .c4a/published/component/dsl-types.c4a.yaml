@@ -1,0 +1,29 @@
+schema: c4a/v1
+type: component
+component:
+  id: dsl-types
+  name: DSL Types
+  description: DSL TypeScript 类型定义，定义 System/Container/Component/ADR 的类型结构
+  technology: TypeScript
+knowledge:
+  responsibility: 提供 C4A DSL 的 TypeScript 类型定义，供其他模块类型检查使用
+  how:
+    description: |
+      源码位置: packages/core/src/types/dsl.ts
+
+      定义的类型:
+      - SystemDSL: 系统层定义
+      - ContainerDSL: 容器层定义
+      - ComponentDSL: 组件层定义
+      - ADRDSL: ADR 定义
+      - Relationship: 关系定义
+      - Knowledge: 知识附加定义
+  interfaces:
+    - name: SystemDSL
+      description: 系统 DSL 类型
+    - name: ContainerDSL
+      description: 容器 DSL 类型
+    - name: ComponentDSL
+      description: 组件 DSL 类型
+    - name: ADRDSL
+      description: ADR DSL 类型

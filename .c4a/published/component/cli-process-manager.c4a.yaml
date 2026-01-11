@@ -1,0 +1,28 @@
+schema: c4a/v1
+type: component
+component:
+  id: cli-process-manager
+  name: CLI Process Manager
+  description: 进程管理工具，处理后台进程的启动、停止和状态查询
+  technology: TypeScript + Node.js child_process
+knowledge:
+  responsibility: 管理 mcp-data、ttyd 等后台进程，使用 PID 文件跟踪进程状态
+  how:
+    description: |
+      源码位置: packages/cli/src/utils/process.ts
+
+      PID 文件存放在 .c4a/logs/ 目录:
+      - mcp-data.pid: mcp-data 进程 ID
+      - ttyd.pid: ttyd Web 终端进程 ID
+
+      提供的功能:
+      - 启动后台进程并记录 PID
+      - 通过 PID 文件检查进程状态
+      - 停止进程并清理 PID 文件
+  interfaces:
+    - name: startProcess
+      description: 启动后台进程
+    - name: stopProcess
+      description: 停止后台进程
+    - name: isProcessRunning
+      description: 检查进程是否运行

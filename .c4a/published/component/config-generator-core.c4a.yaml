@@ -1,0 +1,32 @@
+schema: c4a/v1
+type: component
+component:
+  id: config-generator-core
+  name: Config Generator Core
+  description: 配置生成器核心，协调各适配器生成目标平台配置
+  technology: TypeScript
+relationships:
+  - to: config-schema
+    description: 使用 Schema 解析配置
+  - to: opencode-adapter
+    description: 生成 OpenCode 配置
+  - to: claudesdk-adapter
+    description: 生成 Claude SDK 配置
+  - to: cursor-adapter
+    description: 生成 Cursor 配置
+knowledge:
+  responsibility: 读取 c4a.config.yaml，调用各适配器生成目标平台配置文件
+  how:
+    description: |
+      源码位置: packages/config-generator/src/generator.ts
+
+      生成流程:
+      1. 读取并解析 c4a.config.yaml
+      2. 验证配置正确性
+      3. 根据 --target 参数选择适配器
+      4. 调用适配器生成配置文件
+  interfaces:
+    - name: ConfigGenerator
+      description: 配置生成器类
+    - name: generate
+      description: 执行配置生成

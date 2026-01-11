@@ -1,0 +1,90 @@
+schema: c4a/v1
+type: adr
+adr:
+  id: ADR-003
+  title: MCP 服务架构设计 - 三层服务与本地存储工具
+  status: published
+  date: 2026-01-07
+  authors:
+    - C4A Team
+  reviewers: []
+  approved_by: User
+context: |
+  C4A 需要通过 MCP (Model Context Protocol) 暴露工具能力，供 Agent 调用。
+
+  需要解决：
+  1. 如何划分 MCP Server 职责边界
+  2. 如何处理 MongoDB/Neo4j/Milvus 三库数据一致性
+  3. Agent 如何操作本地 `.c4a/` 目录的 DSL 文件
+  4. 开发模式（Stdio）和部署模式（HTTP）如何切换
+decision: |
+  采用三层 MCP Server 架构 + 本地存储工具：
+
+  1. **c4a-dsl-mcp (TypeScript)**
+     - 职责: DSL 解析、验证、生成、模板管理
+     - 本地存储: 仓库初始化、文件读写、状态流转
+     - 选型理由: JSON Schema 和 YAML 处理生态成熟
+
+  2. **c4a-code-mcp (TypeScript)**
+     - 职责: 代码结构提取、依赖分析、契约生成
+     - 选型理由: Tree-sitter 绑定成熟，支持多语言解析
+
+  3. **c4a-data-mcp (Python)**
+     - 职责: 统一数据服务，封装三库操作
+     - 核心能力: 实体存取、语义搜索、依赖查询、影响分析
+     - 选型理由: pymongo/neo4j/pymilvus SDK 更成熟
+     - 关键设计: 写入时自动同步 MongoDB + Neo4j + Milvus
+
+  4. **双模式传输**
+     - 开发模式: Stdio (被 Agent 自动拉起)
+     - 部署模式: Streamable HTTP (容器化部署)
+
+  5. **本地存储设计**
+     - `.c4a/` 目录存放 DSL 文件
+     - 按状态组织: drafts → approved → published → archive
+     - MCP 工具是 Agent 操作本地文件的唯一入口
+consequences:
+  positive:
+    - 职责清晰，前端逻辑与数据存储分离
+    - 三库同步封装在 data-mcp 内部，Agent 无需关心细节
+    - 本地存储工具封装了目录结构，Agent 不依赖先验知识
+    - 双模式传输支持本地开发和远程部署
+  negative:
+    - 需要维护 TypeScript 和 Python 两套代码
+    - 工具数量较多，Agent 需要一定学习成本
+  neutral:
+    - Embedding 服务支持 OpenAI API 优先，Ollama 备选
+    - 各服务独立端口，便于独立扩展
+alternatives:
+  - name: 合并为单一 MCP Server
+    description: 将所有工具放在一个 MCP Server 中
+    pros:
+      - 部署简单
+      - 无跨服务调用
+    cons:
+      - 代码臃肿
+      - 无法按语言分治
+      - 升级影响面大
+  - name: 将三库分为三个 MCP Server
+    description: MongoDB、Neo4j、Milvus 各一个 MCP Server
+    pros:
+      - 职责更细
+      - 可独立扩展
+    cons:
+      - 数据一致性难保证
+      - Agent 需要协调多个服务
+      - 部署复杂度高
+affects:
+  - element_type: container
+    element_id: c4a-dsl-mcp
+    scope: DSL 解析验证与本地存储管理
+  - element_type: container
+    element_id: c4a-code-mcp
+    scope: 代码分析与契约提取
+  - element_type: container
+    element_id: c4a-data-mcp
+    scope: 三库统一数据服务
+related:
+  related_adrs:
+    - ADR-001
+    - ADR-002

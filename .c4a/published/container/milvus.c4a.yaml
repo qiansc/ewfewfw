@@ -1,0 +1,60 @@
+schema: c4a/v1
+type: container
+container:
+  id: milvus
+  name: Milvus
+  description: |
+    向量数据库，存储 C4A 实体的文本向量，支持语义搜索。
+    用于语义搜索（c4a_db_search_semantic），将自然语言查询转换为向量进行相似度匹配。
+  external: true
+  technology:
+    language: N/A
+    framework: Milvus 2.5.4
+    runtime: Docker (Standalone 模式)
+    protocol: gRPC/HTTP
+relationships:
+  - to: c4a-data-mcp
+    description: 被 mcp-data 服务调用进行向量检索
+    technology: pymilvus (Python)
+  - to: ollama
+    description: 使用 Ollama 生成的向量进行索引
+    technology: Embedding API
+knowledge:
+  how:
+    description: |
+      ## Docker 配置
+
+      镜像: milvusdb/milvus:v2.5.4
+      容器名: c4a-milvus
+      运行模式: Standalone（内置 etcd）
+      端口:
+        - 19530 (gRPC，可通过 MILVUS_PORT 配置)
+        - 9091 (健康检查)
+      数据卷: milvus_data:/var/lib/milvus
+
+      ## 健康检查
+
+      命令: curl -f http://localhost:9091/healthz
+      间隔: 30s, 超时: 10s, 重试: 5次
+      启动等待: 60s（Milvus 启动较慢）
+
+      ## 环境变量
+
+      - MILVUS_URI: http://localhost:19530 (连接地址)
+      - ETCD_USE_EMBED: true (使用内置 etcd)
+
+      ## 向量集合
+
+      集合名: c4a_entities
+      向量维度: 768 (Ollama nomic-embed-text) 或 1536 (OpenAI)
+      索引类型: IVF_FLAT
+
+      ## 升级注意事项
+
+      - 版本升级可能需要重建索引
+      - 向量维度变更需要重新生成所有向量
+      - 启动时间较长（60-90秒），需要耐心等待
+  links:
+    - type: documentation
+      url: https://milvus.io/docs/
+      description: Milvus 官方文档

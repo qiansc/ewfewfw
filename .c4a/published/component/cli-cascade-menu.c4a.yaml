@@ -1,0 +1,22 @@
+schema: c4a/v1
+type: component
+component:
+  id: cli-cascade-menu
+  name: CLI Cascade Menu
+  description: 级联菜单 UI 组件，支持横向展开的子菜单交互
+  technology: TypeScript + React (Ink)
+knowledge:
+  responsibility: 渲染带子菜单的级联选择列表，支持主菜单和子菜单焦点切换
+  how:
+    description: |
+      源码位置: packages/cli/src/components/CascadeMenu.tsx
+
+      接收 Props:
+      - items: 菜单数据
+      - selectedIndex: 主菜单选中索引
+      - expandedId: 展开的子菜单父项 ID
+      - subSelectedIndex: 子菜单选中索引
+      - focusLevel: 焦点层级 (main/sub)
+  interfaces:
+    - name: CascadeMenu
+      description: 级联菜单 React 组件

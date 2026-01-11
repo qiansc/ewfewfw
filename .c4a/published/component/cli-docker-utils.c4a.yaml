@@ -1,0 +1,28 @@
+schema: c4a/v1
+type: component
+component:
+  id: cli-docker-utils
+  name: CLI Docker Utils
+  description: Docker 操作工具，封装 Docker Compose 命令调用
+  technology: TypeScript + execa
+knowledge:
+  responsibility: 提供 Docker Compose 的启动、停止、日志查看等操作封装
+  how:
+    description: |
+      源码位置: packages/cli/src/utils/docker.ts
+
+      封装的 Docker 操作:
+      - 启动服务 (docker compose up -d)
+      - 停止服务 (docker compose down)
+      - 查看状态 (docker compose ps)
+      - 查看日志 (docker compose logs)
+      - 清理数据 (docker compose down -v)
+  interfaces:
+    - name: dockerUp
+      description: 启动 Docker 服务
+    - name: dockerDown
+      description: 停止 Docker 服务
+    - name: dockerPs
+      description: 查看 Docker 服务状态
+    - name: dockerLogs
+      description: 查看 Docker 服务日志

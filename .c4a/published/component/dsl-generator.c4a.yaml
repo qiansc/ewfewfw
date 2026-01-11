@@ -1,0 +1,15 @@
+schema: c4a/v1
+type: component
+component:
+  id: dsl-generator
+  name: DSL Generator
+  description: DSL 生成组件，根据模板和描述生成 DSL 文件
+  technology: TypeScript + Template Engine
+relationships:
+  - to: template-manager
+    description: 获取和渲染模板
+knowledge:
+  responsibility: 根据 DSL 类型和描述信息生成符合规范的 DSL YAML
+  interfaces:
+    - name: generateHandler
+      description: 生成 DSL，支持 system/container/component/adr 类型
