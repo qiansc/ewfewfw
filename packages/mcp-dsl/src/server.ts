@@ -14,6 +14,7 @@ import {
   ReadFileInputSchema,
   WriteFileInputSchema,
   TransitionStatusInputSchema,
+  SuggestPathInputSchema,
 } from "./schemas/storageSchemas.js";
 import { parseHandler } from "./tools/parse.js";
 import { validateHandler } from "./tools/validate.js";
@@ -25,6 +26,7 @@ import {
   readHandler,
   writeHandler,
   transitionHandler,
+  suggestPathHandler,
 } from "./tools/storage/index.js";
 
 export function createServer(): McpServer {
@@ -299,6 +301,36 @@ export function createServer(): McpServer {
             {
               type: "text" as const,
               text: `TRANSITION_ERROR: ${(error as Error).message}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // 注册 c4a_local_suggest_path 工具
+  server.tool(
+    "c4a_local_suggest_path",
+    "根据 DSL type 和 id 自动生成正确的文件路径",
+    SuggestPathInputSchema.shape,
+    async (args) => {
+      try {
+        const result = suggestPathHandler(args as never);
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `SUGGEST_PATH_ERROR: ${(error as Error).message}`,
             },
           ],
           isError: true,
