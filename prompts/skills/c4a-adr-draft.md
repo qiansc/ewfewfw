@@ -151,15 +151,36 @@ ADR 应聚焦于：
 
 📁 创建的文件:
   .c4a/drafts/<adr-id>/
-  ├── <adr-id>.c4a.yaml
-  └── containers/
-      └── <container-id>.c4a.yaml
+  ├── <adr-id>.c4a.yaml          # ADR 文件
+  ├── containers/                 # 只放 type: container 的文件
+  │   └── <container-id>.c4a.yaml
+  └── components/                 # 只放 type: component 的文件
+      └── <component-id>.c4a.yaml
 
 📊 当前状态: draft
 
 🔜 下一步操作:
   - /c4a/adr/review <adr-id>  # 开始评审
 ```
+
+---
+
+## 目录结构约束（重要）
+
+**目录-类型必须一致**，否则验证会产生警告：
+
+| 目录 | 只能放 | 说明 |
+|------|--------|------|
+| `containers/` | `type: container` | 容器定义 |
+| `components/` | `type: component` | 组件定义 |
+| `adr/` | `type: adr` | ADR 文件 |
+| `systems/` | `type: software-system` | 系统定义 |
+| `contracts/` | `type: contract` | 契约定义 |
+
+**常见错误**：
+- ❌ 在 `containers/` 下创建 `type: component` 的文件
+- ❌ 组件和容器放在同一个目录
+- ✅ 容器放 `containers/`，组件放 `components/`
 
 ---
 
