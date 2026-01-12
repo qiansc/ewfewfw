@@ -1,0 +1,48 @@
+schema: c4a/v1
+type: component
+component:
+  id: visual-template-manager
+  name: Visual Template Manager
+  description: 提示词模板管理器，支持变量替换（Handlebars）和模板继承
+  technology: TypeScript + Handlebars + js-yaml
+relationships:
+  - to: mcp-visual
+    description: 作为 mcp-visual 的模板管理组件
+knowledge:
+  responsibility: 管理可视化提示词模板，支持分类、继承和变量替换
+  how:
+    description: |
+      源码位置: packages/mcp-visual/src/templates/template-manager.ts
+
+      模板目录结构:
+      prompts/visual-templates/
+        ├── templates.yaml       # 模板索引文件
+        ├── architecture/        # 架构图模板
+        ├── flowchart/          # 流程图模板
+        ├── image/              # AI 图片生成模板
+        └── _base/             # 基础模板（继承用）
+
+      模板索引 (templates.yaml):
+      ```yaml
+      version: "1.0"
+      default_template: "image/architecture-concept"
+      categories:
+        architecture:
+          templates:
+            - id: system-diagram
+              file: architecture/system-diagram.md
+        image:
+          templates:
+            - id: architecture-concept
+              file: image/architecture-concept.md
+      ```
+
+      核心接口:
+      - loadIndex(): 加载模板索引
+      - getTemplate(templateId): 获取模板内容
+      - render(templateId, variables): 渲染模板（变量替换）
+      - listTemplates(category): 列出模板
+
+      模板继承:
+      - 支持 extends 指令引用基础模板
+      - 子模板覆盖基模板的内容
