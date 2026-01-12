@@ -1,0 +1,37 @@
+schema: c4a/v1
+type: component
+component:
+  id: visual-gemini-renderer
+  name: Visual Gemini Renderer
+  description: Gemini 3 Pro Image API 渲染器，生成高质量图片
+  technology: TypeScript + @google/generative-ai
+relationships:
+  - to: mcp-visual
+    description: 作为 mcp-visual 的图片生成渲染器
+knowledge:
+  responsibility: 封装 Gemini 3 Pro Image API 调用，提供图片生成能力
+  how:
+    description: |
+      源码位置: packages/mcp-visual/src/renderers/gemini.ts
+
+      API 端点: https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent
+
+      支持参数:
+      - prompt: 图片描述提示词（自然语言或模板渲染结果）
+      - size: 1K / 2K / 4K
+      - aspectRatio: 1:1 / 16:9 / 9:16 / 4:3 / 3:4
+      - format: PNG / JPEG
+
+      默认配置:
+      - size: 2K
+      - aspectRatio: 16:9
+      - format: PNG
+
+      核心接口:
+      - generateImage(options): 生成图片，返回 Buffer
+      - validateOptions(options): 验证参数合法性
+
+      错误处理:
+      - API 配额超限
+      - 无效的 API Key
+      - 网络超时

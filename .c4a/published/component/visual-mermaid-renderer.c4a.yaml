@@ -1,0 +1,36 @@
+schema: c4a/v1
+type: component
+component:
+  id: visual-mermaid-renderer
+  name: Visual Mermaid Renderer
+  description: Mermaid 图表渲染器，支持流程图、时序图、架构图等
+  technology: TypeScript + mermaid
+relationships:
+  - to: mcp-visual
+    description: 作为 mcp-visual 的图表渲染器
+knowledge:
+  responsibility: 渲染 Mermaid 代码为图片（SVG/PNG），支持 C4 架构图生成
+  how:
+    description: |
+      源码位置: packages/mcp-visual/src/renderers/mermaid.ts
+
+      支持的图表类型:
+      - flowchart: 流程图（graph TB/LR/RL）
+      - sequence: 时序图（sequenceDiagram）
+      - class: 类图（classDiagram）
+      - state: 状态图（stateDiagram）
+      - gantt: 甘特图（gantt）
+      - C4: C4 架构图
+
+      核心接口:
+      - render(mermaidCode, options): 渲染 Mermaid 代码
+      - renderC4(graphData, options): 基于 Neo4j 数据生成 C4 架构图
+
+      输出格式:
+      - SVG: 矢量图，可缩放
+      - PNG: 位图，适合嵌入文档
+
+      C4 架构图生成:
+      - 从 Neo4j 查询架构关系
+      - 生成 Mermaid graph 代码
+      - 支持系统级、容器级、组件级视图

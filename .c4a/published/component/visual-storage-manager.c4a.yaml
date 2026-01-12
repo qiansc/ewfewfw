@@ -1,0 +1,31 @@
+schema: c4a/v1
+type: component
+component:
+  id: visual-storage-manager
+  name: Visual Storage Manager
+  description: 图片存储管理器，支持 cache/permanent/report 三种存储模式，提供引用生成和元数据追踪
+  technology: TypeScript + Node.js fs/promises
+relationships:
+  - to: mcp-visual
+    description: 作为 mcp-visual 的核心存储组件
+knowledge:
+  responsibility: 管理图片存储生命周期，提供灵活的存储策略和引用方式
+  how:
+    description: |
+      源码位置: packages/mcp-visual/src/storage/storage-manager.ts
+
+      存储模式:
+      - cache: 临时缓存（.c4a/cache/visual/temp/）
+      - permanent: 永久存储（.c4a/assets/images/）
+      - report: 报告专属（.c4a/reports/{report-id}/images/）
+
+      引用方式:
+      - relative: 相对路径（.c4a/assets/images/xxx.png）
+      - absolute: 绝对路径（/Users/.../.c4a/assets/images/xxx.png）
+      - url: URL（http://localhost:3000/images/xxx.png）
+      - markdown: Markdown 格式（![Alt](./images/xxx.png)）
+
+      核心接口:
+      - saveImage(buffer, options): 保存图片，返回元数据
+      - getReference(metadata, type, basePath): 生成引用
+      - cleanupTempFiles(olderThanHours): 清理临时文件
