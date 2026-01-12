@@ -1,0 +1,211 @@
+# Visual Templates 索引文件
+# 定义可用的提示词模板及其分类
+
+version: "1.0"
+default_template: "image/architecture-concept"
+
+# =============================================================================
+# 语言规则
+# =============================================================================
+language:
+  rule: |
+    根据用户会话语言自动选择提示词语言：
+    - 如果用户使用中文对话 → 使用中文提示词
+    - 如果用户使用英文对话 → 使用英文提示词
+    - 如果用户明确指定语言 → 优先使用指定语言
+  default: "auto"  # auto | zh | en
+  note: "用户可通过 'use English prompt' 或 '使用中文提示词' 强制指定"
+
+# =============================================================================
+# 全局风格定义 - Clean & Bright Aesthetic (Apple/Stripe Design Language)
+# =============================================================================
+style:
+  name: "C4A Visual Style"
+  description: "干净明亮美学，3D 抽象数据可视化，专业温暖，轻盈通透"
+  
+  # 核心风格关键词
+  keywords:
+    en: |
+      clean, bright, airy, professional, elegant, minimal, sophisticated,
+      frosted glass, soft glow, gentle shadows, floating elements,
+      Apple design, Stripe aesthetic, premium SaaS dashboard,
+      3D abstract visualization, holographic labels
+    zh: |
+      干净、明亮、通透、专业、优雅、极简、精致、
+      磨砂玻璃、柔和光晕、轻柔阴影、漂浮元素、
+      苹果设计风格、高端SaaS仪表盘、3D抽象可视化
+
+  # 环境与背景
+  environment:
+    background:
+      - "白色至柔和暖灰渐变 (#ffffff 到 #f5f5f7)"
+      - "浅蓝几何网格图案创造景深 (#e8f4fc)"
+      - "通透开阔的空间感"
+    lighting:
+      - "来自上方的柔和环境光"
+      - "轻柔阴影，无硬边"
+      - "淡金色和柔蓝色精致漂浮粒子"
+    atmosphere:
+      - "专业清晰"
+      - "温暖而不沉闷"
+      - "现代科技感"
+
+  # 材质与效果
+  materials:
+    primary:
+      name: "磨砂玻璃 (Frosted Glass)"
+      properties:
+        - "半透明，20-30% 透明度"
+        - "边缘微白光晕"
+        - "圆角矩形"
+        - "柔和投影增加层次感"
+    effects:
+      - "柔和渐变光晕 (Soft Glow)"
+      - "干净全息标签 (Holographic Labels)"
+      - "轻柔粒子效果，带运动轨迹"
+      - "悬浮于不同 Z 轴深度"
+
+  # 配色方案
+  colors:
+    background:
+      white: "#ffffff"
+      warm_gray_1: "#f9fafb"
+      warm_gray_2: "#f3f4f6"
+      depth_blue: "#e8f4fc"
+    primary:
+      blue: "#3b82f6"
+      purple: "#8b5cf6"
+      green: "#10b981"
+    accent:
+      coral: "#fb923c"
+      amber: "#f59e0b"
+      rose: "#ec4899"
+      lavender: "#a78bfa"
+    semantic:
+      success: "#10b981"
+      warning: "#f59e0b"
+      error: "#ef4444"
+      info: "#3b82f6"
+    text:
+      dark: "#1f2937"
+      medium: "#6b7280"
+      light: "#9ca3af"
+
+  # 排版
+  typography:
+    title:
+      - "清晰可读"
+      - "适度醒目"
+      - "使用深色文字 (#1f2937)"
+    labels:
+      - "简洁明了"
+      - "圆角全息风格"
+      - "使用中灰文字 (#6b7280)"
+
+# =============================================================================
+# 模板分类
+# =============================================================================
+categories:
+  architecture:
+    name: 架构图
+    description: 用于生成架构相关图片的模板
+    style_preset: "system_diagram"
+    templates:
+      - id: system-diagram
+        name: 系统架构图
+        description: 生成 C4 系统级架构图
+        file: architecture/system-diagram.md
+        variables:
+          - name: system_name
+            description: 系统名称
+            required: true
+          - name: description
+            description: 系统描述
+            required: true
+          - name: containers
+            description: 容器列表（逗号分隔）
+            required: false
+
+      - id: container-diagram
+        name: 容器架构图
+        description: 生成 C4 容器级架构图
+        file: architecture/container-diagram.md
+        variables:
+          - name: container_name
+            description: 容器名称
+            required: true
+          - name: technology
+            description: 技术栈
+            required: true
+          - name: components
+            description: 组件列表（逗号分隔）
+            required: false
+
+  flowchart:
+    name: 流程图
+    description: 用于生成流程图的模板
+    style_preset: "data_flow"
+    templates:
+      - id: decision-flow
+        name: 决策流程图
+        description: 生成 ADR 决策流程图
+        file: flowchart/decision-flow.md
+        variables:
+          - name: decision_title
+            description: 决策标题
+            required: true
+          - name: options
+            description: 备选方案（逗号分隔）
+            required: true
+          - name: outcome
+            description: 最终决策
+            required: true
+
+      - id: data-flow
+        name: 数据流图
+        description: 生成数据流转图
+        file: flowchart/data-flow.md
+        variables:
+          - name: source
+            description: 数据源
+            required: true
+          - name: destination
+            description: 目标
+            required: true
+          - name: steps
+            description: 处理步骤（逗号分隔）
+            required: false
+
+  image:
+    name: AI 图片
+    description: 用于生成 AI 概念图片的模板
+    style_preset: "concept_art"
+    templates:
+      - id: architecture-concept
+        name: 架构概念图
+        description: 生成抽象的架构概念图
+        file: image/architecture-concept.md
+        variables:
+          - name: title
+            description: 图片标题
+            required: true
+          - name: theme
+            description: 主题风格
+            required: false
+            default: modern tech
+          - name: elements
+            description: 关键元素（逗号分隔）
+            required: false
+
+      - id: tech-illustration
+        name: 技术插图
+        description: 生成技术概念插图
+        file: image/tech-illustration.md
+        variables:
+          - name: concept
+            description: 技术概念
+            required: true
+          - name: style
+            description: 视觉风格
+            required: false
+            default: minimalist
