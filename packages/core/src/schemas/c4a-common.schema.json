@@ -190,23 +190,60 @@
       "additionalProperties": false
     },
 
+    "interface": {
+      "type": "object",
+      "description": "接口/方法定义",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "方法名"
+        },
+        "description": {
+          "type": "string",
+          "description": "方法描述"
+        }
+      }
+    },
+
     "knowledge": {
       "type": "object",
-      "description": "知识附加",
+      "description": "知识附加（精简版，决策过程请放 ADR）",
+      "additionalProperties": false,
       "properties": {
-        "examples": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/example" },
-          "description": "使用示例"
+        "responsibility": {
+          "type": "string",
+          "description": "职责说明（一句话）"
         },
         "how": {
           "type": "object",
+          "description": "实现说明",
+          "additionalProperties": false,
           "properties": {
-            "architecture": { "type": "string" },
-            "description": { "type": "string" }
-          },
-          "additionalProperties": true,
-          "description": "实现说明"
+            "description": {
+              "type": "string",
+              "description": "实现描述"
+            },
+            "architecture": {
+              "type": "string",
+              "description": "架构说明"
+            },
+            "components": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "包含的组件 ID 列表"
+            }
+          }
+        },
+        "interfaces": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/interface" },
+          "description": "关键接口/方法列表"
+        },
+        "api_tag": {
+          "type": "string",
+          "description": "对应 OpenAPI 的 tag"
         },
         "constraints": {
           "$ref": "#/$defs/constraint",
@@ -217,13 +254,17 @@
           "items": { "$ref": "#/$defs/risk" },
           "description": "已知风险"
         },
+        "examples": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/example" },
+          "description": "使用示例"
+        },
         "links": {
           "type": "array",
           "items": { "$ref": "#/$defs/link" },
           "description": "相关链接"
         }
-      },
-      "additionalProperties": true
+      }
     }
   }
 }

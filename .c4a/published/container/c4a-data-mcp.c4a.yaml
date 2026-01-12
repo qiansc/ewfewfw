@@ -32,19 +32,8 @@ relationships:
     technology: pymilvus
     external: true
 knowledge:
-  what:
-    description: |
-      C4A Data MCP Server 是架构知识的持久化服务：
-      - 三库统一写入与同步
-      - 语义相似度搜索
-      - 图遍历依赖查询
-      - 变更影响分析
-  why:
-    description: |
-      选择 Python 实现是因为：
-      - pymongo/neo4j/pymilvus SDK 更成熟
-      - 向量计算与 ML 生态完善
-      - 便于集成 Embedding 服务
+  responsibility: |
+    架构知识持久化服务，负责三库统一写入与同步、语义搜索、图遍历依赖查询、变更影响分析
   how:
     description: |
       高层工具（推荐使用）：
@@ -64,16 +53,11 @@ knowledge:
       - 优先使用 OpenAI API（需配置 OPENAI_API_KEY）
       - 备选使用本地 Ollama（nomic-embed-text）
     components:
-      - id: data-service
-        source: services/data_service.py
-      - id: mongodb-client
-        source: clients/mongodb_client.py
-      - id: neo4j-client
-        source: clients/neo4j_client.py
-      - id: milvus-client
-        source: clients/milvus_client.py
-      - id: embedding-service
-        source: clients/embedding_service.py
+      - data-service
+      - mongodb-client
+      - neo4j-client
+      - milvus-client
+      - embedding-service
   links:
     - type: repository
       url: ./packages/mcp-data

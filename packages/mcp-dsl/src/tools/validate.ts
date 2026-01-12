@@ -10,6 +10,7 @@ export interface ValidateResult {
     path: string;
     message: string;
     rule?: string;
+    hint?: string;
   }>;
 }
 
@@ -28,6 +29,7 @@ export async function validateHandler(
         path: err.path,
         message: err.message,
         rule: err.keyword,
+        hint: err.hint,
       }));
 
       // 3. 如果指定了规则过滤，只返回匹配的错误

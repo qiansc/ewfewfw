@@ -107,6 +107,24 @@ Agent:
 
 ## 输出格式
 
+### DSL knowledge 字段规范（重要）
+
+DSL 的 `knowledge` 字段用于描述**当前状态**，保持精简。决策过程请放在 ADR 中。
+
+**允许的字段**：
+- `responsibility`: 职责说明（一句话）
+- `how`: 实现说明（description, architecture, components）
+- `interfaces`: 关键接口/方法列表
+- `api_tag`: 对应 OpenAPI 的 tag
+- `constraints`: 约束条件（performance, security, availability）
+- `risks`: 已知风险
+- `examples`: 使用示例
+- `links`: 相关链接
+
+**禁止的字段**：
+- `what` / `why` - 这些属于决策说明，应放在 ADR 中
+- 任何未在上述列表中定义的字段（会导致验证失败）
+
 ### 成功时
 ```
 ## 结果
