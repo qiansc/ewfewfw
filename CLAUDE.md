@@ -219,6 +219,10 @@ cp .env.example .env    # 复制环境变量模板
 - 所有对话必须使用中文（除非用户明确要求英语）
 - 代码、命令可以用英文，但解释说明必须用中文
 
+### Git Commit 规则
+- Commit message 必须使用英文
+- 不要在 commit message 末尾添加 Co-Authored-By 或任何作者署名信息
+
 ## 开发索引
 
 | 文档 | 说明 |
