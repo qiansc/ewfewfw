@@ -18,6 +18,49 @@ export function checkDocker(): boolean {
 }
 
 /**
+ * 尝试启动 Docker Desktop (macOS)
+ * @param timeout 超时时间（毫秒），默认 60 秒
+ * @param interval 检查间隔（毫秒），默认 2 秒
+ * @returns 是否成功启动
+ */
+export async function startDockerDesktop(
+  timeout: number = 60000,
+  interval: number = 2000
+): Promise<boolean> {
+  // 已经在运行，直接返回
+  if (checkDocker()) {
+    return true;
+  }
+
+  // 仅支持 macOS
+  if (process.platform !== "darwin") {
+    return false;
+  }
+
+  // 尝试启动 Docker Desktop
+  const result = spawnSync("open", ["-a", "Docker"], { stdio: "pipe" });
+  if (result.status !== 0) {
+    return false;
+  }
+
+  // 等待 Docker 启动就绪
+  const startTime = Date.now();
+  while (Date.now() - startTime < timeout) {
+    if (checkDocker()) {
+      return true;
+    }
+
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    process.stdout.write(`\r  等待 Docker 启动... ${elapsed}s`);
+
+    await new Promise((r) => setTimeout(r, interval));
+  }
+
+  console.log(""); // 换行
+  return false;
+}
+
+/**
  * 清理可能残留的旧容器
  */
 function cleanupOldContainers(): void {

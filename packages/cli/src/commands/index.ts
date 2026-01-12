@@ -4,6 +4,7 @@
 import { resolve } from "node:path";
 import {
   checkDocker,
+  startDockerDesktop,
   startStorageServices,
   startAllServices,
   stopServices,
@@ -58,8 +59,16 @@ async function checkDependencies(deps: string[]): Promise<boolean> {
     if (checkDocker()) {
       success("Docker 已运行");
     } else {
-      error("Docker 未运行，请先启动 Docker");
-      allOk = false;
+      // 尝试自动启动 Docker Desktop
+      warn("Docker 未运行，正在尝试启动...");
+      const started = await startDockerDesktop(60000, 2000);
+      if (started) {
+        console.log(""); // 清除进度行
+        success("Docker 已启动");
+      } else {
+        error("Docker 启动失败或超时，请手动启动 Docker Desktop");
+        allOk = false;
+      }
     }
   }
 
