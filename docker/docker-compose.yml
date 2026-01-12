@@ -144,6 +144,35 @@ services:
       - mcp
       - prod
 
+  # TypeScript Visual MCP Server (Gemini + Mermaid)
+  c4a-visual-mcp:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.mcp-ts
+    container_name: c4a-visual-mcp
+    ports:
+      - "${VISUAL_MCP_PORT:-8053}:8053"
+    volumes:
+      - ../prompts/visual-templates:/app/prompts/visual-templates:ro
+      - ../.c4a/assets/images:/app/.c4a/assets/images
+      - ../.c4a/cache/visual:/app/.c4a/cache/visual
+    environment:
+      MCP_SERVER: mcp-visual
+      MCP_TRANSPORT: streamable-http
+      MCP_PORT: 8053
+      VISUAL_MCP_PORT: 8053
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      VISUAL_STORAGE_BASE_PATH: /app/.c4a
+      VISUAL_TEMPLATES_PATH: /app/prompts/visual-templates
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8053/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    profiles:
+      - mcp
+      - prod
+
   # Python Data MCP Server (MongoDB + Neo4j + Milvus)
   c4a-data-mcp:
     build:

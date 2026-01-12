@@ -1,5 +1,5 @@
 # C4A TypeScript MCP Server Dockerfile
-# 用于 mcp-dsl 和 mcp-code
+# 用于 mcp-dsl, mcp-code, mcp-visual
 
 FROM oven/bun:1.1-alpine
 
@@ -16,6 +16,7 @@ COPY tsconfig.json ./
 COPY packages/core/package.json packages/core/
 COPY packages/mcp-dsl/package.json packages/mcp-dsl/
 COPY packages/mcp-code/package.json packages/mcp-code/
+COPY packages/mcp-visual/package.json packages/mcp-visual/
 
 # Install dependencies
 RUN bun install --frozen-lockfile || bun install
@@ -24,13 +25,14 @@ RUN bun install --frozen-lockfile || bun install
 COPY packages/core packages/core
 COPY packages/mcp-dsl packages/mcp-dsl
 COPY packages/mcp-code packages/mcp-code
+COPY packages/mcp-visual packages/mcp-visual
 
 # Default to HTTP transport for Docker
 ENV MCP_TRANSPORT=streamable-http
 
 # MCP_SERVER and MCP_PORT are set via docker-compose
-# MCP_SERVER: mcp-dsl or mcp-code
-# MCP_PORT: 8051 (dsl) or 8052 (code)
+# MCP_SERVER: mcp-dsl, mcp-code, or mcp-visual
+# MCP_PORT: 8051 (dsl), 8052 (code), or 8053 (visual)
 
 # Run the specified MCP server
 CMD ["sh", "-c", "bun run packages/${MCP_SERVER}/src/index.ts"]
