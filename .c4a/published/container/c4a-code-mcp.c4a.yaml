@@ -23,19 +23,8 @@ relationships:
     description: 使用共享的类型定义
     technology: TypeScript Import
 knowledge:
-  what:
-    description: |
-      C4A Code MCP Server 是代码智能分析服务，负责：
-      - 代码结构分析（支持 TypeScript、Go、Python）
-      - 接口和类型定义提取
-      - AST 抽象语法树解析
-      - API 契约文档生成
-  why:
-    description: |
-      选择 TypeScript 实现是因为：
-      - 可复用 TypeScript 解析能力
-      - 与 DSL MCP 技术栈统一
-      - 便于使用 zod 进行输入验证
+  responsibility: |
+    代码智能分析服务，负责代码结构分析、接口提取、AST 解析、API 契约生成
   how:
     description: |
       核心工具：
@@ -44,16 +33,11 @@ knowledge:
       - c4a_code_ast: 获取代码的 AST 结构
       - c4a_code_contract: 从代码生成 API 契约
     components:
-      - id: code-parser
-        source: src/parsers/codeParser.ts
-      - id: code-analyzer
-        source: src/tools/analyze.ts
-      - id: interface-extractor
-        source: src/tools/extract.ts
-      - id: contract-generator
-        source: src/tools/contract.ts
-      - id: ast-provider
-        source: src/tools/ast.ts
+      - code-parser
+      - code-analyzer
+      - interface-extractor
+      - contract-generator
+      - ast-provider
   links:
     - type: repository
       url: ./packages/mcp-code

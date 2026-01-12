@@ -9,6 +9,7 @@ export interface ValidationError {
   message: string;
   keyword?: string;
   params?: Record<string, unknown>;
+  hint?: string;
 }
 
 export interface ValidationResult {
@@ -18,6 +19,74 @@ export interface ValidationResult {
 }
 
 export type DSLType = "system" | "container" | "component" | "adr" | "contract";
+
+/**
+ * knowledge 允许的字段列表
+ */
+const KNOWLEDGE_ALLOWED_FIELDS = [
+  "responsibility",
+  "how",
+  "interfaces",
+  "api_tag",
+  "constraints",
+  "risks",
+  "examples",
+  "links",
+];
+
+/**
+ * 格式化验证错误，提供更友好的提示
+ */
+function formatValidationError(
+  err: {
+    instancePath?: string;
+    message?: string;
+    keyword?: string;
+    params?: Record<string, unknown>;
+  },
+  type: DSLType
+): ValidationError {
+  const path = err.instancePath || "";
+  const keyword = err.keyword;
+  const params = err.params as Record<string, unknown>;
+
+  let message = err.message || "Unknown error";
+  let hint: string | undefined;
+
+  // 针对 additionalProperties 错误提供更友好的提示
+  if (keyword === "additionalProperties" && params?.additionalProperty) {
+    const extraProp = params.additionalProperty as string;
+
+    if (path.includes("/knowledge")) {
+      message = `knowledge 不支持字段 "${extraProp}"`;
+      hint = `允许的字段: ${KNOWLEDGE_ALLOWED_FIELDS.join(", ")}。决策相关内容（what/why/备选方案）请放在 ADR 中。`;
+    } else {
+      message = `不支持的字段: "${extraProp}"`;
+      hint = `请检查 ${type} 类型的 schema 定义，确认允许的字段。`;
+    }
+  }
+
+  // 针对 required 错误
+  if (keyword === "required" && params?.missingProperty) {
+    const missingProp = params.missingProperty as string;
+    message = `缺少必需字段: "${missingProp}"`;
+    hint = `请在 ${path || "根对象"} 中添加 "${missingProp}" 字段。`;
+  }
+
+  // 针对 enum 错误
+  if (keyword === "enum" && params?.allowedValues) {
+    const allowed = params.allowedValues as string[];
+    hint = `允许的值: ${allowed.join(", ")}`;
+  }
+
+  return {
+    path,
+    message,
+    keyword,
+    params,
+    hint,
+  };
+}
 
 /**
  * 验证 DSL 对象
@@ -50,12 +119,9 @@ export function validateDSL(data: unknown, type: DSLType): ValidationResult {
     return { valid: true, data };
   }
 
-  const errors: ValidationError[] = (validator.errors || []).map((err) => ({
-    path: err.instancePath || "",
-    message: err.message || "Unknown error",
-    keyword: err.keyword,
-    params: err.params as Record<string, unknown>,
-  }));
+  const errors: ValidationError[] = (validator.errors || []).map((err) =>
+    formatValidationError(err, type)
+  );
 
   return { valid: false, errors };
 }

@@ -70,48 +70,8 @@
     },
 
     "knowledge": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "responsibility": {
-          "type": "string",
-          "description": "职责说明"
-        },
-        "api_tag": {
-          "type": "string",
-          "description": "对应 OpenAPI 的 tag"
-        },
-        "how": {
-          "type": "object",
-          "properties": {
-            "description": {
-              "type": "string",
-              "description": "实现说明"
-            }
-          },
-          "additionalProperties": true
-        },
-        "interfaces": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "required": ["name"],
-            "additionalProperties": false,
-            "properties": {
-              "name": {
-                "type": "string",
-                "description": "方法名"
-              },
-              "description": {
-                "type": "string",
-                "description": "方法描述"
-              }
-            }
-          },
-          "description": "关键方法列表"
-        }
-      },
-      "description": "组件级知识附加（简化版）"
+      "$ref": "c4a-common.schema.json#/$defs/knowledge",
+      "description": "组件级知识附加"
     }
   }
 }

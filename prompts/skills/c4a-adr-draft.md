@@ -194,6 +194,11 @@ consequences:
   neutral:             # 必须是 string 数组
     - 中性影响1
 
+affects:               # 可选，影响的架构元素
+  - element_type: container  # 只允许: system, container, component
+    element_id: xxx
+    scope: 影响范围说明
+
 alternatives:          # 必须是 object 数组，不是 string 数组
   - name: 方案名称
     description: 方案描述
@@ -208,6 +213,7 @@ alternatives:          # 必须是 object 数组，不是 string 数组
 - ❌ `alternatives: ["方案1", "方案2"]` → ✅ `alternatives: [{name: "方案1", description: "..."}]`
 - ❌ `neutral: "中性影响"` → ✅ `neutral: ["中性影响"]`（必须是数组）
 - ❌ 添加 `references` 字段 → ✅ 使用 `knowledge.links` 或写在 context 中
+- ❌ `element_type: infrastructure` → ✅ 只允许 `system`, `container`, `component`
 
 ### Container 格式要求
 
@@ -232,9 +238,16 @@ container:
 
 relationships: []      # 可选
 
-knowledge:             # 可选
+knowledge:             # 可选，只允许以下字段
+  responsibility: 职责说明（一句话）
   how:
     description: 使用说明
+    components:      # 组件 ID 列表（字符串数组）
+      - component-a
+      - component-b
+  interfaces:        # 关键接口
+    - name: methodName
+      description: 方法描述
   links:
     - type: repository
       url: ./packages/xxx
@@ -244,10 +257,12 @@ knowledge:             # 可选
 **禁止添加的字段**（不在 Schema 中）：
 - ❌ `status` - 状态由文件所在目录决定
 - ❌ `external` - 仅当确实是外部系统时才添加
-- ❌ `interfaces` - 放入 knowledge.how 或单独文档
+- ❌ `knowledge.what` / `knowledge.why` - 决策信息放 ADR
+- ❌ `knowledge.components` 写成对象数组 → ✅ 必须是字符串数组
 - ❌ `data_flows` - 使用 relationships 表达
 - ❌ `platforms` - 放入 knowledge 或 README
 - ❌ `core_modules` - 由代码分析自动生成
 
 **常见错误**：
 - ❌ `technology: ["Node.js", "Express"]` → ✅ `technology: {language: "Node.js", framework: "Express", ...}`
+- ❌ `components: [{id: "xxx", source: "..."}]` → ✅ `components: ["xxx", "yyy"]`（必须是字符串数组）

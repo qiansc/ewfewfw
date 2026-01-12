@@ -191,7 +191,7 @@ consequences:
   neutral:
     - 组件粒度选择为中等（一个模块文件或一个功能目录对应一个组件）
     - 本次只补充非 MCP 容器的组件，MCP 服务层已有完整定义
-    - 外部服务使用 external: true 标记，与内部容器区分
+    - 外部服务使用 external:true 标记，与内部容器区分
 alternatives:
   - name: 保持现状
     description: 仅为 MCP 服务定义组件，CLI 和配置生成器保持容器级别描述
@@ -230,10 +230,10 @@ affects:
   - element_type: system
     element_id: c4a
     scope: 添加 4 个外部存储服务容器 (mongodb, neo4j, milvus, ollama)
-  - element_type: infrastructure
-    element_id: docker-compose
+  - element_type: component
+    element_id: docker-compose-config
     scope: 添加 Docker Compose 编排配置组件
-  - element_type: infrastructure
+  - element_type: component
     element_id: env-config
     scope: 添加环境变量配置组件
 related:

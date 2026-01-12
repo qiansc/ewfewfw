@@ -23,18 +23,8 @@ relationships:
     description: 使用共享的 JSON Schema 和类型定义
     technology: TypeScript Import
 knowledge:
-  what:
-    description: |
-      C4A DSL MCP Server 是架构知识管理的前端服务，负责：
-      - DSL 语法解析与 Schema 验证
-      - DSL 模板生成
-      - 本地 .c4a/ 目录的初始化、读写、状态流转
-  why:
-    description: |
-      选择 TypeScript 实现是因为：
-      - JSON Schema 处理生态成熟 (ajv)
-      - YAML 解析库完善 (yaml)
-      - 与前端工具链统一
+  responsibility: |
+    DSL 解析验证与本地存储管理服务，负责 DSL 语法解析、Schema 验证、模板生成、.c4a/ 目录管理
   how:
     description: |
       核心工具分为两类：
@@ -52,18 +42,12 @@ knowledge:
       - c4a_local_write_file: 写入 DSL 文件
       - c4a_local_transition_status: 状态流转
     components:
-      - id: dsl-parser
-        source: src/tools/parse.ts
-      - id: dsl-validator
-        source: src/tools/validate.ts
-      - id: dsl-generator
-        source: src/tools/generate.ts
-      - id: template-manager
-        source: src/templates/index.ts
-      - id: schema-provider
-        source: src/tools/schema.ts
-      - id: local-storage
-        source: src/tools/storage/
+      - dsl-parser
+      - dsl-validator
+      - dsl-generator
+      - template-manager
+      - schema-provider
+      - local-storage
   links:
     - type: repository
       url: ./packages/mcp-dsl
