@@ -70,6 +70,11 @@ export const WriteFileInputSchema = z.object({
     .optional()
     .default(true)
     .describe("是否验证 (默认 true)"),
+  strict: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe("严格模式：有警告时也返回失败 (默认 false)"),
   overwrite: z
     .boolean()
     .optional()
@@ -112,12 +117,33 @@ export const TransitionStatusInputSchema = z.object({
     .describe("项目根目录"),
 });
 
+// c4a_local_suggest_path - 建议路径
+const SuggestPathStatusEnum = z.enum(["draft", "approved", "published", "archived"]);
+const SuggestPathTypeEnum = z.enum(["system", "container", "component", "adr", "contract"]);
+
+export const SuggestPathInputSchema = z.object({
+  type: SuggestPathTypeEnum
+    .describe("DSL 类型"),
+  id: z
+    .string()
+    .describe("DSL ID"),
+  status: SuggestPathStatusEnum
+    .optional()
+    .default("draft")
+    .describe("目标状态（默认 draft）"),
+  proposal_id: z
+    .string()
+    .optional()
+    .describe("提案 ID（如 adr-005），用于组织草稿目录"),
+});
+
 // 导出类型
 export type InitRepoInput = z.infer<typeof InitRepoInputSchema>;
 export type ListFilesInput = z.infer<typeof ListFilesInputSchema>;
 export type ReadFileInput = z.infer<typeof ReadFileInputSchema>;
 export type WriteFileInput = z.infer<typeof WriteFileInputSchema>;
 export type TransitionStatusInput = z.infer<typeof TransitionStatusInputSchema>;
+export type SuggestPathInput = z.infer<typeof SuggestPathInputSchema>;
 
 // 类型别名 (兼容旧 import)
 export type InitInput = InitRepoInput;
