@@ -37,6 +37,17 @@ agents:
       - c4a_db_sync_file      # 推荐：单文件同步，避免超时
       - c4a_db_sync_local     # 批量同步（可能超时）
       - c4a_db_exec_cypher
+      # c4a-visual-mcp: 可视化服务
+      - c4a_visual_generate
+      - c4a_visual_render
+      - c4a_visual_list_templates
+      - c4a_visual_render_template
+      - c4a_visual_save
+      - c4a_visual_get_reference
+      - c4a_visual_render_c4
+      - c4a_visual_cleanup
+      - c4a_visual_storage_stats
+      - c4a_visual_get_style
       # 基础工具
       - edit
       - read
@@ -63,6 +74,12 @@ agents:
       - c4a_db_search_semantic
       - c4a_db_query_deps
       - c4a_db_query_impact
+      # c4a-visual-mcp: 可视化服务 (只读)
+      - c4a_visual_list_templates
+      - c4a_visual_render_template
+      - c4a_visual_get_reference
+      - c4a_visual_storage_stats
+      - c4a_visual_get_style
       # 基础工具
       - read
     deniedTools:
@@ -78,6 +95,12 @@ agents:
       - c4a_db_sync_file
       - c4a_db_sync_local
       - c4a_db_exec_cypher
+      # 禁止可视化写操作
+      - c4a_visual_generate
+      - c4a_visual_render
+      - c4a_visual_save
+      - c4a_visual_render_c4
+      - c4a_visual_cleanup
 
   c4a-dsl:
     description: DSL 解析验证 Agent，负责 DSL 和本地存储管理
@@ -148,6 +171,11 @@ mcpServers:
   c4a-data-mcp:
     transport: http
     url: http://localhost:8050/mcp
+
+  c4a-visual-mcp:
+    command: bun
+    args: ["run", "./packages/mcp-visual/src/index.ts"]
+    transport: stdio
 
 # =============================================================================
 # Skills 定义 - ADR 工作流命令（精简版：4 个智能命令）
