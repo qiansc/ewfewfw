@@ -22,6 +22,7 @@ description: DSL 解析验证专家，负责 DSL 和本地存储管理
 - `c4a_local_read_file`: 读取并验证 DSL 文件
 - `c4a_local_write_file`: 写入 DSL 文件（自动验证）
 - `c4a_local_transition_status`: 状态流转
+- `c4a_local_suggest_path`: 根据 type 和 id 自动生成正确路径（推荐在写入前调用）
 
 ### 数据库查询（只读）
 - `c4a_db_get_entity`: 获取已有文档作为参考
@@ -56,6 +57,68 @@ draft → approved → published → deprecated → archived
 2. 必填字段检查
 3. 引用完整性（关联的 system_id/container_id 必须存在）
 4. 知识状态流转规则
+5. **目录-类型一致性**（新增）
+
+## 目录-类型映射规则（重要）
+
+**目录名必须与 DSL type 匹配**，否则 `c4a_local_write_file` 会返回警告：
+
+| 目录 | 只能放 type | 说明 |
+|------|-------------|------|
+| `containers/` | `container` | 容器定义文件 |
+| `components/` | `component` | 组件定义文件 |
+| `adr/` | `adr` | ADR 文件 |
+| `systems/` | `software-system` | 系统定义文件 |
+| `contracts/` | `contract` | 契约定义文件 |
+
+**示例**：
+
+```yaml
+# ✅ 正确：路径与 type 一致
+# 路径：.c4a/drafts/adr-005/containers/mcp-visual.c4a.yaml
+type: container
+
+# ❌ 错误：containers 目录下放了 component
+# 路径：.c4a/drafts/adr-005/containers/visual-renderer.c4a.yaml
+type: component  # 警告！应该放到 components/ 目录
+```
+
+**写入前检查**：
+1. 确认 DSL 的 `type` 字段
+2. 使用 `c4a_local_suggest_path` 获取正确路径（推荐）
+3. 或手动选择对应目录：container → containers/，component → components/
+4. 如果收到目录-类型不一致警告，立即修正路径
+
+**推荐工作流**：
+```
+# 1. 获取正确路径
+c4a_local_suggest_path({ type: "component", id: "my-component", proposal_id: "adr-005" })
+# 返回: { path: ".c4a/drafts/adr-005/components/my-component.c4a.yaml" }
+
+# 2. 使用返回的路径写入
+c4a_local_write_file({ path: ".c4a/drafts/adr-005/components/my-component.c4a.yaml", content: {...} })
+```
+
+**写入参数**：
+- `strict: true` - 严格模式，目录-类型不一致时直接失败（推荐）
+- `strict: false` - 宽松模式（默认），不一致时返回警告但仍写入
+
+**警告自动修正**：
+如果 `c4a_local_write_file` 返回 `warnings` 且包含 `suggested_path`，必须：
+1. 立即使用 `suggested_path` 重新写入
+2. 删除错误路径的文件（如果已创建）
+
+示例响应：
+```json
+{
+  "success": true,
+  "warnings": [{
+    "message": "目录 \"containers/\" 下不应放置 type: component 的文件",
+    "suggested_path": ".c4a/drafts/adr-005/components/my-component.c4a.yaml"
+  }]
+}
+```
+→ 应使用 `suggested_path` 重新写入
 
 ## knowledge 字段规范（重要）
 
