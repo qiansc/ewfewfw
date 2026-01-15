@@ -1,6 +1,6 @@
 # C4A Agent 指令
 
-本文档为 C4A Agent（c4a、c4a-plan、c4a-dsl、c4a-query）提供统一的上下文指令。
+本文档为 C4A Agent 提供统一的上下文指令。
 
 ## ⛔ 文件操作权限（最高优先级）
 
