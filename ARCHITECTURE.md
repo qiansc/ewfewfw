@@ -1,8 +1,8 @@
-# C4A v2 工程架构
+# C4A v0.2 工程架构
 
 ## 概述
 
-C4A v2 采用 **MCP (Model Context Protocol) + Agent** 架构，完全围绕 AI Agent 设计：
+C4A v0.2 采用 **MCP (Model Context Protocol) + Agent** 架构，完全围绕 AI Agent 设计：
 
 - **Agent**：OpenCode 驱动，使用 prompts/ 中定义的角色
 - **MCP 服务**：三个独立的 MCP Server，提供工具能力

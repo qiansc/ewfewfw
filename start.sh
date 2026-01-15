@@ -1,5 +1,5 @@
 #!/bin/bash
-# C4A v2 启动脚本入口
+# C4A v0.2 启动脚本入口
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
