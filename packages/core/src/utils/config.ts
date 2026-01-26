@@ -1,0 +1,134 @@
+/**
+ * C4A 配置管理
+ *
+ * 用于加载和保存项目配置
+ * 基于 v0.3.0 架构设计：.context/.c4a.yaml
+ */
+
+import { readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { parseYAML, stringifyYAML } from './yaml';
+import { CONTEXT_ROOT_DIR, CONFIG_FILENAME } from './path';
+
+// ============================================================================
+// 配置类型
+// ============================================================================
+
+/** 运行模式 */
+export type C4AMode = 'local' | 'server' | 'remote';
+
+/**
+ * C4A 项目配置（.context/.c4a.yaml）
+ */
+export interface C4AConfig {
+  /** 仓库标识 */
+  repo_id?: string;
+
+  /** 项目标识 */
+  project_id?: string;
+
+  /** 运行模式 */
+  mode?: C4AMode;
+
+  /** Server 模式配置 */
+  server?: {
+    url?: string;
+  };
+
+  /** Remote 模式配置 */
+  remote?: {
+    url?: string;
+  };
+}
+
+/** 默认配置 */
+const DEFAULT_CONFIG: C4AConfig = {
+  mode: 'local',
+};
+
+// ============================================================================
+// 配置加载
+// ============================================================================
+
+/**
+ * 获取配置文件完整路径
+ */
+function getConfigFilePath(projectRoot: string): string {
+  return join(projectRoot, CONTEXT_ROOT_DIR, CONFIG_FILENAME);
+}
+
+/**
+ * 加载配置文件
+ */
+export async function loadConfig(projectRoot?: string): Promise<C4AConfig> {
+  const root = projectRoot || process.cwd();
+  const configPath = getConfigFilePath(root);
+
+  try {
+    const content = await readFile(configPath, 'utf-8');
+    const config = parseYAML<C4AConfig>(content);
+    return mergeConfig(DEFAULT_CONFIG, config);
+  } catch {
+    return { ...DEFAULT_CONFIG };
+  }
+}
+
+/**
+ * 保存配置文件
+ */
+export async function saveConfig(config: C4AConfig, projectRoot?: string): Promise<void> {
+  const root = projectRoot || process.cwd();
+  const configPath = getConfigFilePath(root);
+  const content = stringifyYAML(config);
+  await writeFile(configPath, content, 'utf-8');
+}
+
+// ============================================================================
+// 配置工具函数
+// ============================================================================
+
+/**
+ * 深度合并配置
+ */
+function mergeConfig(base: C4AConfig, override: C4AConfig): C4AConfig {
+  return {
+    ...base,
+    ...override,
+    server: { ...base.server, ...override.server },
+    remote: { ...base.remote, ...override.remote },
+  };
+}
+
+/**
+ * 验证配置
+ */
+export function validateConfig(config: C4AConfig): {
+  valid: boolean;
+  errors: string[];
+} {
+  const errors: string[] = [];
+
+  if (config.mode) {
+    const validModes: C4AMode[] = ['local', 'server', 'remote'];
+    if (!validModes.includes(config.mode)) {
+      errors.push(`Invalid mode: ${config.mode}`);
+    }
+  }
+
+  if (config.mode === 'server' && !config.server?.url) {
+    errors.push('Server mode requires server.url');
+  }
+
+  if (config.mode === 'remote' && !config.remote?.url) {
+    errors.push('Remote mode requires remote.url');
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+/**
+ * 获取默认配置
+ */
+export function getDefaultConfig(): C4AConfig {
+  return { ...DEFAULT_CONFIG };
+}

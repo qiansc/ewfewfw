@@ -2,10 +2,13 @@
  * C4A DSL 文件类型定义（与 JSON Schema 完全一致）
  *
  * 这些类型用于 DSL 文件解析和验证，与 Schema 结构保持一致。
- * 区别于 types/index.ts 中的内部业务类型。
+ * 基于 v0.3.0/concepts.md 的双视角三构件模型。
  */
 
+// ============================================================================
 // 基础类型
+// ============================================================================
+
 export interface Owner {
   team?: string;
   tech_lead?: string;
@@ -13,86 +16,91 @@ export interface Owner {
   contact?: string;
 }
 
-export type Criticality = "critical" | "high" | "medium" | "low";
-export type ContractStatus =
-  | "draft"
-  | "approved"
-  | "implemented"
-  | "published"
-  | "deprecated";
-export type ContractType = "openapi" | "protobuf" | "asyncapi" | "graphql";
+export type Criticality = 'critical' | 'high' | 'medium' | 'low';
+
+export type LifecycleStatus =
+  | 'draft'
+  | 'approved'
+  | 'published'
+  | 'deprecated'
+  | 'archived';
+
+export type Scope = 'domain' | 'enterprise' | 'project';
+
+export type ContractType = 'openapi' | 'asyncapi' | 'proto' | 'graphql';
 
 export interface ExternalInfo {
   name: string;
+  description?: string;
+  url?: string;
   owner?: string;
   contact?: string;
 }
 
 export interface Link {
-  type?: "repository" | "documentation" | "dashboard" | "wiki" | "other";
+  type?: 'repository' | 'documentation' | 'dashboard' | 'wiki' | 'other';
   url: string;
   description?: string;
 }
 
-export interface Example {
-  title: string;
-  type?: "scenario" | "code" | "request" | "response";
-  content: string;
-  language?: string;
-}
+// ============================================================================
+// Product DSL（业务视角实体）
+// ============================================================================
 
-export interface Constraint {
-  performance?: {
-    qps?: string;
-    latency_p99?: string;
-    latency_p95?: string;
-    [key: string]: unknown;
+/**
+ * Product DSL - 业务产品定义
+ *
+ * 在 Domain/Enterprise 层定义，Project 层通过 REFERENCES 关系引用
+ */
+export interface ProductDSL {
+  schema: 'c4a/v1';
+  type: 'product';
+  product: {
+    id: string;
+    name: string;
+    description: string;
+    scope: Scope;
+    owner?: Owner;
+    tags?: string[];
+    /** 基于哪个上层 Product（Domain → Enterprise → Project 继承链） */
+    based_on?: string;
+    /** 引用来源（project 层引用 enterprise 时使用） */
+    reference_from?: 'domain' | 'enterprise';
+    /** 产品文档 URI */
+    doc_uri?: string;
   };
-  security?: Record<string, unknown>;
-  availability?: {
-    sla?: string;
-    rto?: string;
-    rpo?: string;
-    [key: string]: unknown;
-  };
-  [key: string]: unknown;
-}
-
-export interface Risk {
-  id?: string;
-  description: string;
-  severity?: Criticality;
-  mitigation?: string;
-}
-
-export interface Knowledge {
-  examples?: Example[];
-  how?: {
-    architecture?: string;
-    description?: string;
-    [key: string]: unknown;
-  };
-  constraints?: Constraint;
-  risks?: Risk[];
   links?: Link[];
-  [key: string]: unknown;
 }
 
-// System DSL
+// ============================================================================
+// System DSL（技术视角顶层实体）
+// ============================================================================
+
+/**
+ * System DSL - 软件系统定义
+ *
+ * 与 Product 1:1 对应，只在 Project 层存在
+ */
 export interface SystemDSL {
-  schema: "c4a/v1";
-  type: "software-system";
+  schema: 'c4a/v1';
+  type: 'software-system';
   system: {
     id: string;
     name: string;
     description: string;
     owner?: Owner;
     tags?: string[];
+    /** 对应的 Product ID（1:1 对应） */
+    corresponds_to?: string;
+    /** 是否外部系统 */
+    external?: boolean;
+    /** 外部系统信息 */
+    external_info?: ExternalInfo;
   };
   relationships?: {
     consumers?: Array<{
       id: string;
-      type: "person" | "software-system";
+      type: 'person' | 'software-system';
       description?: string;
     }>;
     dependencies?: Array<{
@@ -104,7 +112,6 @@ export interface SystemDSL {
       external_info?: ExternalInfo;
     }>;
   };
-  knowledge?: Knowledge;
   containers?: {
     $ref?: string;
   };
@@ -115,36 +122,46 @@ export interface SystemDSL {
   };
 }
 
+// ============================================================================
 // Container DSL
+// ============================================================================
+
 export interface ContainerDSL {
-  schema: "c4a/v1";
-  type: "container";
+  schema: 'c4a/v1';
+  type: 'container';
   container: {
     id: string;
     name: string;
     description: string;
-    technology: {
-      language: string;
+    /** 所属 System ID */
+    system_id: string;
+    technology?: {
+      language?: string;
       framework?: string;
       runtime?: string;
-      protocol: string;
+      protocol?: string;
     };
     ports?: Array<{
       port: number;
-      protocol: "HTTP" | "gRPC" | "TCP" | "WebSocket";
+      protocol: 'HTTP' | 'gRPC' | 'TCP' | 'WebSocket';
       description?: string;
     }>;
     repository?: {
       url?: string;
       path?: string;
     };
+    /** 代码路径（关联代码目录） */
+    code_path?: string;
+    /** 是否外部容器 */
+    external?: boolean;
+    /** 外部容器信息 */
+    external_info?: ExternalInfo;
+    /** API 契约引用 */
     apis?: Array<{
       type: ContractType;
       ref: string;
       version?: string;
-      status?: ContractStatus;
     }>;
-    components?: string[]; // 该容器包含的组件 ID 列表
   };
   relationships?: Array<{
     to: string;
@@ -152,53 +169,167 @@ export interface ContainerDSL {
     technology?: string;
     async?: boolean;
   }>;
-  knowledge?: Knowledge;
 }
 
+// ============================================================================
 // Component DSL
+// ============================================================================
+
 export interface ComponentDSL {
-  schema: "c4a/v1";
-  type: "component";
+  schema: 'c4a/v1';
+  type: 'component';
   component: {
     id: string;
     name: string;
     description: string;
+    /** 所属 Container ID */
+    container_id: string;
     technology?: string;
+    /** 职责描述 */
+    responsibility?: string;
+    /** 代码路径（关联代码文件） */
+    code_path?: string;
+    /** 实现的 Contract ID */
+    implements_contract?: string;
   };
   relationships?: Array<{
     to: string;
     description?: string;
   }>;
-  knowledge?: {
-    responsibility?: string;
-    api_tag?: string;
-    how?: {
-      description?: string;
-      [key: string]: unknown;
-    };
-    interfaces?: Array<{
-      name: string;
-      description?: string;
-    }>;
-    [key: string]: unknown;
+}
+
+// ============================================================================
+// Process DSL（流程）
+// ============================================================================
+
+export type ProcessType = 'business' | 'technical';
+
+export type FlowType = 'sequence_diagram' | 'activity_diagram' | 'state_machine';
+
+export interface FlowInfo {
+  type: FlowType;
+  diagram_uri?: string;
+  diagram_content?: string;
+}
+
+/**
+ * Process DSL - 业务或技术流程
+ *
+ * 描述"怎么运作"
+ */
+export interface ProcessDSL {
+  schema: 'c4a/v1';
+  type: 'process';
+  process: {
+    /** ID 格式：prc-b-{id} 或 prc-t-{id} */
+    id: string;
+    name: string;
+    description: string;
+    scope: Scope;
+    /** 流程类型：业务流程或技术流程 */
+    process_type: ProcessType;
+    /** 基于哪个上层 Process */
+    based_on?: string;
+    /** 父流程 ID（形成流程树） */
+    parent_id?: string;
+    /** 流程图信息 */
+    flow?: FlowInfo;
+  };
+  /** 流程步骤 */
+  steps?: Array<{
+    id: string;
+    name: string;
+    description?: string;
+    actor?: string;
+  }>;
+}
+
+// ============================================================================
+// SoR DSL（需求项）
+// ============================================================================
+
+/**
+ * SoR 的 9 种类型
+ */
+export type SoRType =
+  | 'business_rule'
+  | 'business_data'
+  | 'non_functional'
+  | 'report'
+  | 'communication'
+  | 'utility'
+  | 'user_interface'
+  | 'message'
+  | 'kpi';
+
+/**
+ * SoR 子类型
+ */
+export type SoRSubType =
+  // Business Rule 子类型
+  | 'policy'
+  | 'validation'
+  | 'business_scenario'
+  // Non-functional 子类型
+  | 'performance'
+  | 'security'
+  | 'usability'
+  | 'scalability'
+  | 'reliability'
+  // Communication 子类型
+  | 'inbound'
+  | 'outbound';
+
+/**
+ * SoR 关联的实体类型
+ */
+export type SoREntityType = 'product' | 'system' | 'container' | 'component';
+
+/**
+ * SoR DSL - Statement of Requirements
+ *
+ * 描述"要满足什么"，由 Entity × Process 交叉产生
+ */
+export interface SoRDSL {
+  schema: 'c4a/v1';
+  type: 'sor';
+  sor: {
+    /** ID 格式：sor-b-{id} 或 sor-t-{id} */
+    id: string;
+    name: string;
+    description: string;
+    scope: Scope;
+    /** SoR 类型 */
+    sor_type: SoRType;
+    /** SoR 子类型 */
+    sor_subtype?: SoRSubType;
+    /** 关联的实体类型 */
+    entity_type: SoREntityType;
+    /** 关联的实体 ID */
+    entity_id: string;
+    /** 关联的流程 ID（可选，Entity × Process → SoR） */
+    process_id?: string;
+    /** 基于哪个上层 SoR */
+    based_on?: string;
+    /** 对应的 SoR ID（Business SoR ↔ Technical SoR 对应） */
+    corresponds_to?: string;
+    /** 验收标准 */
+    acceptance_criteria?: string[];
   };
 }
 
-// ADR DSL
+// ============================================================================
+// ADR DSL（架构决策记录）
+// ============================================================================
+
 export interface ADRDSL {
-  schema: "c4a/v1";
-  type: "adr";
+  schema: 'c4a/v1';
+  type: 'adr';
   adr: {
-    id: string; // ADR-001
+    /** ID 格式：adr-{id}-{slug} */
+    id: string;
     title: string;
-    system_id?: string;
-    status:
-      | "draft"
-      | "approved"
-      | "implemented"
-      | "published"
-      | "deprecated"
-      | "superseded";
+    status: LifecycleStatus | 'superseded';
     date?: string;
     authors?: string[];
     reviewers?: string[];
@@ -217,66 +348,68 @@ export interface ADRDSL {
     description?: string;
     pros?: string[];
     cons?: string[];
-    evaluation?: number; // 1-5
+    reason?: string;
   }>;
-  affects?: Array<{
-    element_type: "system" | "container" | "component";
-    element_id: string;
-    scope?: string;
-  }>;
+  /** 影响的实体 */
+  related_entities?: string[];
   related?: {
     supersedes?: string;
     superseded_by?: string;
     related_adrs?: string[];
-    related_contracts?: string[];
   };
-  content?: string;
 }
 
-// Contract DSL
+// ============================================================================
+// Contract DSL（接口规格）
+// ============================================================================
+
+/**
+ * Contract DSL - SoR 的技术设计表达
+ */
 export interface ContractDSL {
-  schema: "c4a/v1";
-  type: "contract";
+  schema: 'c4a/v1';
+  type: 'contract';
   contract: {
     id: string;
     name: string;
     description?: string;
-    container_id?: string;
     contract_type: ContractType;
-    status: ContractStatus;
-    version?: string; // v1.2.0
+    status: LifecycleStatus;
+    version?: string;
+    /** 实现此 Contract 的 Component ID */
+    component_id?: string;
+    /** 此 Contract 实现的 SoR ID 列表 */
+    implements_sor?: string[];
   };
-  content?: string;
-  metadata?: {
-    created_at?: string;
-    updated_at?: string;
-    created_by?: string;
-    approved_by?: string;
-    approved_at?: string;
-  };
-  validation?: {
-    last_validated_at?: string;
-    success?: boolean;
-    errors?: string[];
-    warnings?: string[];
-  };
-  related?: {
-    adr_id?: string;
-    consumers?: string[];
-    supersedes?: string;
-    superseded_by?: string;
-  };
-  breaking_changes?: Array<{
-    version: string;
-    description: string;
-    migration_guide?: string;
-  }>;
+  /** 内联存储规格内容（小型契约） */
+  spec?: unknown;
+  /** 外部引用（大型契约） */
+  spec_uri?: string;
 }
 
+// ============================================================================
 // 联合类型
+// ============================================================================
+
 export type C4ADSL =
+  | ProductDSL
   | SystemDSL
   | ContainerDSL
   | ComponentDSL
+  | ProcessDSL
+  | SoRDSL
   | ADRDSL
   | ContractDSL;
+
+/**
+ * DSL 类型字符串
+ */
+export type DSLType =
+  | 'product'
+  | 'software-system'
+  | 'container'
+  | 'component'
+  | 'process'
+  | 'sor'
+  | 'adr'
+  | 'contract';

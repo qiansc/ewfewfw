@@ -1,0 +1,96 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://context4ai.org/schemas/c4a-sor.schema.json",
+  "title": "C4A SoR Schema",
+  "description": "C4A DSL SoR (需求项) 定义",
+  "type": "object",
+  "required": ["schema", "type", "sor"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "c4a/v1",
+      "description": "Schema 版本"
+    },
+    "type": {
+      "const": "sor",
+      "description": "实体类型"
+    },
+    "sor": {
+      "type": "object",
+      "required": ["id", "sor_type", "entity_type", "entity_id", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^sor-[bt]-[a-z]\\d{3}$",
+          "description": "SoR ID (e.g. sor-b-a001)"
+        },
+        "sor_type": {
+          "type": "string",
+          "enum": [
+            "business_rule",
+            "business_data",
+            "non_functional",
+            "report",
+            "communication",
+            "utility",
+            "user_interface",
+            "message",
+            "kpi"
+          ],
+          "description": "SoR 类型"
+        },
+        "sor_subtype": {
+          "type": "string",
+          "enum": [
+            "policy",
+            "validation",
+            "business_scenario",
+            "performance",
+            "security",
+            "usability",
+            "scalability",
+            "reliability",
+            "inbound",
+            "outbound"
+          ],
+          "description": "SoR 子类型"
+        },
+        "entity_type": {
+          "type": "string",
+          "enum": ["product", "system", "container", "component"],
+          "description": "关联实体类型"
+        },
+        "entity_id": {
+          "type": "string",
+          "description": "关联实体 ID"
+        },
+        "process_id": {
+          "type": "string",
+          "description": "关联流程 ID"
+        },
+        "description": {
+          "type": "string",
+          "description": "需求描述"
+        },
+        "owner": {
+          "$ref": "c4a-common.schema.json#/$defs/owner"
+        },
+        "tags": {
+          "$ref": "c4a-common.schema.json#/$defs/tags"
+        },
+        "based_on": {
+          "type": "string",
+          "description": "基于哪个上层 SoR"
+        },
+        "corresponds_to": {
+          "type": "string",
+          "description": "对应的 SoR ID"
+        }
+      }
+    },
+    "knowledge": {
+      "$ref": "c4a-common.schema.json#/$defs/knowledge"
+    }
+  }
+}

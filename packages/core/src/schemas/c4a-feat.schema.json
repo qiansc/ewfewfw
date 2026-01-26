@@ -1,0 +1,211 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://context4ai.org/schemas/c4a-feat.schema.json",
+  "title": "C4A Feat Schema",
+  "description": "C4A Feat（需求迭代）实体 Schema",
+  "type": "object",
+  "required": ["id", "type", "name", "status", "source_project", "created_at"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^feat-[a-z]\\d{3}(-[a-z0-9]+)*$",
+      "description": "Feat ID，格式：feat-{序号}-{简短描述}"
+    },
+    "type": {
+      "type": "string",
+      "const": "feat",
+      "description": "类型标识"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "显示名称"
+    },
+    "description": {
+      "type": "string",
+      "description": "描述"
+    },
+    "status": {
+      "$ref": "#/$defs/featStatus"
+    },
+    "source_project": {
+      "type": "string",
+      "description": "所属项目"
+    },
+    "source_repo": {
+      "type": "string",
+      "description": "所属仓库"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "创建时间"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "更新时间"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "创建者"
+    },
+    "owner": {
+      "$ref": "c4a-common.schema.json#/$defs/owner"
+    },
+    "changes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/featChange" },
+      "description": "变更记录列表"
+    },
+    "workflow_steps": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/workflowStep" },
+      "description": "Workflow 步骤"
+    },
+    "current_step_index": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "当前 Workflow 步骤索引"
+    },
+    "related_adrs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "关联的 ADR ID 列表"
+    },
+    "checklist_id": {
+      "type": "string",
+      "description": "关联的 Checklist ID"
+    },
+    "metadata": {
+      "$ref": "#/$defs/featMetadata"
+    }
+  },
+  "$defs": {
+    "featStatus": {
+      "type": "string",
+      "enum": ["draft", "approved", "published", "deprecated", "archived"],
+      "description": "Feat 生命周期状态"
+    },
+    "changeOperation": {
+      "type": "string",
+      "enum": ["create", "update", "delete"],
+      "description": "变更操作类型"
+    },
+    "featChange": {
+      "type": "object",
+      "required": ["entity_id", "entity_type", "operation", "changed_at"],
+      "additionalProperties": false,
+      "properties": {
+        "entity_id": {
+          "type": "string",
+          "description": "实体 ID"
+        },
+        "entity_type": {
+          "type": "string",
+          "description": "实体类型"
+        },
+        "operation": {
+          "$ref": "#/$defs/changeOperation"
+        },
+        "before_hash": {
+          "type": "string",
+          "description": "变更前的内容哈希"
+        },
+        "after_hash": {
+          "type": "string",
+          "description": "变更后的内容哈希"
+        },
+        "changed_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "变更时间"
+        },
+        "changed_by": {
+          "type": "string",
+          "description": "变更者"
+        },
+        "change_note": {
+          "type": "string",
+          "description": "变更说明"
+        }
+      }
+    },
+    "workflowStepStatus": {
+      "type": "string",
+      "enum": ["pending", "running", "completed", "failed", "skipped"],
+      "description": "Workflow 步骤状态"
+    },
+    "workflowStep": {
+      "type": "object",
+      "required": ["step_id", "name", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "step_id": {
+          "type": "string",
+          "description": "步骤 ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "步骤名称"
+        },
+        "status": {
+          "$ref": "#/$defs/workflowStepStatus"
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "开始时间"
+        },
+        "completed_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "完成时间"
+        },
+        "error": {
+          "type": "string",
+          "description": "错误信息"
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "步骤数据"
+        }
+      }
+    },
+    "featMetadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "reviewers": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "审核人列表"
+        },
+        "approved_by": {
+          "type": "string",
+          "description": "批准人"
+        },
+        "approved_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "批准时间"
+        },
+        "published_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "发布时间"
+        },
+        "rejection_reason": {
+          "type": "string",
+          "description": "拒绝原因"
+        },
+        "external_id": {
+          "type": "string",
+          "description": "关联的外部系统 ID"
+        }
+      }
+    }
+  }
+}

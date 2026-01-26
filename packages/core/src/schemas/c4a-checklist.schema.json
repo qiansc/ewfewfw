@@ -1,0 +1,177 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://context4ai.org/schemas/c4a-checklist.schema.json",
+  "title": "C4A Checklist Schema",
+  "description": "C4A Checklist 实体 Schema",
+  "type": "object",
+  "required": ["id", "feat_id", "title", "items", "created_at"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Checklist ID"
+    },
+    "feat_id": {
+      "type": "string",
+      "description": "关联的 Feat ID"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "标题"
+    },
+    "description": {
+      "type": "string",
+      "description": "描述"
+    },
+    "items": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/checklistItem" },
+      "description": "所有项目"
+    },
+    "groups": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/checklistGroup" },
+      "description": "分组"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "创建时间"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "更新时间"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "创建者"
+    },
+    "progress": {
+      "$ref": "#/$defs/checklistProgress"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "扩展元数据"
+    }
+  },
+  "$defs": {
+    "checklistItemStatus": {
+      "type": "string",
+      "enum": ["pending", "in_progress", "completed", "skipped", "blocked"],
+      "description": "项目状态"
+    },
+    "checklistItemType": {
+      "type": "string",
+      "enum": ["task", "milestone", "review", "validation"],
+      "description": "项目类型"
+    },
+    "checklistItem": {
+      "type": "object",
+      "required": ["id", "content", "type", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "项目 ID"
+        },
+        "content": {
+          "type": "string",
+          "description": "项目内容"
+        },
+        "type": {
+          "$ref": "#/$defs/checklistItemType"
+        },
+        "status": {
+          "$ref": "#/$defs/checklistItemStatus"
+        },
+        "assignee": {
+          "type": "string",
+          "description": "负责人"
+        },
+        "due_date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "预计完成时间"
+        },
+        "completed_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "实际完成时间"
+        },
+        "completed_by": {
+          "type": "string",
+          "description": "完成者"
+        },
+        "related_entity_id": {
+          "type": "string",
+          "description": "关联的实体 ID"
+        },
+        "related_entity_type": {
+          "type": "string",
+          "description": "关联的实体类型"
+        },
+        "depends_on": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "前置任务 ID 列表"
+        },
+        "notes": {
+          "type": "string",
+          "description": "备注"
+        },
+        "order": {
+          "type": "integer",
+          "description": "顺序"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "扩展数据"
+        }
+      }
+    },
+    "checklistGroup": {
+      "type": "object",
+      "required": ["id", "name", "item_ids"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "分组 ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "分组名称"
+        },
+        "description": {
+          "type": "string",
+          "description": "分组描述"
+        },
+        "item_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "分组内的项目 ID 列表"
+        },
+        "order": {
+          "type": "integer",
+          "description": "顺序"
+        }
+      }
+    },
+    "checklistProgress": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "completed": { "type": "integer", "minimum": 0 },
+        "in_progress": { "type": "integer", "minimum": 0 },
+        "pending": { "type": "integer", "minimum": 0 },
+        "skipped": { "type": "integer", "minimum": 0 },
+        "blocked": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

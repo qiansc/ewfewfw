@@ -1,16 +1,8 @@
 # C4A - Context For AI
 
-> ## 第一性原理
->
-> **代码是知识的有损投影。**
->
-> 代码是给机器执行的指令，只包含执行所需的信息。理解一个系统所需的知识——设计意图、架构边界、依赖关系、历史演进——并不在代码里。
->
-> **C4A 的任务：将隐性知识显性化，使其可被机器消费。**
-
 ---
 
-架构知识管理平台，为 AI Agent 提供项目知识的生产与消费能力。
+知识管理平台，为 AI Agent 提供知识的生产与消费能力。
 
 ## 项目结构
 
@@ -21,8 +13,7 @@ c4a/
 │   ├── config-generator/      # 配置生成器 (TypeScript)
 │   ├── core/                  # 共享核心库 (TypeScript)
 │   ├── mcp-code/              # 代码分析提取 (TypeScript)
-│   ├── mcp-data/              # 统一数据服务 (Python)
-│   └── mcp-dsl/               # DSL 解析验证 (TypeScript)
+│   └── mcp-data/              # 统一数据服务 (Python)
 ├── prompts/                   # Agent Prompts
 ├── docker/                    # Docker 配置
 ├── docs/                      # 项目文档
@@ -116,7 +107,6 @@ cp .env.example .env    # 复制环境变量模板
 ./start.sh dev          # 开发模式: 启动存储 + mcp-data + ttyd，提供 Web 终端访问
 ./start.sh docker       # Docker 模式: 全部服务容器化，暴露 HTTP 端口
 ./start.sh prod         # 生产模式: 启用健康检查和自动重启
-./start.sh debug:dsl    # 调试 mcp-dsl (前台运行)
 ./start.sh debug:code   # 调试 mcp-code (前台运行)
 ./start.sh debug:data   # 调试 mcp-data (前台运行)
 ./start.sh status       # 查看服务状态
@@ -149,7 +139,6 @@ cp .env.example .env    # 复制环境变量模板
 | 19530 | Milvus |
 | 7681 | ttyd (Web 终端，仅 dev 模式) |
 | 8050 | mcp-data (数据服务) |
-| 8051 | mcp-dsl (DSL 解析，仅 docker/prod 模式) |
 | 8052 | mcp-code (代码分析，仅 docker/prod 模式) |
 
 ## 核心概念
@@ -177,6 +166,7 @@ cp .env.example .env    # 复制环境变量模板
 2. **直接修改**: 不打补丁，直接更新
 3. **无营销语言**: 不用"高性能"、"灵活"等模糊词汇
 4. **链接有效**: 所有内部链接必须可用
+5. **避免冗余版本号**: 不要在展示类文档、示例、DSL 文件中写 C4A 版本信息（如 `version: v0.1`）。版本号仅在需要严格版本控制的地方使用（如 JSON Schema、发布文档）
 
 ## 详细文档
 
