@@ -36,11 +36,16 @@ export function getAjv(): Ajv {
 function loadSchemas(ajv: Ajv): void {
   const schemaFiles = [
     "c4a-common.schema.json",
+    "c4a-product.schema.json",
     "c4a-system.schema.json",
     "c4a-container.schema.json",
     "c4a-component.schema.json",
+    "c4a-process.schema.json",
+    "c4a-sor.schema.json",
     "c4a-adr.schema.json",
     "c4a-contract.schema.json",
+    "c4a-feat.schema.json",
+    "c4a-checklist.schema.json",
     "c4a-constraints.schema.json",
     "c4a-risks.schema.json",
     "c4a-history.schema.json",
@@ -61,7 +66,7 @@ function loadSchemas(ajv: Ajv): void {
  * 获取特定类型的验证器
  */
 export function getValidator(
-  type: "system" | "container" | "component" | "adr" | "contract"
+  type: "product" | "system" | "container" | "component" | "process" | "sor" | "adr" | "contract"
 ): ValidateFunction | null {
   const cacheKey = type;
 
@@ -71,9 +76,12 @@ export function getValidator(
 
   const ajv = getAjv();
   const schemaMap: Record<string, string> = {
+    product: "https://c4a.dev/schema/c4a-product.schema.json",
     system: "https://c4a.dev/schema/c4a-system.schema.json",
     container: "https://c4a.dev/schema/c4a-container.schema.json",
     component: "https://c4a.dev/schema/c4a-component.schema.json",
+    process: "https://c4a.dev/schema/c4a-process.schema.json",
+    sor: "https://c4a.dev/schema/c4a-sor.schema.json",
     adr: "https://c4a.dev/schema/c4a-adr.schema.json",
     contract: "https://c4a.dev/schema/c4a-contract.schema.json",
   };

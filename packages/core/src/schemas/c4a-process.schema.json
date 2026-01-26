@@ -1,0 +1,83 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://context4ai.org/schemas/c4a-process.schema.json",
+  "title": "C4A Process Schema",
+  "description": "C4A DSL Process (流程) 定义",
+  "type": "object",
+  "required": ["schema", "type", "process"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "c4a/v1",
+      "description": "Schema 版本"
+    },
+    "type": {
+      "const": "process",
+      "description": "实体类型"
+    },
+    "process": {
+      "type": "object",
+      "required": ["id", "name", "process_type"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^prc-[bt]-[a-z]\\d{3}$",
+          "description": "流程 ID (e.g. prc-b-a001)"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "流程名称"
+        },
+        "process_type": {
+          "type": "string",
+          "enum": ["business", "technical"],
+          "description": "流程类型"
+        },
+        "description": {
+          "type": "string",
+          "description": "流程描述"
+        },
+        "owner": {
+          "$ref": "c4a-common.schema.json#/$defs/owner"
+        },
+        "tags": {
+          "$ref": "c4a-common.schema.json#/$defs/tags"
+        },
+        "based_on": {
+          "type": "string",
+          "description": "基于哪个上层 Process"
+        },
+        "parent_id": {
+          "type": "string",
+          "description": "父流程 ID"
+        },
+        "flow": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["sequence_diagram", "activity_diagram", "state_machine"],
+              "description": "流程图类型"
+            },
+            "diagram_uri": {
+              "type": "string",
+              "description": "流程图文件路径"
+            },
+            "diagram_content": {
+              "type": "string",
+              "description": "流程图源码 (如 Mermaid)"
+            }
+          },
+          "required": ["type"],
+          "additionalProperties": false
+        }
+      }
+    },
+    "knowledge": {
+      "$ref": "c4a-common.schema.json#/$defs/knowledge"
+    }
+  }
+}

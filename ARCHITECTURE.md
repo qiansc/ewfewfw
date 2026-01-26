@@ -1,5 +1,11 @@
 # C4A v0.2 工程架构
 
+> **注意**：本文档描述的是 v0.2 的实现架构。
+>
+> **v0.3.0 设计文档**请查看 [v0.3.0/architecture.md](docs/v0.3.0/architecture.md)
+>
+---
+
 ## 概述
 
 C4A v0.2 采用 **MCP (Model Context Protocol) + Agent** 架构，完全围绕 AI Agent 设计：

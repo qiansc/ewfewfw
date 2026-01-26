@@ -1,0 +1,221 @@
+/**
+ * C4A 基础类型定义
+ *
+ * 定义所有实体共享的基础类型和枚举
+ */
+
+// ============================================================================
+// 知识层级 (Scope)
+// ============================================================================
+
+/**
+ * 三层知识结构
+ * - domain: 行业知识，纯业务视角
+ * - enterprise: 企业知识，纯业务视角
+ * - project: 项目知识，业务视角 + 技术视角（完整双视角）
+ */
+export type Scope = 'domain' | 'enterprise' | 'project';
+
+// ============================================================================
+// 知识生命周期 (Status)
+// ============================================================================
+
+/**
+ * 知识生命周期状态
+ *
+ * 状态流转：draft → approved → published → deprecated → archived
+ * 强制规则：
+ * - 状态流转必须按顺序进行，不可跳过
+ * - draft → published 是非法操作，必须先经过 approved
+ * - published 状态的实体不可直接修改，需创建新版本（新 draft）
+ */
+export type LifecycleStatus = 'draft' | 'approved' | 'published' | 'deprecated' | 'archived';
+
+/**
+ * 状态流转有效性映射
+ */
+export const VALID_STATUS_TRANSITIONS: Record<LifecycleStatus, LifecycleStatus[]> = {
+  draft: ['approved', 'archived'], // archived 用于拒绝场景
+  approved: ['published', 'archived'], // archived 用于废弃场景
+  published: ['deprecated'],
+  deprecated: ['archived'],
+  archived: [], // 终态，不可流转
+};
+
+/**
+ * 检查状态流转是否有效
+ */
+export function isValidStatusTransition(from: LifecycleStatus, to: LifecycleStatus): boolean {
+  return VALID_STATUS_TRANSITIONS[from]?.includes(to) ?? false;
+}
+
+// ============================================================================
+// 知识点类型 (Kind)
+// ============================================================================
+
+/**
+ * 知识点类型
+ * - implementation: 实现层面的知识（代码、配置等）
+ * - external: 外部系统/服务
+ * - concept: 概念层面的知识（设计、规范等）
+ */
+export type EntityKind = 'implementation' | 'external' | 'concept';
+
+// ============================================================================
+// 双视角 (Perspective)
+// ============================================================================
+
+/**
+ * 双视角
+ * - business: 业务视角，关注业务价值、用户需求
+ * - technical: 技术视角，关注技术实现、系统架构
+ */
+export type Perspective = 'business' | 'technical';
+
+// ============================================================================
+// 实体类型 (EntityType)
+// ============================================================================
+
+/**
+ * 所有实体类型
+ */
+export type EntityType =
+  // 业务视角实体
+  | 'product'
+  // 技术视角实体 (C4 模型)
+  | 'system'
+  | 'container'
+  | 'component'
+  // 流程
+  | 'process'
+  // 需求项
+  | 'sor'
+  // 附属实体
+  | 'adr'
+  | 'contract'
+  // Feature 分支
+  | 'feat';
+
+/**
+ * 核心实体类型（三构件）
+ */
+export type CoreEntityType = 'product' | 'system' | 'container' | 'component' | 'process' | 'sor';
+
+/**
+ * 技术视角实体类型
+ */
+export type TechnicalEntityType = 'system' | 'container' | 'component';
+
+/**
+ * 附属实体类型
+ */
+export type AttachedEntityType = 'adr' | 'contract';
+
+// ============================================================================
+// 基础元数据接口
+// ============================================================================
+
+/**
+ * Owner 信息
+ */
+export interface Owner {
+  team?: string;
+  tech_lead?: string;
+  product_owner?: string;
+  contact?: string;
+}
+
+/**
+ * 外部系统信息
+ */
+export interface ExternalInfo {
+  name: string;
+  description?: string;
+  url?: string;
+  owner?: string;
+  contact?: string;
+}
+
+/**
+ * 链接
+ */
+export interface Link {
+  type?: 'repository' | 'documentation' | 'dashboard' | 'wiki' | 'other';
+  url: string;
+  description?: string;
+}
+
+/**
+ * 基础实体元数据
+ * 所有实体都必须包含这些字段
+ */
+export interface BaseEntityMetadata {
+  /** 实体唯一标识 */
+  id: string;
+
+  /** 实体类型 */
+  type: EntityType;
+
+  /** 知识层级 */
+  scope: Scope;
+
+  /** 显示名称 */
+  name: string;
+
+  /** 描述 */
+  description?: string;
+
+  /** 版本号 */
+  version?: string;
+
+  /** 标签 */
+  tags?: string[];
+
+  /** 所属者信息 */
+  owner?: Owner;
+
+  /** 相关链接 */
+  links?: Link[];
+
+  /** 生命周期状态 */
+  status: LifecycleStatus;
+
+  /** 创建时间 */
+  created_at?: string;
+
+  /** 更新时间 */
+  updated_at?: string;
+
+  /** 创建者 */
+  created_by?: string;
+
+  /** 更新者 */
+  updated_by?: string;
+}
+
+/**
+ * 数据库存储的实体元数据
+ * 包含额外的存储层字段
+ */
+export interface StoredEntityMetadata extends BaseEntityMetadata {
+  /** 提案 ID，用于 Copy-on-Write 机制 */
+  proposal_id?: string | null;
+
+  /** 实体归属的项目 ID */
+  source_project?: string | null;
+
+  /** 实体归属的代码仓库 URL */
+  source_repo?: string | null;
+
+  /** 内容哈希，用于变更检测 */
+  content_hash?: string;
+}
+
+// ============================================================================
+// 批量性级别 (Criticality)
+// ============================================================================
+
+/**
+ * 重要性级别
+ */
+export type Criticality = 'critical' | 'high' | 'medium' | 'low';

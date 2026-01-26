@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://context4ai.org/schemas/c4a-product.schema.json",
+  "title": "C4A Product Schema",
+  "description": "C4A DSL Product (业务视角实体) 定义",
+  "type": "object",
+  "required": ["schema", "type", "product"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "c4a/v1",
+      "description": "Schema 版本"
+    },
+    "type": {
+      "const": "product",
+      "description": "实体类型"
+    },
+    "product": {
+      "type": "object",
+      "required": ["id", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "产品唯一标识"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "产品名称"
+        },
+        "description": {
+          "type": "string",
+          "description": "产品描述"
+        },
+        "owner": {
+          "$ref": "c4a-common.schema.json#/$defs/owner"
+        },
+        "tags": {
+          "$ref": "c4a-common.schema.json#/$defs/tags"
+        },
+        "based_on": {
+          "type": "string",
+          "description": "基于哪个上层 Product"
+        },
+        "reference_from": {
+          "type": "string",
+          "enum": ["domain", "enterprise"],
+          "description": "引用来源"
+        },
+        "doc_uri": {
+          "type": "string",
+          "description": "产品文档 URI"
+        }
+      }
+    },
+    "knowledge": {
+      "$ref": "c4a-common.schema.json#/$defs/knowledge"
+    }
+  }
+}

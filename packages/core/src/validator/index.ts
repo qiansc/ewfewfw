@@ -18,7 +18,7 @@ export interface ValidationResult {
   data?: unknown;
 }
 
-export type DSLType = "system" | "container" | "component" | "adr" | "contract";
+export type DSLType = "product" | "system" | "container" | "component" | "process" | "sor" | "adr" | "contract";
 
 /**
  * knowledge 允许的字段列表
@@ -171,9 +171,12 @@ export function validateDSLAuto(data: unknown): ValidationResult {
   const type = obj.type as string;
 
   const typeMap: Record<string, DSLType> = {
+    product: "product",
     "software-system": "system",
     container: "container",
     component: "component",
+    process: "process",
+    sor: "sor",
     adr: "adr",
     contract: "contract",
   };

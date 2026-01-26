@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://c4a.dev/schema/c4a-risks.schema.json",
+  "$id": "https://context4ai.org/schemas/c4a-risks.schema.json",
   "title": "C4A Risks Schema",
   "description": "C4A 风险和技术债定义",
 

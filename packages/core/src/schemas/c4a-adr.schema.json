@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://c4a.dev/schema/c4a-adr.schema.json",
+  "$id": "https://context4ai.org/schemas/c4a-adr.schema.json",
   "title": "C4A ADR Schema",
   "description": "C4A 架构决策记录 (Architecture Decision Record) 定义",
 
@@ -26,8 +26,8 @@
       "properties": {
         "id": {
           "type": "string",
-          "pattern": "^ADR-[0-9]{3,4}$",
-          "description": "ADR 编号，如 ADR-001"
+          "pattern": "^adr-[a-z]\\d{3}(-[a-z0-9]+)*$",
+          "description": "ADR ID，格式：adr-{序号}-{简短描述}，如 adr-a001-introduce-mq"
         },
         "title": {
           "type": "string",
@@ -41,7 +41,7 @@
         },
         "status": {
           "type": "string",
-          "enum": ["draft", "approved", "implemented", "published", "deprecated", "superseded"],
+          "enum": ["draft", "approved", "published", "deprecated", "archived", "superseded"],
           "description": "ADR 状态"
         },
         "date": {
@@ -173,19 +173,19 @@
       "properties": {
         "supersedes": {
           "type": "string",
-          "pattern": "^ADR-[0-9]{3,4}$",
+          "pattern": "^adr-[a-z]\\d{3}(-[a-z0-9]+)*$",
           "description": "替代的 ADR ID"
         },
         "superseded_by": {
           "type": "string",
-          "pattern": "^ADR-[0-9]{3,4}$",
+          "pattern": "^adr-[a-z]\\d{3}(-[a-z0-9]+)*$",
           "description": "被哪个 ADR 替代"
         },
         "related_adrs": {
           "type": "array",
           "items": {
             "type": "string",
-            "pattern": "^ADR-[0-9]{3,4}$"
+            "pattern": "^adr-[a-z]\\d{3}(-[a-z0-9]+)*$"
           },
           "description": "相关 ADR 列表"
         },
