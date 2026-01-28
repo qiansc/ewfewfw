@@ -21,7 +21,7 @@
 
     "system": {
       "type": "object",
-      "required": ["id", "name", "description"],
+      "required": ["id", "name", "description", "scope"],
       "additionalProperties": false,
       "properties": {
         "id": {
@@ -42,6 +42,11 @@
           "minLength": 1,
           "description": "系统描述，说明业务价值"
         },
+        "scope": {
+          "type": "string",
+          "enum": ["project"],
+          "description": "知识层级（System 仅在 Project 层）"
+        },
         "owner": {
           "$ref": "c4a-common.schema.json#/$defs/owner",
           "description": "所有权信息"
@@ -49,6 +54,19 @@
         "tags": {
           "$ref": "c4a-common.schema.json#/$defs/tags",
           "description": "分类标签"
+        },
+        "corresponds_to": {
+          "type": "string",
+          "description": "对应的 Product ID（1:1 双视角映射）"
+        },
+        "external": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否为外部系统"
+        },
+        "external_info": {
+          "$ref": "c4a-common.schema.json#/$defs/externalInfo",
+          "description": "外部系统信息（仅 external=true 时）"
         }
       }
     },
@@ -118,11 +136,6 @@
           }
         }
       }
-    },
-
-    "knowledge": {
-      "$ref": "c4a-common.schema.json#/$defs/knowledge",
-      "description": "系统级知识附加"
     },
 
     "containers": {

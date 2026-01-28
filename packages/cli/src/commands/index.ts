@@ -237,7 +237,7 @@ async function cmdDev(forceRestart = false) {
     success(`mcp-data 已启动 (PID: ${mcpPid})`);
   } catch (e) {
     error(`mcp-data 启动失败: ${e}`);
-    error("请检查日志: .c4a/logs/mcp-data.log");
+    error("请检查日志: .context/logs/mcp-data.log");
     process.exit(1);
   }
 
@@ -283,7 +283,7 @@ async function cmdDev(forceRestart = false) {
   console.log(`    ${getOpencodeCommand()}`);
   console.log("");
   console.log(yellow("服务已在后台运行，使用 ./start.sh stop 停止"));
-  console.log(yellow("遇到问题？查看日志: .c4a/logs/"));
+  console.log(yellow("遇到问题？查看日志: .context/logs/"));
   console.log("");
 }
 
@@ -377,7 +377,7 @@ async function cmdStatus() {
 
   console.log("\n" + blue("日志文件位置:"));
   const { resolve } = await import("node:path");
-  const logsDir = resolve(PROJECT_ROOT, ".c4a/logs");
+  const logsDir = resolve(PROJECT_ROOT, ".context/logs");
   console.log(`  ${logsDir}/mcp-data.log`);
   console.log(`  ${logsDir}/mcp-data.stdout.log`);
   console.log("");
@@ -440,7 +440,7 @@ async function cmdRestart() {
     success(`mcp-data 已启动 (PID: ${mcpPid})`);
   } catch (e) {
     error(`mcp-data 启动失败: ${e}`);
-    error("请检查日志: .c4a/logs/mcp-data.log");
+    error("请检查日志: .context/logs/mcp-data.log");
     process.exit(1);
   }
 
@@ -474,7 +474,7 @@ async function cmdCleanStorage() {
       "Milvus 数据 (milvus_data volume) - 向量索引",
       "Ollama 模型 (ollama_data volume) - embedding 模型缓存",
     ],
-    warning: "本地 .c4a/ 目录的文件不受影响",
+    warning: "本地 .context/ 目录的文件不受影响",
   });
 
   if (confirmed) {
@@ -492,12 +492,12 @@ async function cmdCleanLocal() {
     title: "clean:local - 清理本地知识文件",
     message: "将清理以下目录的内容：",
     items: [
-      ".c4a/drafts/ - 草稿 DSL 文件",
-      ".c4a/approved/ - 已批准的 DSL 文件",
-      ".c4a/published/ - 已发布的 DSL 文件",
-      ".c4a/research/ - 调研文档",
-      ".c4a/archive/ - 归档文件",
-      ".c4a/cache/ - 缓存文件",
+      ".context/business/ - 业务视角 DSL 文件",
+      ".context/technical/ - 技术视角 DSL 文件",
+      ".context/feat/ - feat 迭代目录",
+      ".context/assets/ - 资源文件",
+      ".context/.schemas/ - 本地 Schema 缓存",
+      ".context/logs/ - 本地日志",
     ],
     warning: "远程存储（MongoDB/Neo4j/Milvus）和日志文件不受影响",
   });
@@ -505,19 +505,19 @@ async function cmdCleanLocal() {
   if (confirmed) {
     const { rmSync, readdirSync, existsSync } = await import("node:fs");
 
-    const c4aDir = resolve(PROJECT_ROOT, ".c4a");
+    const contextDir = resolve(PROJECT_ROOT, ".context");
 
-    // 清理 .c4a 指定子目录的内容（保留目录本身）
-    const c4aSubDirs = ["drafts", "approved", "published", "research", "archive", "cache"];
-    for (const subDir of c4aSubDirs) {
-      const dirPath = resolve(c4aDir, subDir);
+    // 清理 .context 指定子目录的内容（保留目录本身）
+    const contextSubDirs = ["business", "technical", "feat", "assets", ".schemas", "logs"];
+    for (const subDir of contextSubDirs) {
+      const dirPath = resolve(contextDir, subDir);
       if (existsSync(dirPath)) {
         // 删除目录内的所有内容，但保留目录本身
         const entries = readdirSync(dirPath);
         for (const entry of entries) {
           rmSync(resolve(dirPath, entry), { recursive: true, force: true });
         }
-        success(`已清空 .c4a/${subDir}/`);
+        success(`已清空 .context/${subDir}/`);
       }
     }
 
@@ -533,7 +533,7 @@ async function cmdCleanAll() {
     message: "此命令将清理：",
     items: [
       "远程存储 (MongoDB/Neo4j/Milvus/Ollama volumes)",
-      "本地知识文件 (.c4a/ 指定目录内容)",
+      "本地知识文件 (.context/ 指定目录内容)",
     ],
     warning: "此操作将删除所有数据，包括本地知识和远程存储！",
   });
@@ -551,12 +551,12 @@ async function cmdCleanAll() {
     info("清理本地知识文件...");
     const { rmSync, readdirSync, existsSync } = await import("node:fs");
 
-    const c4aDir = resolve(PROJECT_ROOT, ".c4a");
+    const contextDir = resolve(PROJECT_ROOT, ".context");
 
-    // 清理 .c4a 指定子目录的内容（保留目录本身）
-    const c4aSubDirs = ["drafts", "approved", "published", "research", "archive", "cache"];
-    for (const subDir of c4aSubDirs) {
-      const dirPath = resolve(c4aDir, subDir);
+    // 清理 .context 指定子目录的内容（保留目录本身）
+    const contextSubDirs = ["business", "technical", "feat", "assets", ".schemas", "logs"];
+    for (const subDir of contextSubDirs) {
+      const dirPath = resolve(contextDir, subDir);
       if (existsSync(dirPath)) {
         const entries = readdirSync(dirPath);
         for (const entry of entries) {

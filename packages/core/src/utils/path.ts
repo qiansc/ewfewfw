@@ -5,7 +5,7 @@
  * 基于 v0.3.0 架构设计：.context/ + business/technical/feat 双视角结构
  */
 
-import type { EntityType } from '../types/base';
+import type { EntityType, Perspective } from '../types/base.js';
 
 // ============================================================================
 // 路径常量
@@ -20,8 +20,8 @@ export const CONFIG_FILENAME = '.c4a.yaml';
 /** DSL 文件扩展名 */
 export const DSL_EXTENSION = '.c4a.yaml';
 
-/** 视角类型 */
-export type Perspective = 'business' | 'technical';
+// 重新导出 Perspective 类型（保持向后兼容）
+export type { Perspective };
 
 /** 业务视角实体类型 */
 export const BUSINESS_TYPES = ['product', 'process', 'sor'] as const;
@@ -88,8 +88,12 @@ export function getEntityPath(
   if (!perspective && (type === 'process' || type === 'sor')) {
     perspective = getPerspectiveFromId(id);
   }
+  if (!perspective && (type === 'process' || type === 'sor')) {
+    // process/sor 必须通过 ID 前缀 (prc-b-/prc-t-/sor-b-/sor-t-) 或 options.perspective 指定视角
+    throw new Error(`Cannot determine perspective for ${type} "${id}": ID must start with prc-b-/prc-t- or sor-b-/sor-t-, or provide perspective option`);
+  }
   if (!perspective) {
-    perspective = 'technical'; // 默认技术视角
+    perspective = 'technical'; // 其他类型默认技术视角
   }
 
   // feat 内实体

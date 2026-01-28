@@ -18,16 +18,18 @@ const KNOWN_TOOLS: Record<string, string[]> = {
     "c4a_local_write_file",
     "c4a_local_transition_status",
   ],
-  c4a_db: [
-    "c4a_db_save_entity",
-    "c4a_db_get_entity",
-    "c4a_db_delete_entity",
-    "c4a_db_search_semantic",
-    "c4a_db_query_deps",
-    "c4a_db_query_impact",
-    "c4a_db_sync_file",
-    "c4a_db_sync_local",
-    "c4a_db_exec_cypher",
+  c4a_store: [
+    "c4a_store_save",
+    "c4a_store_read",
+    "c4a_store_delete",
+    "c4a_store_sync_file",
+    "c4a_store_sync",
+  ],
+  c4a_query: [
+    "c4a_query_search",
+    "c4a_query_deps",
+    "c4a_query_impact",
+    "c4a_query_exec_cypher",
   ],
 };
 
@@ -40,7 +42,8 @@ const TOOL_PREFIX_TO_SERVER: Record<string, string> = {
   c4a_dsl: "c4a-dsl-mcp",
   c4a_local: "c4a-dsl-mcp", // c4a_local_* 工具由 c4a-dsl-mcp 提供
   c4a_code: "c4a-code-mcp",
-  c4a_db: "c4a-data-mcp",
+  c4a_store: "c4a-data-mcp",
+  c4a_query: "c4a-data-mcp",
 };
 
 /**

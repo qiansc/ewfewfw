@@ -29,6 +29,29 @@ export type Scope = 'domain' | 'enterprise' | 'project';
 
 export type ContractType = 'openapi' | 'asyncapi' | 'proto' | 'graphql';
 
+/**
+ * ADR 状态（与 attached.ts 中的 ADRStatus 保持一致）
+ * 使用通用生命周期状态 + superseded（被替代）
+ */
+export type ADRStatus =
+  | 'draft'
+  | 'approved'
+  | 'published'
+  | 'deprecated'
+  | 'archived'
+  | 'superseded';
+
+/**
+ * Contract 状态（与 Schema 一致）
+ * Contract 有独立的生命周期，包含 implemented 状态表示已被 Component 实现
+ */
+export type ContractStatus =
+  | 'draft'
+  | 'approved'
+  | 'implemented'
+  | 'published'
+  | 'deprecated';
+
 export interface ExternalInfo {
   name: string;
   description?: string;
@@ -88,6 +111,8 @@ export interface SystemDSL {
     id: string;
     name: string;
     description: string;
+    /** System 只在 Project 层存在 */
+    scope: 'project';
     owner?: Owner;
     tags?: string[];
     /** 对应的 Product ID（1:1 对应） */
@@ -133,14 +158,16 @@ export interface ContainerDSL {
     id: string;
     name: string;
     description: string;
+    /** Container 只在 Project 层存在 */
+    scope: 'project';
     /** 所属 System ID */
     system_id: string;
-    technology?: {
-      language?: string;
+    technology?: Array<{
+      language: string;
       framework?: string;
       runtime?: string;
       protocol?: string;
-    };
+    }>;
     ports?: Array<{
       port: number;
       protocol: 'HTTP' | 'gRPC' | 'TCP' | 'WebSocket';
@@ -168,6 +195,10 @@ export interface ContainerDSL {
     description?: string;
     technology?: string;
     async?: boolean;
+    /** 是否为外部容器（如 Redis、Kafka 等） */
+    external?: boolean;
+    /** 外部容器信息 */
+    external_info?: ExternalInfo;
   }>;
 }
 
@@ -182,15 +213,15 @@ export interface ComponentDSL {
     id: string;
     name: string;
     description: string;
+    /** Component 只在 Project 层存在 */
+    scope: 'project';
     /** 所属 Container ID */
     container_id: string;
     technology?: string;
-    /** 职责描述 */
-    responsibility?: string;
     /** 代码路径（关联代码文件） */
     code_path?: string;
-    /** 实现的 Contract ID */
-    implements_contract?: string;
+    /** 实现的 Contract ID 列表 */
+    implements_contracts?: string[];
   };
   relationships?: Array<{
     to: string;
@@ -228,6 +259,8 @@ export interface ProcessDSL {
     scope: Scope;
     /** 流程类型：业务流程或技术流程 */
     process_type: ProcessType;
+    owner?: Owner;
+    tags?: string[];
     /** 基于哪个上层 Process */
     based_on?: string;
     /** 父流程 ID（形成流程树） */
@@ -296,6 +329,7 @@ export interface SoRDSL {
   sor: {
     /** ID 格式：sor-b-{id} 或 sor-t-{id} */
     id: string;
+    /** SoR 名称 */
     name: string;
     description: string;
     scope: Scope;
@@ -309,6 +343,8 @@ export interface SoRDSL {
     entity_id: string;
     /** 关联的流程 ID（可选，Entity × Process → SoR） */
     process_id?: string;
+    owner?: Owner;
+    tags?: string[];
     /** 基于哪个上层 SoR */
     based_on?: string;
     /** 对应的 SoR ID（Business SoR ↔ Technical SoR 对应） */
@@ -329,7 +365,9 @@ export interface ADRDSL {
     /** ID 格式：adr-{id}-{slug} */
     id: string;
     title: string;
-    status: LifecycleStatus | 'superseded';
+    /** 所属系统 ID */
+    system_id?: string;
+    status: ADRStatus;
     date?: string;
     authors?: string[];
     reviewers?: string[];
@@ -348,9 +386,12 @@ export interface ADRDSL {
     description?: string;
     pros?: string[];
     cons?: string[];
+    /** 未选择该方案的原因 */
     reason?: string;
+    /** 评分 1-5 */
+    evaluation?: number;
   }>;
-  /** 影响的实体 */
+  /** 影响的实体 ID 列表 */
   related_entities?: string[];
   related?: {
     supersedes?: string;
@@ -374,10 +415,9 @@ export interface ContractDSL {
     name: string;
     description?: string;
     contract_type: ContractType;
-    status: LifecycleStatus;
+    /** Contract 状态（含 implemented，与 Schema 一致） */
+    status: ContractStatus;
     version?: string;
-    /** 实现此 Contract 的 Component ID */
-    component_id?: string;
     /** 此 Contract 实现的 SoR ID 列表 */
     implements_sor?: string[];
   };

@@ -7,8 +7,8 @@
 
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { parseYAML, stringifyYAML } from './yaml';
-import { CONTEXT_ROOT_DIR, CONFIG_FILENAME } from './path';
+import { parseYAML, stringifyYAML } from './yaml.js';
+import { CONTEXT_ROOT_DIR, CONFIG_FILENAME } from './path.js';
 
 // ============================================================================
 // 配置类型
@@ -16,6 +16,26 @@ import { CONTEXT_ROOT_DIR, CONFIG_FILENAME } from './path';
 
 /** 运行模式 */
 export type C4AMode = 'local' | 'server' | 'remote';
+
+/** ADR 缺失时的行为 */
+export type ADROnMissing = 'error' | 'warning' | 'ignore';
+
+/** Skills 配置 */
+export interface SkillsConfig {
+  cursor?: boolean;
+  claude?: boolean;
+  opencode?: boolean;
+}
+
+/** ADR 策略配置 */
+export interface ADRPolicyConfig {
+  /** 是否强制要求 ADR */
+  enforce?: boolean;
+  /** 哪些实体类型需要 ADR */
+  scope?: Array<'system' | 'container' | 'component'>;
+  /** 缺少 ADR 时的行为 */
+  on_missing?: ADROnMissing;
+}
 
 /**
  * C4A 项目配置（.context/.c4a.yaml）
@@ -29,6 +49,12 @@ export interface C4AConfig {
 
   /** 运行模式 */
   mode?: C4AMode;
+
+  /** Skills 配置 */
+  skills?: SkillsConfig;
+
+  /** ADR 策略配置 */
+  adr_policy?: ADRPolicyConfig;
 
   /** Server 模式配置 */
   server?: {
@@ -94,6 +120,8 @@ function mergeConfig(base: C4AConfig, override: C4AConfig): C4AConfig {
   return {
     ...base,
     ...override,
+    skills: { ...base.skills, ...override.skills },
+    adr_policy: { ...base.adr_policy, ...override.adr_policy },
     server: { ...base.server, ...override.server },
     remote: { ...base.remote, ...override.remote },
   };

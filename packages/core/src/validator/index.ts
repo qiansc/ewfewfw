@@ -3,6 +3,7 @@
  */
 import type { ValidateFunction } from "ajv";
 import { getValidator } from "./ajvInstance.js";
+import type { SchemaType } from "../types/base.js";
 
 export interface ValidationError {
   path: string;
@@ -18,21 +19,8 @@ export interface ValidationResult {
   data?: unknown;
 }
 
-export type DSLType = "product" | "system" | "container" | "component" | "process" | "sor" | "adr" | "contract";
-
-/**
- * knowledge 允许的字段列表
- */
-const KNOWLEDGE_ALLOWED_FIELDS = [
-  "responsibility",
-  "how",
-  "interfaces",
-  "api_tag",
-  "constraints",
-  "risks",
-  "examples",
-  "links",
-];
+// 重新导出 SchemaType
+export type { SchemaType };
 
 /**
  * 格式化验证错误，提供更友好的提示
@@ -44,7 +32,7 @@ function formatValidationError(
     keyword?: string;
     params?: Record<string, unknown>;
   },
-  type: DSLType
+  type: SchemaType
 ): ValidationError {
   const path = err.instancePath || "";
   const keyword = err.keyword;
@@ -56,14 +44,8 @@ function formatValidationError(
   // 针对 additionalProperties 错误提供更友好的提示
   if (keyword === "additionalProperties" && params?.additionalProperty) {
     const extraProp = params.additionalProperty as string;
-
-    if (path.includes("/knowledge")) {
-      message = `knowledge 不支持字段 "${extraProp}"`;
-      hint = `允许的字段: ${KNOWLEDGE_ALLOWED_FIELDS.join(", ")}。决策相关内容（what/why/备选方案）请放在 ADR 中。`;
-    } else {
-      message = `不支持的字段: "${extraProp}"`;
-      hint = `请检查 ${type} 类型的 schema 定义，确认允许的字段。`;
-    }
+    message = `不支持的字段: "${extraProp}"`;
+    hint = `请检查 ${type} 类型的 schema 定义，确认允许的字段。`;
   }
 
   // 针对 required 错误
@@ -103,7 +85,7 @@ function formatValidationError(
  * }
  * ```
  */
-export function validateDSL(data: unknown, type: DSLType): ValidationResult {
+export function validateDSL(data: unknown, type: SchemaType): ValidationResult {
   const validator = getValidator(type);
 
   if (!validator) {
@@ -135,7 +117,7 @@ export function validateDSL(data: unknown, type: DSLType): ValidationResult {
  */
 export async function validateDSLString(
   content: string,
-  type: DSLType
+  type: SchemaType
 ): Promise<ValidationResult> {
   const { parseDSL } = await import("../utils/index.js");
 
@@ -170,7 +152,7 @@ export function validateDSLAuto(data: unknown): ValidationResult {
   const obj = data as Record<string, unknown>;
   const type = obj.type as string;
 
-  const typeMap: Record<string, DSLType> = {
+  const typeMap: Record<string, SchemaType> = {
     product: "product",
     "software-system": "system",
     container: "container",
@@ -179,6 +161,8 @@ export function validateDSLAuto(data: unknown): ValidationResult {
     sor: "sor",
     adr: "adr",
     contract: "contract",
+    feat: "feat",
+    checklist: "checklist",
   };
 
   const mappedType = typeMap[type];

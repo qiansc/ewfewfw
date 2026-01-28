@@ -17,13 +17,19 @@
     },
     "sor": {
       "type": "object",
-      "required": ["id", "sor_type", "entity_type", "entity_id", "description"],
+      "required": ["id", "name", "sor_type", "entity_type", "entity_id", "description", "scope"],
       "additionalProperties": false,
       "properties": {
         "id": {
           "type": "string",
           "pattern": "^sor-[bt]-[a-z]\\d{3}$",
           "description": "SoR ID (e.g. sor-b-a001)"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "SoR 名称"
         },
         "sor_type": {
           "type": "string",
@@ -73,6 +79,11 @@
           "type": "string",
           "description": "需求描述"
         },
+        "scope": {
+          "type": "string",
+          "enum": ["domain", "enterprise", "project"],
+          "description": "知识层级"
+        },
         "owner": {
           "$ref": "c4a-common.schema.json#/$defs/owner"
         },
@@ -86,11 +97,15 @@
         "corresponds_to": {
           "type": "string",
           "description": "对应的 SoR ID"
+        },
+        "acceptance_criteria": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "验收标准列表"
         }
       }
-    },
-    "knowledge": {
-      "$ref": "c4a-common.schema.json#/$defs/knowledge"
     }
   }
 }

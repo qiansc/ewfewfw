@@ -9,7 +9,7 @@ import {
   computeContentHash,
   isContentEqual,
   shortHash,
-} from '../hash';
+} from '../hash.js';
 
 describe('computeHash', () => {
   test('returns SHA-256 hash', () => {

@@ -1,14 +1,12 @@
 """
 C4A Data MCP Server
 
-统一封装 MongoDB + Neo4j + Milvus，提供 8 个工具：
-- c4a_db_save_entity, c4a_db_get_entity, c4a_db_delete_entity (CRUD)
-- c4a_db_search_semantic (语义搜索)
-- c4a_db_query_deps, c4a_db_query_impact (关系查询)
-- c4a_db_exec_cypher (原生 Cypher)
-- c4a_db_sync_local (批量同步本地 DSL 到三库)
+统一封装 MongoDB + Neo4j + Milvus，提供 MCP 工具：
+- c4a_store_save, c4a_store_read, c4a_store_delete
+- c4a_store_sync_file, c4a_store_sync
+- c4a_query_search, c4a_query_deps, c4a_query_impact, c4a_query_exec_cypher
 
-命名规范: c4a_db_{verb}_{object}
+命名规范: c4a_store_* / c4a_query_*
 """
 
 import os
@@ -54,7 +52,7 @@ def get_data_service() -> DataService:
 
 
 @mcp.tool()
-async def c4a_db_save_entity(
+async def c4a_store_save(
     collection: str,
     data: dict[str, Any],
     id: str | None = None,
@@ -63,7 +61,7 @@ async def c4a_db_save_entity(
     保存/更新 C4A 文档，自动同步三库（MongoDB + Neo4j + Milvus）。
 
     Args:
-        collection: 集合名称 (systems, containers, components, adrs, contracts)
+        collection: 集合名称 (products, systems, containers, components, processes, sors, adrs, contracts)
         data: 文档数据
         id: 文档 ID（省略则自动生成）
 
@@ -75,7 +73,7 @@ async def c4a_db_save_entity(
 
 
 @mcp.tool()
-async def c4a_db_get_entity(
+async def c4a_store_read(
     collection: str,
     query: dict[str, Any],
 ) -> list[dict[str, Any]]:
@@ -83,7 +81,7 @@ async def c4a_db_get_entity(
     从 MongoDB 查询 C4A 文档。
 
     Args:
-        collection: 集合名称 (systems, containers, components, adrs, contracts)
+        collection: 集合名称 (products, systems, containers, components, processes, sors, adrs, contracts)
         query: 查询条件
             - {"id": "xxx"}: 按 ID 获取单个文档
             - {"filter": {...}, "limit": 10}: 按条件过滤
@@ -96,7 +94,7 @@ async def c4a_db_get_entity(
 
 
 @mcp.tool()
-async def c4a_db_delete_entity(
+async def c4a_store_delete(
     collection: str,
     id: str,
 ) -> dict[str, str]:
@@ -104,7 +102,7 @@ async def c4a_db_delete_entity(
     删除 C4A 文档，级联清理三库。
 
     Args:
-        collection: 集合名称 (systems, containers, components, adrs, contracts)
+        collection: 集合名称 (products, systems, containers, components, processes, sors, adrs, contracts)
         id: 文档 ID
 
     Returns:
@@ -115,7 +113,7 @@ async def c4a_db_delete_entity(
 
 
 @mcp.tool()
-async def c4a_db_search_semantic(
+async def c4a_query_search(
     query: str,
     scope: str | None = None,
     limit: int = 10,
@@ -127,7 +125,7 @@ async def c4a_db_search_semantic(
 
     Args:
         query: 自然语言搜索词
-        scope: 搜索范围限制 (systems, containers, components, adrs, contracts, all)
+        scope: 搜索范围限制 (products, systems, containers, components, processes, sors, adrs, contracts, all)
         limit: 返回结果数量上限（默认 10）
 
     Returns:
@@ -138,7 +136,7 @@ async def c4a_db_search_semantic(
 
 
 @mcp.tool()
-async def c4a_db_query_deps(
+async def c4a_query_deps(
     id: str,
     direction: str = "both",
     depth: int = 1,
@@ -161,7 +159,7 @@ async def c4a_db_query_deps(
 
 
 @mcp.tool()
-async def c4a_db_query_impact(
+async def c4a_query_impact(
     id: str,
     change_type: str | None = None,
     depth: int = 3,
@@ -184,7 +182,7 @@ async def c4a_db_query_impact(
 
 
 @mcp.tool()
-async def c4a_db_exec_cypher(
+async def c4a_query_exec_cypher(
     query: str,
     params: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
@@ -205,7 +203,7 @@ async def c4a_db_exec_cypher(
 
 
 @mcp.tool()
-async def c4a_db_sync_file(
+async def c4a_store_sync_file(
     file_path: str,
     project_path: str | None = None,
 ) -> dict[str, Any]:
@@ -216,7 +214,7 @@ async def c4a_db_sync_file(
     然后逐个调用此工具同步。
 
     Args:
-        file_path: DSL 文件路径（相对于项目根目录，如 .c4a/published/adr/adr-001.c4a.yaml）
+        file_path: DSL 文件路径（相对于项目根目录）
         project_path: 项目根目录（默认使用 C4A_PROJECT_ROOT 环境变量）
 
     Returns:
@@ -228,8 +226,8 @@ async def c4a_db_sync_file(
 
 
 @mcp.tool()
-async def c4a_db_sync_local(
-    scope: str = "published",
+async def c4a_store_sync(
+    scope: str = "all",
     path: str | None = None,
     type: str = "all",
     mode: str = "incremental",
@@ -237,15 +235,15 @@ async def c4a_db_sync_local(
     project_path: str | None = None,
 ) -> dict[str, Any]:
     """
-    将本地 .c4a/ 目录的 DSL 文件批量同步到三库 (MongoDB/Neo4j/Milvus)。
+    将本地 .context/ 目录的 DSL 文件批量同步到三库 (MongoDB/Neo4j/Milvus)。
 
     ⚠️ 注意：批量同步可能因文件数量较多导致超时。
-    推荐使用 c4a_db_sync_file 逐文件同步以避免超时问题。
+    推荐使用 c4a_store_sync_file 逐文件同步以避免超时问题。
 
     Args:
-        scope: 同步范围 (published=已发布, approved=已批准, all=全部, path=指定路径)
+        scope: 同步范围 (all=全部, path=指定路径)
         path: 指定路径 (当 scope="path" 时使用)
-        type: 按类型筛选 (system, container, component, adr, all)
+        type: 按类型筛选 (software-system, product, container, component, process, sor, adr, contract, all)
         mode: 同步模式 (incremental=增量, full=完整)
         conflict_policy: 冲突处理策略 (skip=跳过, error=报错, override=覆盖)
         project_path: 项目根目录（默认使用 C4A_PROJECT_ROOT 环境变量）
@@ -255,7 +253,6 @@ async def c4a_db_sync_local(
         和 details (每个文件的同步结果) 的结果
     """
     service = get_data_service()
-    # 使用配置中的 project_root 作为默认值
     effective_project_path = project_path if project_path else config.project_root
     return await service.sync(
         scope=scope,

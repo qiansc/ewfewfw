@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { validateConfig, getDefaultConfig, type C4AConfig } from '../config';
+import { validateConfig, getDefaultConfig, type C4AConfig } from '../config.js';
 
 describe('getDefaultConfig', () => {
   test('returns default config with local mode', () => {

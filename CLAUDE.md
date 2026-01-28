@@ -42,6 +42,53 @@ const content = await file.text();
 - 使用标准 Node.js API（`node:fs`, `node:path`, `node:child_process` 等）
 - 如果遇到 native addon 兼容问题，优先找纯 JS 替代品
 
+### ESM 模块导入规则 (必须遵守)
+
+使用 CommonJS 模块（如 `better-sqlite3`、`ajv`）时，注意导入语法：
+
+```typescript
+// ❌ 错误：namespace import 在 ESM 中无法正确获取 default export
+import * as Database from 'better-sqlite3';
+new Database('test.db');  // Error: not constructable
+
+// ✅ 正确：使用 default import
+import Database from 'better-sqlite3';
+new Database('test.db');  // OK
+
+// 如果只需要类型，使用 type import
+import type Database from 'better-sqlite3';
+```
+
+### Zod Schema 与 MCP SDK 规则 (必须遵守)
+
+使用 Zod 定义 MCP 工具参数时，**不要对需要 `.shape` 的 schema 使用 `.refine()`**：
+
+```typescript
+// ❌ 错误：.refine() 返回 ZodEffects，没有 .shape 属性
+// 会导致 TypeScript 编译时内存溢出 (OOM)
+export const MyInputSchema = z.object({
+  data: z.string(),
+  content: z.string().optional(),
+}).refine((d) => d.data || d.content, { message: "..." });
+
+server.tool("my_tool", ..., MyInputSchema.shape, ...);  // ❌ .shape 不存在！
+
+// ✅ 正确：拆分为基础 schema 和带验证的 schema
+export const MyInputSchema = z.object({  // 纯 ZodObject，用于 .shape
+  data: z.string(),
+  content: z.string().optional(),
+});
+
+export const MyInputSchemaWithRefine = MyInputSchema.refine(  // 用于运行时验证
+  (d) => d.data || d.content,
+  { message: "..." }
+);
+
+server.tool("my_tool", ..., MyInputSchema.shape, ...);  // ✅ 正常工作
+```
+
+**原因**：Zod 的 `.refine()` / `.superRefine()` / `.transform()` 返回 `ZodEffects` 类型而非 `ZodObject`，TypeScript 尝试推断深度嵌套的泛型类型时会消耗大量内存导致 OOM。
+
 ### 代码风格
 
 **TypeScript:**
@@ -117,6 +164,12 @@ cp .env.example .env    # 复制环境变量模板
 ./start.sh clean        # 清理所有数据 (危险!)
 ```
 
+## 命令执行规则（必须遵守）
+
+- **项目使用 Bun**：一律使用 `bun run`/`bunx` 执行脚本与工具。
+- **禁止使用 pnpm/npm/yarn** 执行 `tsc`、`test`、`build` 等命令。
+- 类型检查/测试/构建应参考 `package.json` 中的 `scripts`（如 `bun run test`、`bun run build`）。
+
 ## 启动模式
 
 | 模式 | 命令 | 适用场景 |
@@ -158,6 +211,56 @@ cp .env.example .env    # 复制环境变量模板
 ### Git Commit 规则
 - Commit message 必须使用英文
 - 不要在 commit message 末尾添加 Co-Authored-By 或任何作者署名信息
+
+### 代码规模规则 (必须遵守)
+
+**单个模块文件不得超过 800 行。** 当文件接近或超过此限制时：
+
+1. **立即暂停代码实现**
+2. **向用户报告当前文件行数**
+3. **提出分拆建议**，包括：
+   - 建议拆分的模块/文件结构
+   - 每个拆分后文件的职责说明
+   - 拆分的具体步骤
+4. **等待用户确认后再继续**
+
+```
+⚠️ 文件 xxx.ts 已达到 XXX 行，超过 800 行限制。
+建议拆分方案：
+- xxx-core.ts: 核心逻辑 (~300 行)
+- xxx-utils.ts: 工具函数 (~200 行)
+- xxx-types.ts: 类型定义 (~100 行)
+
+是否按此方案进行拆分？
+```
+
+**原因**：过大的文件难以维护、测试和理解，也会增加 AI 助手的上下文负担。
+
+### 文件操作规范
+
+**创建/写入文件**：
+
+- ✅ **优先使用** `Write` 工具 - 适用于所有文件大小
+  ```typescript
+  // Write 工具是 Claude Code 推荐的标准方法
+  // 支持中小型文件（< 1000 行）
+  // 类型安全，简单直接
+  ```
+- ✅ **大文件策略** - 当文件超过 1000 行时：
+  - **方案 A**：分段创建多个小文件，最后合并
+  - **方案 B**：使用 Write 工具创建主体，Edit 工具补充细节
+  - **方案 C**：创建文件骨架，让用户补充内容
+- ❌ **禁止使用** `Bash` 的 `cat`/`echo`/`printf` 创建文件
+  - 原因：违反项目规范，难以维护，不利于类型检查
+  - 例外：仅在 Write 工具确实无法工作时作为紧急备用
+
+**文件操作最佳实践**：
+
+1. **读取优先**：编辑现有文件前必须先用 `Read` 工具读取
+2. **精确编辑**：使用 `Edit` 工具进行精确字符串替换
+3. **路径规范**：始终使用绝对路径，避免相对路径
+4. **编码安全**：确保文件使用 UTF-8 编码
+5. **验证结果**：文件操作后使用 `Read` 或 `Bash ls` 验证
 
 ## 文档规范
 

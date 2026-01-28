@@ -21,7 +21,7 @@
 
     "component": {
       "type": "object",
-      "required": ["id", "name", "description"],
+      "required": ["id", "name", "description", "scope", "container_id"],
       "additionalProperties": false,
       "properties": {
         "id": {
@@ -30,6 +30,11 @@
           "minLength": 1,
           "maxLength": 64,
           "description": "组件唯一标识"
+        },
+        "scope": {
+          "type": "string",
+          "enum": ["project"],
+          "description": "知识层级（Component 仅在 Project 层）"
         },
         "name": {
           "type": "string",
@@ -45,6 +50,20 @@
         "technology": {
           "type": "string",
           "description": "实现技术或设计模式"
+        },
+        "container_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "所属 Container ID"
+        },
+        "code_path": {
+          "type": "string",
+          "description": "代码路径（关联代码目录）"
+        },
+        "implements_contracts": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "实现的契约 ID 列表"
         }
       }
     },
@@ -67,11 +86,6 @@
         }
       },
       "description": "组件间依赖关系"
-    },
-
-    "knowledge": {
-      "$ref": "c4a-common.schema.json#/$defs/knowledge",
-      "description": "组件级知识附加"
     }
   }
 }

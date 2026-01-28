@@ -17,7 +17,7 @@
     },
     "product": {
       "type": "object",
-      "required": ["id", "name"],
+      "required": ["id", "name", "description", "scope"],
       "additionalProperties": false,
       "properties": {
         "id": {
@@ -36,6 +36,11 @@
         "description": {
           "type": "string",
           "description": "产品描述"
+        },
+        "scope": {
+          "type": "string",
+          "enum": ["domain", "enterprise", "project"],
+          "description": "知识层级"
         },
         "owner": {
           "$ref": "c4a-common.schema.json#/$defs/owner"
@@ -57,9 +62,6 @@
           "description": "产品文档 URI"
         }
       }
-    },
-    "knowledge": {
-      "$ref": "c4a-common.schema.json#/$defs/knowledge"
     }
   }
 }
