@@ -1,6 +1,8 @@
-import Database from 'better-sqlite3';
-import { join } from 'node:path';
+import { Database } from 'bun:sqlite';
+import { dirname, join } from 'node:path';
 import { existsSync, mkdirSync } from 'node:fs';
+import { VectorStore } from './usearch-store.js';
+import { generateEmbedding, generateVectorKey, getEmbeddingDimension } from './vector-search.js';
 
 /**
  * SQLite Store for Local Mode
@@ -40,9 +42,11 @@ export interface SQLiteStoreConfig {
  */
 export class SQLiteStore {
   private static instance: SQLiteStore | null = null;
-  private db: Database.Database;
+  private db: Database;
   private config: Required<SQLiteStoreConfig>;
   private vectorSearchEnabled: boolean = false;
+  private vectorStore: VectorStore | null = null;
+  private ftsEnabled: boolean = false;
 
   private constructor(config: SQLiteStoreConfig = {}) {
     this.config = {
@@ -52,22 +56,23 @@ export class SQLiteStore {
     };
 
     // 确保目录存在
-    const dbDir = join(this.config.dbPath, '..');
+    const dbDir = dirname(this.config.dbPath);
     if (!existsSync(dbDir)) {
       mkdirSync(dbDir, { recursive: true });
     }
 
     // 初始化数据库
-    this.db = new Database(this.config.dbPath, {
-      readonly: this.config.readonly,
-      fileMustExist: false,
-    });
+    const dbOptions = this.config.readonly ? { readonly: true } : { create: true };
+    this.db = new Database(this.config.dbPath, dbOptions);
 
     // 配置并发访问参数 (设计文档 §1.2)
     this.configureConcurrency();
 
-    // 尝试加载 sqlite-vec 扩展
-    this.loadVectorExtension();
+    // 探测 FTS5 可用性
+    this.ftsEnabled = this.probeFTS5();
+
+    // 初始化向量索引（USearch）
+    this.initVectorStore();
 
     // 创建表结构
     if (!this.config.readonly) {
@@ -87,28 +92,120 @@ export class SQLiteStore {
   private configureConcurrency(): void {
     // 启用 WAL 模式（Write-Ahead Logging）
     // 允许读写并发，显著提升并发性能
-    this.db.pragma('journal_mode = WAL');
+    this.db.exec('PRAGMA journal_mode = WAL;');
 
     // 设置忙等待超时（毫秒）
     // 当数据库被锁定时，等待而非立即失败
-    this.db.pragma(`busy_timeout = ${this.config.busyTimeout}`);
+    this.db.exec(`PRAGMA busy_timeout = ${this.config.busyTimeout};`);
 
     // 同步模式设置为 NORMAL（平衡性能和安全性）
-    this.db.pragma('synchronous = NORMAL');
+    this.db.exec('PRAGMA synchronous = NORMAL;');
   }
 
   /**
-   * 加载 sqlite-vec 扩展
-   *
-   * 设计文档: appendix.md Q1 降级策略
+   * 探测 FTS5 可用性（只读模式下仅检查表是否存在）
    */
-  private loadVectorExtension(): void {
+  private probeFTS5(): boolean {
+    if (this.config.readonly) {
+      try {
+        const row = this.db
+          .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'entities_fts'`)
+          .get();
+        return Boolean(row);
+      } catch {
+        return false;
+      }
+    }
+
     try {
-      this.db.loadExtension('vec0');
+      this.db.exec('CREATE VIRTUAL TABLE IF NOT EXISTS _fts5_probe USING fts5(content)');
+      this.db.exec('DROP TABLE IF EXISTS _fts5_probe');
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * 创建 FTS5 索引表与触发器
+   */
+  private createFtsTables(): void {
+    try {
+      this.db.exec(`
+        CREATE VIRTUAL TABLE IF NOT EXISTS entities_fts USING fts5(
+          entity_id UNINDEXED,
+          source_project UNINDEXED,
+          proposal_id UNINDEXED,
+          search_text,
+          tokenize = 'unicode61'
+        );
+      `);
+
+      this.db.exec(`
+        CREATE TRIGGER IF NOT EXISTS entities_fts_insert AFTER INSERT ON entities
+        BEGIN
+          INSERT INTO entities_fts(entity_id, source_project, proposal_id, search_text)
+          SELECT
+            NEW.id,
+            NEW.source_project,
+            NEW.proposal_id,
+            COALESCE(json_extract(NEW.data, '$.name'), '') || ' ' ||
+            COALESCE(json_extract(NEW.data, '$.description'), '') || ' ' ||
+            COALESCE(json_extract(NEW.data, '$.tags'), '');
+        END;
+      `);
+
+      this.db.exec(`
+        CREATE TRIGGER IF NOT EXISTS entities_fts_update AFTER UPDATE ON entities
+        BEGIN
+          DELETE FROM entities_fts
+          WHERE entity_id = OLD.id
+            AND source_project = OLD.source_project
+            AND proposal_id = OLD.proposal_id;
+          INSERT INTO entities_fts(entity_id, source_project, proposal_id, search_text)
+          SELECT
+            NEW.id,
+            NEW.source_project,
+            NEW.proposal_id,
+            COALESCE(json_extract(NEW.data, '$.name'), '') || ' ' ||
+            COALESCE(json_extract(NEW.data, '$.description'), '') || ' ' ||
+            COALESCE(json_extract(NEW.data, '$.tags'), '');
+        END;
+      `);
+
+      this.db.exec(`
+        CREATE TRIGGER IF NOT EXISTS entities_fts_delete AFTER DELETE ON entities
+        BEGIN
+          DELETE FROM entities_fts
+          WHERE entity_id = OLD.id
+            AND source_project = OLD.source_project
+            AND proposal_id = OLD.proposal_id;
+        END;
+      `);
+    } catch {
+      this.ftsEnabled = false;
+    }
+  }
+
+  /**
+   * 初始化向量索引（USearch）
+   */
+  private initVectorStore(): void {
+    try {
+      const indexDir = dirname(this.config.dbPath);
+      const indexPath = join(indexDir, 'c4a.usearch');
+      const keyMapPath = join(indexDir, 'c4a.keymap.json');
+      this.vectorStore = new VectorStore({
+        dimensions: getEmbeddingDimension(),
+        indexPath,
+        keyMapPath,
+        readonly: this.config.readonly,
+      });
       this.vectorSearchEnabled = true;
     } catch {
-      // 扩展不可用，降级到全文搜索
+      // USearch 不可用，降级到全文搜索
       this.vectorSearchEnabled = false;
+      this.vectorStore = null;
     }
   }
 
@@ -116,7 +213,21 @@ export class SQLiteStore {
    * 检查向量搜索是否可用
    */
   isVectorSearchEnabled(): boolean {
-    return this.vectorSearchEnabled;
+    return this.vectorSearchEnabled && this.vectorStore !== null;
+  }
+
+  /**
+   * 获取向量索引实例
+   */
+  getVectorStore(): VectorStore | null {
+    return this.vectorStore;
+  }
+
+  /**
+   * 检查 FTS5 是否可用
+   */
+  isFtsEnabled(): boolean {
+    return this.ftsEnabled;
   }
 
   /**
@@ -140,8 +251,8 @@ export class SQLiteStore {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS entities (
         id TEXT NOT NULL,
-        source_project TEXT NOT NULL,
-        proposal_id TEXT,
+        source_project TEXT NOT NULL DEFAULT '',
+        proposal_id TEXT NOT NULL DEFAULT '',
         type TEXT NOT NULL,
         kind TEXT,
         scope TEXT,
@@ -154,6 +265,7 @@ export class SQLiteStore {
       CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(type);
       CREATE INDEX IF NOT EXISTS idx_entities_source_project ON entities(source_project);
       CREATE INDEX IF NOT EXISTS idx_entities_id ON entities(id);
+      CREATE INDEX IF NOT EXISTS idx_entities_composite ON entities(source_project, id, proposal_id);
     `);
 
     // 实体元数据表
@@ -161,8 +273,8 @@ export class SQLiteStore {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS metadata (
         entity_id TEXT NOT NULL,
-        source_project TEXT NOT NULL,
-        proposal_id TEXT,
+        source_project TEXT NOT NULL DEFAULT '',
+        proposal_id TEXT NOT NULL DEFAULT '',
         source_repo TEXT,
         external_url TEXT,
         status TEXT NOT NULL,
@@ -184,12 +296,13 @@ export class SQLiteStore {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS relations (
         id TEXT PRIMARY KEY,
-        proposal_id TEXT,
-        from_project TEXT NOT NULL,
+        proposal_id TEXT NOT NULL DEFAULT '',
+        from_project TEXT NOT NULL DEFAULT '',
         from_id TEXT NOT NULL,
-        to_project TEXT NOT NULL,
+        to_project TEXT NOT NULL DEFAULT '',
         to_id TEXT NOT NULL,
         rel_type TEXT NOT NULL,
+        status TEXT DEFAULT 'active',
         properties TEXT,
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now'))
@@ -201,16 +314,31 @@ export class SQLiteStore {
       CREATE INDEX IF NOT EXISTS idx_relations_type ON relations(rel_type);
     `);
 
+    try {
+      this.db.exec(`ALTER TABLE relations ADD COLUMN status TEXT DEFAULT 'active';`);
+    } catch {
+      // column already exists
+    }
+
+    try {
+      this.db.exec(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_relations_unique
+          ON relations(proposal_id, from_project, from_id, to_project, to_id, rel_type);
+      `);
+    } catch {
+      // duplicates may exist; ignore to avoid breaking startup
+    }
+
     // 实体变更历史表
     // 设计文档: L166-188
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS entity_history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         entity_id TEXT NOT NULL,
-        source_project TEXT NOT NULL,
-        proposal_id TEXT,
+        source_project TEXT NOT NULL DEFAULT '',
+        proposal_id TEXT NOT NULL DEFAULT '',
         entity_type TEXT NOT NULL,
-        feat_id TEXT,
+        feat_id TEXT NOT NULL DEFAULT '',
         action TEXT NOT NULL,
         changed_fields TEXT,
         snapshot_after TEXT,
@@ -270,24 +398,12 @@ export class SQLiteStore {
       CREATE INDEX IF NOT EXISTS idx_graph_cache_expires ON graph_cache(expires_at);
     `);
 
-    // vectors 表：使用 sqlite-vec 扩展创建虚拟表
-    // 设计文档: L254-267
-    if (this.vectorSearchEnabled) {
-      try {
-        this.db.exec(`
-          CREATE VIRTUAL TABLE IF NOT EXISTS vectors USING vec0(
-            entity_id TEXT NOT NULL,
-            source_project TEXT NOT NULL,
-            proposal_id TEXT,
-            embedding FLOAT[384],
-            PRIMARY KEY (source_project, entity_id, proposal_id)
-          );
-        `);
-      } catch {
-        // 虚拟表创建失败，禁用向量搜索
-        this.vectorSearchEnabled = false;
-      }
+    // 全文搜索索引表（USearch 降级方案）
+    // 设计文档: sqlite-schema.md §2.3.2
+    if (this.ftsEnabled) {
+      this.createFtsTables();
     }
+
   }
 
   // ============================================================
@@ -310,7 +426,7 @@ export class SQLiteStore {
     if (proposalId === null) {
       // 只查主分支
       return this.db.prepare(`
-        SELECT * FROM entities WHERE proposal_id IS NULL
+        SELECT * FROM entities WHERE proposal_id IS NULL OR proposal_id = ''
       `).all();
     }
 
@@ -323,12 +439,12 @@ export class SQLiteStore {
             ORDER BY
               CASE
                 WHEN proposal_id = ? THEN 1
-                WHEN proposal_id IS NULL THEN 2
+                WHEN proposal_id IS NULL OR proposal_id = '' THEN 2
                 ELSE 3
               END
           ) AS rn
         FROM entities
-        WHERE proposal_id = ? OR proposal_id IS NULL
+        WHERE proposal_id = ? OR proposal_id = '' OR proposal_id IS NULL
       )
       SELECT id, source_project, proposal_id, type, kind, scope, perspective, data
       FROM ranked WHERE rn = 1
@@ -343,7 +459,9 @@ export class SQLiteStore {
   getMergedRelations(proposalId: string | null = null): unknown[] {
     if (proposalId === null) {
       return this.db.prepare(`
-        SELECT * FROM relations WHERE proposal_id IS NULL
+        SELECT * FROM relations
+        WHERE (proposal_id IS NULL OR proposal_id = '')
+          AND (status IS NULL OR status != 'deleted')
       `).all();
     }
 
@@ -355,15 +473,15 @@ export class SQLiteStore {
             ORDER BY
               CASE
                 WHEN proposal_id = ? THEN 1
-                WHEN proposal_id IS NULL THEN 2
+                WHEN proposal_id IS NULL OR proposal_id = '' THEN 2
                 ELSE 3
               END
           ) AS rn
         FROM relations
-        WHERE proposal_id = ? OR proposal_id IS NULL
+        WHERE proposal_id = ? OR proposal_id = '' OR proposal_id IS NULL
       )
       SELECT id, proposal_id, from_project, from_id, to_project, to_id, rel_type, properties, created_at, updated_at
-      FROM ranked WHERE rn = 1
+      FROM ranked WHERE rn = 1 AND (status IS NULL OR status != 'deleted')
     `).all(proposalId, proposalId);
   }
 
@@ -402,6 +520,7 @@ export class SQLiteStore {
    */
   private static closeInstance(): void {
     if (this.instance) {
+      this.instance.vectorStore?.save();
       this.instance.db.close();
       this.instance = null;
     }
@@ -411,166 +530,82 @@ export class SQLiteStore {
    * 关闭数据库连接（实例方法）
    */
   close(): void {
+    this.vectorStore?.save();
     this.db.close();
   }
 
   /**
    * 获取原生数据库对象 (用于高级操作)
    */
-  getDatabase(): Database.Database {
+  getDatabase(): Database {
     return this.db;
-  }
-
-  // ============================================================
-  // 向量索引维护 (设计文档 §3.4)
-  // ============================================================
-
-  /**
-   * 保存实体并同步创建向量
-   *
-   * 设计文档: vector-search.md L528-575
-   *
-   * @param entity - 实体数据
-   * @param embedding - 向量（如未提供，需外部先生成）
-   */
-  saveEntityWithVector(
-    entity: {
-      id: string;
-      source_project: string;
-      proposal_id: string | null;
-      type: string;
-      kind?: string;
-      scope?: string;
-      perspective?: string;
-      data: Record<string, unknown>;
-    },
-    embedding: Float32Array
-  ): void {
-    // 使用事务保证 entities 和 vectors 表的一致性
-    const transaction = this.db.transaction(() => {
-      // 1. 插入实体
-      this.db
-        .prepare(
-          `
-        INSERT INTO entities (id, source_project, proposal_id, type, kind, scope, perspective, data)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT (source_project, id, proposal_id) DO UPDATE SET
-          type = excluded.type,
-          kind = excluded.kind,
-          scope = excluded.scope,
-          perspective = excluded.perspective,
-          data = excluded.data
-      `
-        )
-        .run(
-          entity.id,
-          entity.source_project,
-          entity.proposal_id,
-          entity.type,
-          entity.kind || null,
-          entity.scope || null,
-          entity.perspective || null,
-          JSON.stringify(entity.data)
-        );
-
-      // 2. 插入向量（需要 sqlite-vec 扩展）
-      // 注意: 此处使用 INSERT OR REPLACE 语义
-      // 实际 SQL 需要根据 sqlite-vec 的 API 调整
-      this.db
-        .prepare(
-          `
-        INSERT INTO vectors (entity_id, source_project, proposal_id, embedding)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT (source_project, entity_id, proposal_id) DO UPDATE SET
-          embedding = excluded.embedding
-      `
-        )
-        .run(entity.id, entity.source_project, entity.proposal_id, embedding);
-    });
-
-    transaction();
   }
 
   /**
    * 批量重建向量索引
    *
-   * 设计文档: vector-search.md L589-594
-   *
-   * @param proposalId - Feat ID (null 表示重建主分支)
-   * @param generateEmbedding - 向量生成函数
+   * 设计文档: vector-search.md §3.4
    */
-  async rebuildVectorIndex(
-    proposalId: string | null,
-    generateEmbedding: (text: string) => Promise<Float32Array>
-  ): Promise<void> {
-    // 1. 获取指定版本的所有实体
-    const entities = this.db
-      .prepare(
-        `
-      SELECT id, source_project, proposal_id, type, data
-      FROM entities
-      WHERE proposal_id IS ?
-    `
-      )
-      .all(proposalId) as Array<{
+  async rebuildVectorIndex(): Promise<{ total: number; indexed: number; skipped: number }> {
+    if (!this.vectorStore || !this.vectorSearchEnabled) {
+      return { total: 0, indexed: 0, skipped: 0 };
+    }
+
+    const rows = this.db.prepare(`
+      SELECT e.id, e.source_project, e.proposal_id, e.data, m.status
+      FROM entities e
+      JOIN metadata m ON e.source_project = m.source_project
+        AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+      WHERE m.status NOT IN ('archived', 'deprecated')
+    `).all() as Array<{
       id: string;
       source_project: string;
       proposal_id: string | null;
-      type: string;
       data: string;
+      status: string;
     }>;
 
-    // 2. 批量生成向量（每 100 条提交一次事务）
-    const BATCH_SIZE = 100;
-    for (let i = 0; i < entities.length; i += BATCH_SIZE) {
-      const batch = entities.slice(i, i + BATCH_SIZE);
+    const items: Array<{ key: string; embedding: Float32Array }> = [];
+    let skipped = 0;
 
-      // 先生成所有向量（事务外）
-      const embeddings = await Promise.all(
-        batch.map(async (entity) => {
-          const parsedData = JSON.parse(entity.data) as Record<string, unknown>;
-          const text = this.generateSearchText(parsedData);
-          return generateEmbedding(text);
-        })
-      );
+    for (const row of rows) {
+      let data: Record<string, unknown>;
+      try {
+        data = JSON.parse(row.data) as Record<string, unknown>;
+      } catch {
+        skipped += 1;
+        continue;
+      }
 
-      // 再批量插入（事务内）
-      const transaction = this.db.transaction(() => {
-        batch.forEach((entity, idx) => {
-          this.db
-            .prepare(
-              `
-            INSERT INTO vectors (entity_id, source_project, proposal_id, embedding)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT (source_project, entity_id, proposal_id) DO UPDATE SET
-              embedding = excluded.embedding
-          `
-            )
-            .run(
-              entity.id,
-              entity.source_project,
-              entity.proposal_id,
-              embeddings[idx]
-            );
-        });
-      });
+      const text = buildSearchText(data);
+      if (!text) {
+        skipped += 1;
+        continue;
+      }
 
-      transaction();
+      try {
+        const embedding = await generateEmbedding(text);
+        const proposalId = row.proposal_id === '' ? null : row.proposal_id;
+        const key = generateVectorKey(row.source_project ?? '', row.id, proposalId);
+        items.push({ key, embedding });
+      } catch {
+        skipped += 1;
+      }
     }
+
+    this.vectorStore.rebuild(items);
+
+    return {
+      total: rows.length,
+      indexed: items.length,
+      skipped,
+    };
   }
 
-  /**
-   * 生成搜索文本（用于向量化）
-   *
-   * 设计文档: vector-search.md L566-575
-   */
-  private generateSearchText(data: Record<string, unknown>): string {
-    const parts = [
-      data.name,
-      data.description,
-      Array.isArray(data.tags) ? data.tags.join(' ') : null,
-    ].filter(Boolean);
+}
 
-    return parts.join(' ');
-  }
+function buildSearchText(data: Record<string, unknown>): string {
+  const tags = Array.isArray(data.tags) ? data.tags.join(' ') : null;
+  const parts = [data.name, data.description, data.title, tags].filter(Boolean);
+  return parts.join(' ');
 }

@@ -10,7 +10,7 @@
  * - 缓存失效机制
  */
 
-import type Database from 'better-sqlite3';
+import type { Database } from 'bun:sqlite';
 
 // 节点唯一键：project + id
 type NodeKey = string; // 格式: `${project}:${id}` 或 `null:${id}`（无项目归属）
@@ -19,7 +19,13 @@ type NodeKey = string; // 格式: `${project}:${id}` 或 `null:${id}`（无项�
  * 生成节点键
  */
 function makeNodeKey(project: string | null, id: string): NodeKey {
-  return `${project ?? 'null'}:${id}`;
+  const normalizedProject = project === '' || project === null ? 'null' : project;
+  return `${normalizedProject}:${id}`;
+}
+
+function normalizeProject(project: string | null): string | null {
+  if (project === '') return null;
+  return project;
 }
 
 /**
@@ -66,35 +72,100 @@ export class InMemoryGraph {
    * @param db - SQLite 数据库连接
    * @param proposalId - Feat ID (null 表示主分支)
    */
-  load(db: Database.Database, proposalId: string | null = null): void {
+  load(db: Database, proposalId: string | null = null): void {
     this.proposalId = proposalId;
     this.nodes.clear();
     this.queryCache.clear();
 
     // 加载合并视图：主分支 + feat 的关系
+    const dbProposalId = proposalId ?? '';
     const query = proposalId
       ? `
         WITH all_relations AS (
-          SELECT * FROM relations
-          WHERE (proposal_id IS NULL)
-             OR (proposal_id = ?)
+          SELECT r.* FROM relations r
+          WHERE r.proposal_id = ? OR r.proposal_id IS NULL OR r.proposal_id = ''
         ),
-        ranked AS (
+        ranked_relations AS (
           SELECT *,
             ROW_NUMBER() OVER (
               PARTITION BY from_project, from_id, to_project, to_id, rel_type
-              ORDER BY CASE WHEN proposal_id = ? THEN 0 ELSE 1 END
+              ORDER BY CASE
+                WHEN proposal_id = ? THEN 0
+                WHEN proposal_id IS NULL OR proposal_id = '' THEN 1
+                ELSE 2
+              END
             ) AS rn
           FROM all_relations
+        ),
+        valid_relations AS (
+          SELECT * FROM ranked_relations
+          WHERE rn = 1 AND (status IS NULL OR status != 'deleted')
         )
-        SELECT from_project, from_id, to_project, to_id, rel_type
-        FROM ranked WHERE rn = 1
+        SELECT r.* FROM valid_relations r
+        WHERE EXISTS (
+          SELECT 1 FROM (
+            SELECT m.status,
+              ROW_NUMBER() OVER (
+                PARTITION BY m.source_project, m.entity_id
+                ORDER BY CASE
+                  WHEN m.proposal_id = ? THEN 0
+                  WHEN m.proposal_id IS NULL OR m.proposal_id = '' THEN 1
+                  ELSE 2
+                END
+              ) AS rn
+            FROM metadata m
+            WHERE m.source_project = r.from_project
+              AND m.entity_id = r.from_id
+              AND (m.proposal_id = ? OR m.proposal_id IS NULL OR m.proposal_id = '')
+          ) src WHERE src.rn = 1 AND src.status NOT IN ('archived', 'deprecated')
+        )
+        AND EXISTS (
+          SELECT 1 FROM (
+            SELECT m.status,
+              ROW_NUMBER() OVER (
+                PARTITION BY m.source_project, m.entity_id
+                ORDER BY CASE
+                  WHEN m.proposal_id = ? THEN 0
+                  WHEN m.proposal_id IS NULL OR m.proposal_id = '' THEN 1
+                  ELSE 2
+                END
+              ) AS rn
+            FROM metadata m
+            WHERE m.source_project = r.to_project
+              AND m.entity_id = r.to_id
+              AND (m.proposal_id = ? OR m.proposal_id IS NULL OR m.proposal_id = '')
+          ) tgt WHERE tgt.rn = 1 AND tgt.status NOT IN ('archived', 'deprecated')
+        )
       `
-      : 'SELECT from_project, from_id, to_project, to_id, rel_type FROM relations WHERE proposal_id IS NULL';
+      : `SELECT from_project, from_id, to_project, to_id, rel_type
+         FROM relations r
+         WHERE (r.proposal_id IS NULL OR r.proposal_id = '')
+           AND (r.status IS NULL OR r.status != 'deleted')
+           AND EXISTS (
+             SELECT 1 FROM metadata m
+             WHERE m.source_project = r.from_project
+               AND m.entity_id = r.from_id
+               AND (m.proposal_id IS NULL OR m.proposal_id = '')
+               AND m.status NOT IN ('archived', 'deprecated')
+           )
+           AND EXISTS (
+             SELECT 1 FROM metadata m
+             WHERE m.source_project = r.to_project
+               AND m.entity_id = r.to_id
+               AND (m.proposal_id IS NULL OR m.proposal_id = '')
+               AND m.status NOT IN ('archived', 'deprecated')
+           )`;
 
     const relations = (
       proposalId
-        ? db.prepare(query).all(proposalId, proposalId)
+        ? db.prepare(query).all(
+          dbProposalId,
+          dbProposalId,
+          dbProposalId,
+          dbProposalId,
+          dbProposalId,
+          dbProposalId
+        )
         : db.prepare(query).all()
     ) as Array<{
       from_project: string | null;
@@ -106,9 +177,9 @@ export class InMemoryGraph {
 
     for (const rel of relations) {
       this.addRelation(
-        rel.from_project,
+        rel.from_project || null,
         rel.from_id,
-        rel.to_project,
+        rel.to_project || null,
         rel.to_id,
         rel.rel_type
       );
@@ -127,13 +198,15 @@ export class InMemoryGraph {
     toId: string,
     relType: string
   ): void {
-    const fromKey = makeNodeKey(fromProject, fromId);
-    const toKey = makeNodeKey(toProject, toId);
+    const normalizedFrom = normalizeProject(fromProject);
+    const normalizedTo = normalizeProject(toProject);
+    const fromKey = makeNodeKey(normalizedFrom, fromId);
+    const toKey = makeNodeKey(normalizedTo, toId);
 
     // 确保节点存在
     if (!this.nodes.has(fromKey)) {
       this.nodes.set(fromKey, {
-        project: fromProject,
+        project: normalizedFrom,
         id: fromId,
         outgoing: new Map(),
         incoming: new Map(),
@@ -141,7 +214,7 @@ export class InMemoryGraph {
     }
     if (!this.nodes.has(toKey)) {
       this.nodes.set(toKey, {
-        project: toProject,
+        project: normalizedTo,
         id: toId,
         outgoing: new Map(),
         incoming: new Map(),
@@ -178,8 +251,10 @@ export class InMemoryGraph {
     toId: string,
     relType: string
   ): void {
-    const fromKey = makeNodeKey(fromProject, fromId);
-    const toKey = makeNodeKey(toProject, toId);
+    const normalizedFrom = normalizeProject(fromProject);
+    const normalizedTo = normalizeProject(toProject);
+    const fromKey = makeNodeKey(normalizedFrom, fromId);
+    const toKey = makeNodeKey(normalizedTo, toId);
     const fromNode = this.nodes.get(fromKey);
     const toNode = this.nodes.get(toKey);
 

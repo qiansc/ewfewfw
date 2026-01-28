@@ -27,37 +27,109 @@ async function generateEmbedding(text: string): Promise<Float32Array> {
 - 语言：多语言支持（中英文）
 - 缓存位置：`~/.cache/huggingface/`
 
+**Embedding 生成性能**：
+- 单条生成时间：~10-20ms（取决于文本长度）
+- 批量生成：可达 100-200 条/秒
+- 首次下载模型：~80MB（首次运行）
+
 ### 3.2 向量搜索
+
+> **技术选型**：使用 [USearch](https://github.com/unum-cloud/usearch) (WASM) 实现向量搜索，独立于 SQLite 存储。
+>
+> **存储结构**：
+> - `c4a.db` - SQLite 数据库（实体、关系、元数据）
+> - `c4a.usearch` - USearch 向量索引文件
+> - `c4a.keymap.json` - entity_id ↔ USearch key 映射
 
 **问题**：向量搜索必须实现 Feat 版本隔离（Copy-on-Write），否则会返回重复或错误版本的数据。
 
-**错误示例**（缺少 proposal_id 过滤）：
+**USearch 向量存储封装**：
 
 ```typescript
-// ❌ 错误：未过滤 proposal_id，会返回重复数据
-async function semanticSearch_WRONG(query: string, limit: number = 10) {
-  const db = DatabaseConnection.getInstance();
-  const embedding = await generateEmbedding(query);
+import { Index } from 'usearch';
 
-  return db.prepare(`
-    SELECT
-      e.id,
-      e.type,
-      e.data,
-      vec_distance_cosine(v.embedding, ?) as distance
-    FROM entities e
-    JOIN vectors v ON e.id = v.entity_id  -- ❌ 缺少 proposal_id 过滤
-    ORDER BY distance ASC
-    LIMIT ?
-  `).all(embedding, limit);
+export class VectorStore {
+  private index: Index;
+  private keyMap: Map<bigint, string>;  // USearch key → composite_id
+  private reverseMap: Map<string, bigint>;  // composite_id → USearch key
+  private nextKey: bigint = 1n;
+  private indexPath: string;
+
+  constructor(config: { dimensions: number; indexPath: string }) {
+    this.index = new Index({
+      metric: 'cos',
+      connectivity: 16,
+      dimensions: config.dimensions,
+    });
+    this.indexPath = config.indexPath;
+    this.keyMap = new Map();
+    this.reverseMap = new Map();
+  }
+
+  // 生成复合 ID（用于 Feat 版本隔离）
+  private makeCompositeId(sourceProject: string, entityId: string, proposalId: string | null): string {
+    return `${sourceProject ?? ''}:${entityId}:${proposalId ?? ''}`;
+  }
+
+  // 添加向量
+  add(sourceProject: string, entityId: string, proposalId: string | null, embedding: Float32Array): void {
+    const compositeId = this.makeCompositeId(sourceProject, entityId, proposalId);
+
+    // 如果已存在，先删除旧向量
+    if (this.reverseMap.has(compositeId)) {
+      this.remove(sourceProject, entityId, proposalId);
+    }
+
+    const key = this.nextKey++;
+    this.index.add(key, embedding);
+    this.keyMap.set(key, compositeId);
+    this.reverseMap.set(compositeId, key);
+  }
+
+  // 删除向量
+  remove(sourceProject: string, entityId: string, proposalId: string | null): void {
+    const compositeId = this.makeCompositeId(sourceProject, entityId, proposalId);
+    const key = this.reverseMap.get(compositeId);
+    if (key !== undefined) {
+      this.index.remove(key);
+      this.keyMap.delete(key);
+      this.reverseMap.delete(compositeId);
+    }
+  }
+
+  // KNN 搜索（返回 composite_id 和距离）
+  search(queryVector: Float32Array, limit: number): Array<{ compositeId: string; distance: number }> {
+    const { keys, distances } = this.index.search(queryVector, limit);
+
+    return Array.from(keys).map((key, i) => ({
+      compositeId: this.keyMap.get(key)!,
+      distance: distances[i],
+    }));
+  }
+
+  // 持久化
+  save(): void {
+    this.index.save(this.indexPath);
+    // 保存映射表
+    const mapData = {
+      nextKey: this.nextKey.toString(),
+      entries: Array.from(this.keyMap.entries()).map(([k, v]) => [k.toString(), v]),
+    };
+    Bun.write(this.indexPath.replace('.usearch', '.keymap.json'), JSON.stringify(mapData));
+  }
+
+  // 加载
+  load(): void {
+    if (existsSync(this.indexPath)) {
+      this.index.load(this.indexPath);
+      const mapData = JSON.parse(readFileSync(this.indexPath.replace('.usearch', '.keymap.json'), 'utf-8'));
+      this.nextKey = BigInt(mapData.nextKey);
+      this.keyMap = new Map(mapData.entries.map(([k, v]: [string, string]) => [BigInt(k), v]));
+      this.reverseMap = new Map(Array.from(this.keyMap.entries()).map(([k, v]) => [v, k]));
+    }
+  }
 }
 ```
-
-**问题分析**：
-
-1. **重复数据**：如果实体 `auth-service` 在主分支和 Feat 中都存在，上述查询会返回两条记录
-2. **版本混乱**：JOIN 条件只匹配 `entity_id`，没有匹配 `proposal_id`，可能返回错误版本的向量
-3. **缺少 Merge View**：没有实现"Feat 优先，主分支兜底"的版本选择逻辑
 
 **正确实现**（带 Feat 版本隔离 + 生命周期过滤）：
 
@@ -67,210 +139,89 @@ async function semanticSearch(
   query: string,
   currentProposalId: string | null,  // 当前 Feat ID（null 表示主分支）
   limit: number = 10
-) {
+): Promise<SearchResult[]> {
   const db = DatabaseConnection.getInstance();
+  const vectorStore = VectorStore.getInstance();
   const embedding = await generateEmbedding(query);
 
-  // 方案 1：使用 Window Function 实现 Merge View（推荐）
-  return db.prepare(`
-    WITH ranked_entities AS (
-      SELECT
-        e.id,
-        e.source_project,
-        e.proposal_id,
-        e.type,
-        e.data,
-        m.status,
-        v.embedding,
-        vec_distance_cosine(v.embedding, ?) as distance,
-        -- 版本优先级：当前 Feat > 主分支
-        -- 注意：proposal_id 使用空字符串哨兵值代替 NULL
-        ROW_NUMBER() OVER (
-          PARTITION BY e.source_project, e.id
-          ORDER BY
-            CASE
-              WHEN e.proposal_id = ? THEN 1  -- 当前 Feat 优先
-              WHEN e.proposal_id = '' THEN 2  -- 主分支兜底（空字符串）
-              ELSE 3  -- 其他 Feat 版本（不应出现）
-            END
-        ) as rn
+  // 1. 从 USearch 获取候选结果（扩大搜索范围以便后续过滤）
+  const candidates = vectorStore.search(embedding, limit * 3);
+
+  // 2. 解析 composite_id，过滤版本
+  const dbProposalId = currentProposalId ?? '';
+  const filtered: Array<{ compositeId: string; distance: number; sourceProject: string; entityId: string; proposalId: string }> = [];
+
+  for (const { compositeId, distance } of candidates) {
+    const [sourceProject, entityId, proposalId] = compositeId.split(':');
+
+    // 只保留当前 Feat 和主分支的实体
+    if (proposalId === dbProposalId || proposalId === '') {
+      filtered.push({ compositeId, distance, sourceProject, entityId, proposalId });
+    }
+  }
+
+  // 3. 实现 Merge View：Feat 优先，主分支兜底
+  const entityMap = new Map<string, typeof filtered[0]>();
+  for (const item of filtered) {
+    const key = `${item.sourceProject}:${item.entityId}`;
+    const existing = entityMap.get(key);
+
+    if (!existing) {
+      entityMap.set(key, item);
+    } else if (item.proposalId === dbProposalId && existing.proposalId !== dbProposalId) {
+      // Feat 版本优先于主分支版本
+      entityMap.set(key, item);
+    }
+  }
+
+  // 4. 从 SQLite 获取实体详情，过滤已归档/已删除
+  const results: SearchResult[] = [];
+  for (const item of entityMap.values()) {
+    const entity = db.prepare(`
+      SELECT e.id, e.source_project, e.proposal_id, e.type, e.data, m.status
       FROM entities e
       JOIN metadata m ON
         e.source_project = m.source_project AND
         e.id = m.entity_id AND
         e.proposal_id = m.proposal_id
-      JOIN vectors v ON
-        e.source_project = v.source_project AND
-        e.id = v.entity_id AND
-        e.proposal_id = v.proposal_id  -- 直接比较，无需处理 NULL
-      WHERE
-        -- 只搜索当前 Feat 和主分支的实体
-        (e.proposal_id = ? OR e.proposal_id = '')
-        -- ✅ 过滤已归档/已删除的实体
+      WHERE e.source_project = ? AND e.id = ? AND e.proposal_id = ?
         AND m.status NOT IN ('archived', 'deprecated')
-    )
-    SELECT
-      id,
-      source_project,
-      proposal_id,
-      type,
-      data,
-      distance
-    FROM ranked_entities
-    WHERE rn = 1  -- 每个实体只保留优先级最高的版本
-    ORDER BY distance ASC
-    LIMIT ?
-  `).all(
-    embedding,
-    currentProposalId,  -- 用于 CASE 判断
-    currentProposalId,  -- 用于 WHERE 过滤
-    limit
-  );
+    `).get(item.sourceProject, item.entityId, item.proposalId);
+
+    if (entity) {
+      results.push({
+        ...entity,
+        distance: item.distance,
+      });
+    }
+  }
+
+  // 5. 按距离排序，返回 top N
+  return results
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, limit);
 }
 ```
 
-**方案 2：使用 UNION 实现 Merge View（简化版）**：
-
-```typescript
-// ✅ 正确：使用 UNION 实现版本选择 + 生命周期过滤
-// 注意：proposal_id 使用空字符串哨兵值代替 NULL
-async function semanticSearch_Alternative(
-  query: string,
-  currentProposalId: string | null,
-  limit: number = 10
-) {
-  const db = DatabaseConnection.getInstance();
-  const embedding = await generateEmbedding(query);
-  const dbProposalId = currentProposalId ?? '';  // null → ''
-
-  return db.prepare(`
-    WITH feat_entities AS (
-      -- 当前 Feat 中的实体
-      SELECT
-        e.id,
-        e.source_project,
-        e.proposal_id,
-        e.type,
-        e.data,
-        m.status,
-        v.embedding,
-        vec_distance_cosine(v.embedding, ?) as distance
-      FROM entities e
-      JOIN metadata m ON
-        e.source_project = m.source_project AND
-        e.id = m.entity_id AND
-        e.proposal_id = m.proposal_id
-      JOIN vectors v ON
-        e.source_project = v.source_project AND
-        e.id = v.entity_id AND
-        e.proposal_id = v.proposal_id
-      WHERE e.proposal_id = ?
-        AND m.status NOT IN ('archived', 'deprecated')
-    ),
-    main_entities AS (
-      -- 主分支中的实体（proposal_id = ''）
-      SELECT
-        e.id,
-        e.source_project,
-        e.proposal_id,
-        e.type,
-        e.data,
-        m.status,
-        v.embedding,
-        vec_distance_cosine(v.embedding, ?) as distance
-      FROM entities e
-      JOIN metadata m ON
-        e.source_project = m.source_project AND
-        e.id = m.entity_id AND
-        e.proposal_id = '' AND m.proposal_id = ''
-      JOIN vectors v ON
-        e.source_project = v.source_project AND
-        e.id = v.entity_id AND
-        e.proposal_id = v.proposal_id
-      WHERE e.proposal_id = ''
-        AND m.status NOT IN ('archived', 'deprecated')
-    ),
-    merged AS (
-      -- Feat 优先，主分支兜底
-      SELECT * FROM feat_entities
-      UNION ALL
-      SELECT m.*
-      FROM main_entities m
-      WHERE NOT EXISTS (
-        SELECT 1 FROM feat_entities f
-        WHERE f.source_project = m.source_project AND f.id = m.id
-      )
-    )
-    SELECT
-      id,
-      source_project,
-      proposal_id,
-      type,
-      data,
-      distance
-    FROM merged
-    ORDER BY distance ASC
-    LIMIT ?
-  `).all(
-    embedding,
-    currentProposalId,
-    embedding,
-    limit
-  );
-}
-```
-
-**方案 3：主分支搜索（仅搜索主分支版本）**：
+**主分支搜索（仅搜索主分支版本）**：
 
 ```typescript
 // ✅ 正确：仅搜索主分支版本（用于主分支环境）
-// 注意：proposal_id = '' 表示主分支
 async function semanticSearch_MainBranchOnly(
   query: string,
   limit: number = 10
-) {
-  const db = DatabaseConnection.getInstance();
-  const embedding = await generateEmbedding(query);
-
-  return db.prepare(`
-    SELECT
-      e.id,
-      e.source_project,
-      e.proposal_id,
-      e.type,
-      e.data,
-      vec_distance_cosine(v.embedding, ?) as distance
-    FROM entities e
-    JOIN vectors v ON
-      e.source_project = v.source_project AND
-      e.id = v.entity_id AND
-      e.proposal_id = v.proposal_id  -- 直接比较，无需处理 NULL
-    WHERE e.proposal_id = ''  -- 仅搜索主分支（空字符串）
-    ORDER BY distance ASC
-    LIMIT ?
-  `).all(embedding, limit);
+): Promise<SearchResult[]> {
+  // 调用通用搜索，传入 null 表示主分支
+  return semanticSearch(query, null, limit);
 }
 ```
 
 **设计要点**：
 
-1. **复合主键匹配**：JOIN 条件必须同时匹配 `(source_project, entity_id, proposal_id)` 三元组
-2. **版本过滤**：WHERE 条件必须限制 `proposal_id` 的范围（当前 Feat + 主分支，或仅主分支）
-3. **Merge View**：使用 Window Function 或 UNION 实现"Feat 优先，主分支兜底"的版本选择
-4. **去重**：确保每个实体只返回一个版本（优先级最高的版本）
-
-**性能优化**：
-
-```sql
--- 向量表的辅助索引（支持 Feat 版本隔离）
--- 注意：此索引已在 sqlite-schema.md §2.3.1 定义，此处仅作参考
--- CREATE INDEX idx_vectors_lookup ON vectors(source_project, entity_id, proposal_id);
-
--- 实体表的复合索引（已在 sqlite-schema.md §2.1 定义）
--- CREATE INDEX idx_entities_composite ON entities(source_project, id, proposal_id);
-```
-
-> **索引定义**：所有索引的权威定义请参考 [sqlite-schema.md §2](./sqlite-schema.md#21-核心表)
+1. **复合 ID**：使用 `source_project:entity_id:proposal_id` 作为向量的唯一标识
+2. **版本过滤**：在 USearch 搜索后过滤，只保留当前 Feat 和主分支的实体
+3. **Merge View**：Feat 版本优先于主分支版本
+4. **生命周期过滤**：从 SQLite 获取实体时过滤已归档/已删除的实体
 
 **测试用例**：
 
@@ -303,7 +254,7 @@ const results = await semanticSearch("认证", null, 10);
 **关键设计**：
 - ⚠️ **多进程场景**：CLI 命令和 IDE 的 MCP Server 是独立进程，会同时访问同一个 SQLite 文件
 - ✅ **WAL 模式**：启用 WAL 模式支持多进程并发读写
-- ✅ **busy_timeout**：设置合理的超时时间（30 秒）处理写锁等待
+- ✅ **busy_timeout**：设置合理的超时时间（5 秒），应用层进行重试/退避
 - ✅ **文件锁**：依赖 SQLite 的文件锁机制保证写操作互斥
 - ⚠️ **WriteQueue 局限**：内存级别的 WriteQueue 仅在单进程内有效，跨进程并发依赖 SQLite 自身机制
 
@@ -323,7 +274,7 @@ const results = await semanticSearch("认证", null, 10);
 - CLI 和 MCP Server 是**独立进程**，各自持有数据库连接
 - SQLite WAL 模式支持多个读者和一个写者并发
 - 写操作通过 SQLite 文件锁串行化
-- 如果写锁被占用，等待 `busy_timeout`（30 秒）后返回错误
+- 如果写锁被占用，等待 `busy_timeout`（5 秒）后返回错误，应用层按策略重试
 
 **场景 2：多个 CLI 命令并发执行**
 
@@ -556,10 +507,11 @@ class DatabaseConnection {
 
 ```typescript
 // 插入实体时同步创建向量
-// 注意：better-sqlite3 的 transaction 回调是同步的，不能在回调里使用 await。
+// 注意：bun:sqlite 的 transaction 回调是同步的，不能在回调里使用 await。
 async function saveEntity(entity: Entity) {
   // 使用单例连接
   const db = DatabaseConnection.getInstance();
+  const vectorStore = VectorStore.getInstance();
 
   // 1) 先在事务外生成向量（可能较慢/需要网络下载模型）
   const text = generateSearchText(entity);
@@ -567,7 +519,7 @@ async function saveEntity(entity: Entity) {
   const dbSourceProject = entity.source_project ?? '';
   const dbProposalId = entity.proposal_id ?? '';  // 主分支为 ''（空字符串）
 
-  // 2) 再用同步事务写入两张表，保证一致性
+  // 2) 再用同步事务写入 SQLite
   const transaction = db.transaction(() => {
     db.prepare(`
       INSERT INTO entities (id, source_project, proposal_id, type, kind, scope, perspective, data)
@@ -582,25 +534,13 @@ async function saveEntity(entity: Entity) {
       entity.perspective,
       JSON.stringify(entity.data)
     );
-
-    db.prepare(`
-      INSERT INTO vectors (vector_key, entity_id, source_project, proposal_id, embedding)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(
-      makeVectorKey(entity.source_project, entity.id, entity.proposal_id),
-      entity.id,
-      dbSourceProject,
-      dbProposalId,
-      embedding
-    );
   });
 
   transaction();
-}
 
-// 生成 vector_key（处理 NULL 值）
-function makeVectorKey(sourceProject: string | null, entityId: string, proposalId: string | null): string {
-  return `${sourceProject ?? ''}:${entityId}:${proposalId ?? ''}`;
+  // 3) 写入 USearch 向量索引（事务外，独立持久化）
+  vectorStore.add(dbSourceProject, entity.id, entity.proposal_id, embedding);
+  vectorStore.save();
 }
 
 // 生成搜索文本（用于向量化）
@@ -631,6 +571,6 @@ function generateSearchText(entity: Entity): string {
 | 向量维度 | 384 | 平衡精度和性能 |
 | 批量插入 | 每 100 条提交一次事务 | 减少磁盘 I/O |
 | 缓存策略 | LRU 缓存最近 1000 个查询 | 加速重复查询 |
-| 索引策略 | 依赖 sqlite-vec 支持（如 IVF/HNSW，或无显式索引） | 以实现与可维护性为准 |
+| 索引策略 | USearch HNSW 索引 | 高效近似最近邻搜索 |
 
 ---

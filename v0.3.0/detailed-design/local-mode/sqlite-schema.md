@@ -16,7 +16,7 @@ Local 模式使用 SQLite 单文件数据库替代 Server 模式的三库架构�
 |------|----------|------------|
 | 数据库 | SQLite 单文件 | MongoDB + Neo4j + Milvus |
 | 图存储 | SQLite relations 表 + 内存图 | Neo4j 原生图数据库 |
-| 向量存储 | SQLite + sqlite-vec 扩展 | Milvus |
+| 向量存储 | USearch (WASM) 独立索引 | Milvus |
 | 事务性 | 单库事务，ACID 保证 | 跨库事务需协调 |
 | 部署复杂度 | 低（单文件） | 高（三个服务） |
 | 性能 | 适合小规模（< 10K 实体） | 适合大规模（> 10K 实体） |
@@ -61,7 +61,7 @@ Local 模式使用 SQLite 单文件数据库，表结构设计与 Server 模式�
 |--------|------------|----------|
 | 数据库 | MongoDB + Neo4j + Milvus | SQLite 单文件 |
 | 图存储 | Neo4j 原生图数据库 | SQLite relations 表 + 内存图 |
-| 向量存储 | Milvus | SQLite + sqlite-vec 扩展 |
+| 向量存储 | Milvus | USearch (WASM) 独立索引 |
 | 事务性 | 跨库事务需协调 | 单库事务，ACID 保证 |
 | **用户表** | ✅ 有 | ❌ 无 |
 | **权限表** | ✅ 有 | ❌ 无 |
@@ -290,40 +290,50 @@ CREATE INDEX idx_feat_history_published_at ON feat_history(published_at);
 
 ### 2.3 Local 模式特有表
 
-#### 2.3.1 向量索引表
+#### 2.3.1 向量索引（USearch）
 
-使用 [sqlite-vec](https://github.com/asg017/sqlite-vec) 扩展实现向量存储：
+使用 [USearch](https://github.com/unum-cloud/usearch) (WASM) 实现向量存储，独立于 SQLite：
 
-```sql
--- 向量索引表（使用 sqlite-vec 扩展）
--- 注意：sqlite-vec 虚拟表不支持复合主键，使用组合字符串作为主键
--- 注意：虚拟表的列不支持 NOT NULL 约束，空字符串哨兵值在应用层处理
-CREATE VIRTUAL TABLE vectors USING vec0(
-    vector_key TEXT PRIMARY KEY,   -- 组合键："{source_project}:{entity_id}:{proposal_id}"
-    entity_id TEXT,
-    source_project TEXT,           -- 实体归属项目（'' 表示全局实体）
-    proposal_id TEXT,              -- '' 表示主分支，与 entities 表对应
-    embedding FLOAT[384]           -- all-MiniLM-L6-v2 模型维度
-);
+**存储结构**：
+- `c4a.db` - SQLite 数据库（实体、关系、元数据）
+- `c4a.usearch` - USearch 向量索引文件
+- `c4a.keymap.json` - entity_id ↔ USearch key 映射
 
--- 辅助索引加速查询（支持 Feat 版本隔离）
-CREATE INDEX idx_vectors_lookup ON vectors(source_project, entity_id, proposal_id);
+```typescript
+// USearch 向量存储封装（详见 vector-search.md）
+import { Index } from 'usearch';
+
+const index = new Index({
+  metric: 'cos',        // 余弦距离
+  connectivity: 16,     // HNSW 连接数
+  dimensions: 384,      // all-MiniLM-L6-v2 模型维度
+});
+
+// 添加向量
+index.add(key, embedding);
+
+// KNN 搜索
+const { keys, distances } = index.search(queryVector, limit);
+
+// 持久化
+index.save('c4a.usearch');
 ```
 
 **设计说明**：
-- `vector_key` 格式：`"{source_project}:{entity_id}:{proposal_id}"`，使用空字符串代替 NULL
-- 示例：`"backend-api:auth-service:"` (项目实体主分支)、`":order-state-machine:"` (Domain 层全局实体)
-- 辅助索引 `idx_vectors_lookup` 支持按实体三元组快速查询
+- 使用 `source_project:entity_id:proposal_id` 作为复合 ID，映射到 USearch 的 bigint key
+- 映射关系存储在 `c4a.keymap.json` 文件中
 - 主分支实体的 `proposal_id` 为 `''`（空字符串）
 - feat 内实体的 `proposal_id` 为 feat ID（如 `"feat-a001-user-login"`）
-- 查询时需要同时指定 `source_project`、`entity_id` 和 `proposal_id` 来获取正确版本的向量
+- 查询时需要在应用层过滤版本（Feat 优先，主分支兜底）
 
-#### 2.3.2 全文搜索索引表（sqlite-vec 降级方案）
+> **详细实现**：向量搜索的完整实现请参考 [vector-search.md](./vector-search.md#32-向量搜索)
 
-当 sqlite-vec 扩展不可用时，使用 FTS5 全文搜索作为降级方案：
+#### 2.3.2 全文搜索索引表（USearch 降级方案）
+
+当 USearch 不可用时，使用 FTS5 全文搜索作为降级方案：
 
 ```sql
--- 全文搜索索引表（sqlite-vec 不可用时的降级方案）
+-- 全文搜索索引表（USearch 不可用时的降级方案）
 CREATE VIRTUAL TABLE entities_fts USING fts5(
     entity_id UNINDEXED,           -- 实体 ID（不参与搜索，仅用于关联）
     source_project UNINDEXED,      -- 项目 ID（不参与搜索）
@@ -458,7 +468,7 @@ LIMIT :limit;
 
 | 搜索方式 | 1K 实体 | 10K 实体 | 说明 |
 |---------|--------|---------|------|
-| sqlite-vec 向量搜索 | ~10ms | ~50ms | 语义相似度，召回质量高 |
+| USearch 向量搜索 | ~10ms | ~50ms | 语义相似度，召回质量高 |
 | FTS5 全文搜索 | ~5ms | ~20ms | 关键词匹配，速度更快 |
 | LIKE 模糊匹配 | ~50ms | ~500ms | 最终降级方案，性能差 |
 

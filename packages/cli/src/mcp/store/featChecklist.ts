@@ -4,13 +4,16 @@
  * Checklist 管理：生成/获取/更新/清除
  * 基于设计文档：v0.3.0/detailed-design/mcp/store-feat-checklist.md §3.8
  */
-import { getAdapter } from "@c4a/core/store";
+import { getAdapter, isLocalMode } from "@c4a/core/store";
 import type {
   ChecklistParams,
   ChecklistResult,
   ChecklistAction,
   ChecklistPatch,
+  Checklist,
 } from "@c4a/core/store";
+import { join } from "node:path";
+import { safeRenderFile } from "./fileProtection.js";
 
 /**
  * 输入参数类型
@@ -48,5 +51,58 @@ export async function storeFeatChecklistHandler(
     validate: args.validate ?? true,
   });
 
+  // Local 模式下更新只读视图（checklist.md）
+  if (isLocalMode()) {
+    const checklist = result.updated_checklist ?? result.checklist;
+    if (checklist) {
+      renderChecklistView(args.feat_id, checklist);
+    }
+  }
+
   return result;
+}
+
+function renderChecklistView(featId: string, checklist: Checklist): void {
+  const checklistPath = join(process.cwd(), ".context", "feat", featId, "checklist.md");
+  const body = renderChecklistMarkdown(featId, checklist);
+  const renderResult = safeRenderFile(checklistPath, featId, body);
+  if (!renderResult.success && renderResult.error) {
+    console.warn(renderResult.error);
+  }
+  if (renderResult.message) {
+    console.warn(renderResult.message);
+  }
+}
+
+function renderChecklistMarkdown(featId: string, checklist: Checklist): string {
+  const lines: string[] = [];
+  lines.push(`# Feat Checklist: ${featId}`);
+
+  const updatedAt = checklist.updated_at ?? checklist.metadata?.generated_at;
+  if (updatedAt) {
+    lines.push("");
+    lines.push(`- 更新时间: ${updatedAt}`);
+  }
+
+  lines.push("");
+  lines.push("## 任务列表");
+
+  for (const item of checklist.items) {
+    const marker = item.status === "completed" ? "x" : " ";
+    const statusLabel = item.status === "completed" ? "" : ` (${item.status})`;
+    const entitySuffix = item.entity_id ? ` [${item.entity_id}]` : "";
+    lines.push(`- [${marker}] ${item.title}${entitySuffix}${statusLabel}`);
+
+    if (item.assignee) {
+      lines.push(`  - 负责人: ${item.assignee}`);
+    }
+    if (item.completed_at) {
+      lines.push(`  - 完成时间: ${item.completed_at}`);
+    }
+    if (item.blocked_reason) {
+      lines.push(`  - 阻塞原因: ${item.blocked_reason}`);
+    }
+  }
+
+  return lines.join("\n");
 }

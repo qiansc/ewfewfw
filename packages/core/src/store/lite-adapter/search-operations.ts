@@ -25,14 +25,17 @@ export async function search(ctx: AdapterContext, params: SearchParams): Promise
   const db = ctx.store.getDatabase();
   const proposalId = params.proposal_id ?? null;
   const limit = params.limit || 10;
+  const vectorStore = ctx.store.getVectorStore();
+  const ftsEnabled = ctx.store.isFtsEnabled();
 
   // 检查向量搜索是否可用
-  const vectorEnabled = ctx.config.enableVectorSearch && ctx.store.isVectorSearchEnabled();
+  const vectorEnabled =
+    ctx.config.enableVectorSearch && ctx.store.isVectorSearchEnabled() && vectorStore !== null;
 
   // 尝试使用向量搜索
-  if (vectorEnabled) {
+  if (vectorEnabled && vectorStore) {
     try {
-      const vectorResults = await vectorSearch(db, params.query, proposalId, limit);
+      const vectorResults = await vectorSearch(db, vectorStore, params.query, proposalId, limit);
       if (vectorResults.length > 0) {
         return {
           items: vectorResults,
@@ -41,36 +44,96 @@ export async function search(ctx: AdapterContext, params: SearchParams): Promise
         };
       }
       // 向量搜索无结果，降级到文本搜索
-      const textResults = textSearch(db, params, proposalId, limit);
+      if (ftsEnabled) {
+        const ftsResults = safeFtsSearch(db, params, proposalId, limit);
+        if (!ftsResults) {
+          const likeResults = likeSearch(db, params, proposalId, limit);
+          return {
+            items: likeResults,
+            degraded: true,
+            degraded_reason: 'FULLTEXT_SEARCH_UNAVAILABLE',
+            degraded_message: '向量搜索无结果且 FTS5 不可用，已降级到 LIKE 模糊匹配',
+            search_mode: 'like',
+          };
+        }
+        return {
+          items: ftsResults,
+          degraded: true,
+          degraded_reason: 'NO_VECTOR_RESULTS',
+          degraded_message: '向量搜索无结果，已降级到全文搜索',
+          search_mode: 'fulltext',
+        };
+      }
+      const likeResults = likeSearch(db, params, proposalId, limit);
       return {
-        items: textResults,
+        items: likeResults,
         degraded: true,
-        degraded_reason: 'NO_VECTOR_RESULTS',
-        degraded_message: '向量搜索无结果，已降级到全文搜索',
-        search_mode: 'fulltext',
+        degraded_reason: 'FULLTEXT_SEARCH_UNAVAILABLE',
+        degraded_message: '向量搜索无结果且 FTS5 不可用，已降级到 LIKE 模糊匹配',
+        search_mode: 'like',
       };
     } catch {
-      // 向量搜索失败，降级到文本搜索
-      const textResults = textSearch(db, params, proposalId, limit);
+      // 向量搜索失败，降级到全文搜索/LIKE
+      if (ftsEnabled) {
+        const ftsResults = safeFtsSearch(db, params, proposalId, limit);
+        if (!ftsResults) {
+          const likeResults = likeSearch(db, params, proposalId, limit);
+          return {
+            items: likeResults,
+            degraded: true,
+            degraded_reason: 'FULLTEXT_SEARCH_UNAVAILABLE',
+            degraded_message: 'USearch 和 FTS5 均不可用，已降级到 LIKE 模糊匹配',
+            search_mode: 'like',
+          };
+        }
+        return {
+          items: ftsResults,
+          degraded: true,
+          degraded_reason: 'VECTOR_SEARCH_FAILED',
+          degraded_message: '向量搜索执行失败，已降级到全文搜索',
+          search_mode: 'fulltext',
+        };
+      }
+      const likeResults = likeSearch(db, params, proposalId, limit);
       return {
-        items: textResults,
+        items: likeResults,
         degraded: true,
-        degraded_reason: 'VECTOR_SEARCH_FAILED',
-        degraded_message: '向量搜索执行失败，已降级到全文搜索',
-        search_mode: 'fulltext',
+        degraded_reason: 'FULLTEXT_SEARCH_UNAVAILABLE',
+        degraded_message: 'USearch 和 FTS5 均不可用，已降级到 LIKE 模糊匹配',
+        search_mode: 'like',
       };
     }
   }
 
-  // sqlite-vec 不可用，使用文本搜索
-  const textResults = textSearch(db, params, proposalId, limit);
+  // USearch 不可用，使用全文搜索/LIKE
   const shouldHaveVector = ctx.config.enableVectorSearch;
+  if (ftsEnabled) {
+    const ftsResults = safeFtsSearch(db, params, proposalId, limit);
+    if (!ftsResults) {
+      const likeResults = likeSearch(db, params, proposalId, limit);
+      return {
+        items: likeResults,
+        degraded: true,
+        degraded_reason: 'FULLTEXT_SEARCH_UNAVAILABLE',
+        degraded_message: 'USearch 和 FTS5 均不可用，已降级到 LIKE 模糊匹配',
+        search_mode: 'like',
+      };
+    }
+    return {
+      items: ftsResults,
+      degraded: shouldHaveVector,
+      degraded_reason: shouldHaveVector ? 'VECTOR_SEARCH_UNAVAILABLE' : undefined,
+      degraded_message: shouldHaveVector ? 'USearch 不可用，使用全文搜索替代' : undefined,
+      search_mode: 'fulltext',
+    };
+  }
+  const likeResults = likeSearch(db, params, proposalId, limit);
   return {
-    items: textResults,
-    degraded: shouldHaveVector,
-    degraded_reason: shouldHaveVector ? 'VECTOR_SEARCH_UNAVAILABLE' : undefined,
-    degraded_message: shouldHaveVector ? 'sqlite-vec 不可用，使用全文搜索替代' : undefined,
-    search_mode: 'fulltext',
+    items: likeResults,
+    degraded: true,
+    degraded_reason: 'FULLTEXT_SEARCH_UNAVAILABLE',
+    degraded_message: 'USearch 和 FTS5 均不可用，已降级到 LIKE 模糊匹配',
+    search_mode: 'like',
   };
 }
 
@@ -83,11 +146,12 @@ export async function search(ctx: AdapterContext, params: SearchParams): Promise
  */
 async function vectorSearch(
   db: ReturnType<SQLiteStore['getDatabase']>,
+  vectorStore: NonNullable<ReturnType<SQLiteStore['getVectorStore']>>,
   query: string,
   proposalId: string | null,
   limit: number
 ): Promise<SearchResultItem[]> {
-  const results = await semanticSearch(db, query, proposalId, limit);
+  const results = await semanticSearch(db, vectorStore, query, proposalId, limit);
 
   return results.map((row) => {
     const data = JSON.parse(row.data) as Record<string, unknown>;
@@ -104,9 +168,201 @@ async function vectorSearch(
 }
 
 /**
- * 文本搜索（降级方案）
+ * 全文搜索（FTS5 降级方案）
  */
-function textSearch(
+function ftsSearch(
+  db: ReturnType<SQLiteStore['getDatabase']>,
+  params: SearchParams,
+  proposalId: string | null,
+  limit: number
+): SearchResultItem[] {
+  const dbProposalId = proposalId ?? '';
+  const conditions: string[] = [];
+  const values: unknown[] = [];
+
+  conditions.push("(e.proposal_id = ? OR e.proposal_id IS NULL OR e.proposal_id = '')");
+  values.push(dbProposalId);
+  conditions.push("m.status NOT IN ('archived', 'deprecated')");
+  conditions.push('entities_fts MATCH ?');
+  values.push(params.query);
+
+  if (params.scope && params.scope !== 'all') {
+    conditions.push('e.type = ?');
+    values.push(params.scope);
+  }
+
+  const whereClause = conditions.join(' AND ');
+
+  const results = db.prepare(`
+    WITH ranked AS (
+      SELECT
+        e.id,
+        e.source_project,
+        e.proposal_id,
+        e.type,
+        e.data,
+        m.status,
+        m.updated_at,
+        m.content_hash,
+        bm25(entities_fts) AS fts_rank,
+        ROW_NUMBER() OVER (
+          PARTITION BY e.source_project, e.id
+          ORDER BY
+            CASE
+              WHEN e.proposal_id = ? THEN 1
+              WHEN e.proposal_id IS NULL OR e.proposal_id = '' THEN 2
+              ELSE 3
+            END
+        ) AS rn
+      FROM entities e
+      JOIN metadata m ON e.source_project = m.source_project
+        AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+      JOIN entities_fts ON e.id = entities_fts.entity_id
+        AND e.source_project = entities_fts.source_project
+        AND e.proposal_id IS entities_fts.proposal_id
+      WHERE ${whereClause}
+    )
+    SELECT id, source_project, proposal_id, type, data, status, updated_at, content_hash, fts_rank
+    FROM ranked
+    WHERE rn = 1
+    ORDER BY fts_rank
+    LIMIT ?
+  `).all(dbProposalId, ...values, limit) as Array<{
+    id: string;
+    type: EntityType;
+    data: string;
+    status: EntityStatus;
+    updated_at: string;
+    content_hash: string;
+    source_project: string;
+    fts_rank: number;
+  }>;
+
+  return results.map((row) => {
+    const data = JSON.parse(row.data) as Record<string, unknown>;
+    const rank = Number(row.fts_rank ?? 0);
+    const score = rank <= 0 ? 1 : 1 / (1 + rank);
+    return {
+      id: row.id,
+      type: row.type,
+      score,
+      snippet: extractSnippet(data, params.query),
+      metadata: {
+        status: row.status,
+        updated_at: row.updated_at,
+        content_hash: row.content_hash,
+        source_project: row.source_project,
+      },
+    };
+  });
+}
+
+function safeFtsSearch(
+  db: ReturnType<SQLiteStore['getDatabase']>,
+  params: SearchParams,
+  proposalId: string | null,
+  limit: number
+): SearchResultItem[] | null {
+  try {
+    return ftsSearch(db, params, proposalId, limit);
+  } catch {
+    try {
+      return ftsSearchFallback(db, params, proposalId, limit);
+    } catch {
+      return null;
+    }
+  }
+}
+
+function ftsSearchFallback(
+  db: ReturnType<SQLiteStore['getDatabase']>,
+  params: SearchParams,
+  proposalId: string | null,
+  limit: number
+): SearchResultItem[] {
+  const dbProposalId = proposalId ?? '';
+  const conditions: string[] = [];
+  const values: unknown[] = [];
+
+  conditions.push("(e.proposal_id = ? OR e.proposal_id IS NULL OR e.proposal_id = '')");
+  values.push(dbProposalId);
+  conditions.push("m.status NOT IN ('archived', 'deprecated')");
+  conditions.push('entities_fts MATCH ?');
+  values.push(params.query);
+
+  if (params.scope && params.scope !== 'all') {
+    conditions.push('e.type = ?');
+    values.push(params.scope);
+  }
+
+  const whereClause = conditions.join(' AND ');
+
+  const results = db.prepare(`
+    WITH ranked AS (
+      SELECT
+        e.id,
+        e.source_project,
+        e.proposal_id,
+        e.type,
+        e.data,
+        m.status,
+        m.updated_at,
+        m.content_hash,
+        0.0 AS fts_rank,
+        ROW_NUMBER() OVER (
+          PARTITION BY e.source_project, e.id
+          ORDER BY
+            CASE
+              WHEN e.proposal_id = ? THEN 1
+              WHEN e.proposal_id IS NULL OR e.proposal_id = '' THEN 2
+              ELSE 3
+            END
+        ) AS rn
+      FROM entities e
+      JOIN metadata m ON e.source_project = m.source_project
+        AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+      JOIN entities_fts ON e.id = entities_fts.entity_id
+        AND e.source_project = entities_fts.source_project
+        AND e.proposal_id IS entities_fts.proposal_id
+      WHERE ${whereClause}
+    )
+    SELECT id, source_project, proposal_id, type, data, status, updated_at, content_hash, fts_rank
+    FROM ranked
+    WHERE rn = 1
+    ORDER BY id
+    LIMIT ?
+  `).all(dbProposalId, ...values, limit) as Array<{
+    id: string;
+    type: EntityType;
+    data: string;
+    status: EntityStatus;
+    updated_at: string;
+    content_hash: string;
+    source_project: string;
+    fts_rank: number;
+  }>;
+
+  return results.map((row) => {
+    const data = JSON.parse(row.data) as Record<string, unknown>;
+    return {
+      id: row.id,
+      type: row.type,
+      score: 1,
+      snippet: extractSnippet(data, params.query),
+      metadata: {
+        status: row.status,
+        updated_at: row.updated_at,
+        content_hash: row.content_hash,
+        source_project: row.source_project,
+      },
+    };
+  });
+}
+
+/**
+ * 文本搜索（LIKE 降级方案）
+ */
+function likeSearch(
   db: ReturnType<SQLiteStore['getDatabase']>,
   params: SearchParams,
   proposalId: string | null,
@@ -121,10 +377,10 @@ function textSearch(
 
   // proposal_id 过滤
   if (proposalId) {
-    conditions.push('(e.proposal_id = ? OR e.proposal_id IS NULL)');
+    conditions.push('(e.proposal_id = ? OR e.proposal_id IS NULL OR e.proposal_id = \'\')');
     values.push(proposalId);
   } else {
-    conditions.push('e.proposal_id IS NULL');
+    conditions.push('(e.proposal_id IS NULL OR e.proposal_id = \'\')');
   }
 
   // scope 过滤
@@ -132,6 +388,8 @@ function textSearch(
     conditions.push('e.type = ?');
     values.push(params.scope);
   }
+
+  conditions.push("m.status NOT IN ('archived', 'deprecated')");
 
   const whereClause = conditions.join(' AND ');
 

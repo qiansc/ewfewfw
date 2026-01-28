@@ -234,12 +234,12 @@ export class Benchmark {
 
     db.prepare(`
       INSERT INTO entities (id, source_project, proposal_id, type, data)
-      VALUES (?, 'benchmark', NULL, 'component', ?)
+      VALUES (?, 'benchmark', '', 'component', ?)
     `).run(id, JSON.stringify({ name: `Test ${id}`, description: 'Benchmark test entity' }));
 
     db.prepare(`
       INSERT INTO metadata (entity_id, source_project, proposal_id, status, content_hash, created_at, updated_at)
-      VALUES (?, 'benchmark', NULL, 'draft', ?, ?, ?)
+      VALUES (?, 'benchmark', '', 'draft', ?, ?, ?)
     `).run(id, `hash-${id}`, now, now);
   }
 

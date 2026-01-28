@@ -6,6 +6,7 @@
 
 // Adapter 层
 export { LiteAdapter } from './lite-adapter.js';
+export { ServerAdapter } from './server-adapter.js';
 export type { LiteAdapterConfig } from './lite-adapter.js';
 export type * from './adapter.js';
 
@@ -21,13 +22,14 @@ export {
 export type { StorageMode, ServerConfig, C4AConfig } from './get-adapter.js';
 
 // 模式切换
-export { LocalBackup, LocalRestore } from './mode-switch.js';
+export { LocalBackup, LocalRestore, formatConflictSummary } from './mode-switch.js';
 export type {
   ConflictPolicy,
   BackupOptions,
   RestoreOptions,
   BackupResult,
   RestoreResult,
+  ConflictSummary,
 } from './mode-switch.js';
 
 // SQLite Store

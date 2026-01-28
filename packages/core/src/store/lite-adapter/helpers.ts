@@ -96,7 +96,7 @@ export function rowToEntity(row: EntityRow): Entity {
     scope: row.scope || undefined,
     perspective: row.perspective || undefined,
     data: JSON.parse(row.data),
-    proposal_id: row.proposal_id,
+    proposal_id: row.proposal_id === '' ? null : row.proposal_id,
     metadata: {
       source_project: row.source_project,
       source_repo: row.source_repo || undefined,

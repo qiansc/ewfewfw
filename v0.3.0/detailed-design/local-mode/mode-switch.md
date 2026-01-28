@@ -100,7 +100,7 @@ c4a local restore ./backup.tar.gz --conflict-policy=merge
 
 **向量索引重建**：
 
-Local 模式使用 sqlite-vec 扩展。重建分为两个阶段：
+Local 模式使用 USearch (WASM) 实现向量搜索。重建分为两个阶段：
 
 **阶段 1：SQLite 批量插入**（仅数据写入，不含 Embedding 生成）
 
@@ -124,18 +124,18 @@ Local 模式使用 sqlite-vec 扩展。重建分为两个阶段：
 
 | 操作类型 | 可用性 | 说明 |
 |---------|--------|------|
-| 写操作 | ⚠️ 阻塞 | SQLite 写锁，等待重建完成（超时 30 秒后返回错误） |
+| 写操作 | ⚠️ 阻塞 | SQLite 写锁，等待重建完成（超时 5 秒后返回错误，应用层重试） |
 | 读操作 | ✅ 正常 | 可查询已导入数据 |
-| 语义搜索 | ⚠️ 降级 | 降级到全文搜索（若 FTS5 不可用则降级到 LIKE，如 sqlite-vec 可用则逐步恢复） |
+| 语义搜索 | ⚠️ 降级 | 降级到全文搜索（若 FTS5 不可用则降级到 LIKE，USearch 索引重建后恢复） |
 | 图查询 | ✅ 正常 | 内存图已加载 |
 
 **写操作阻塞处理**：
 
-| 数据规模 | 重建时间 | 写操作超时 | 处理策略 |
+| 数据规模 | 重建时间 | 单次写操作超时（busy_timeout=5 秒） | 处理策略 |
 |---------|---------|-----------|---------|
-| < 10,000 实体 | < 30 秒 | 不超时 | 同步重建，用户等待 |
-| 10,000 - 50,000 实体 | 30 秒 - 3 分钟 | 可能超时 | 建议使用后台任务 |
-| > 50,000 实体 | > 3 分钟 | 必定超时 | **强制使用后台任务** |
+| < 10,000 实体 | < 30 秒 | 可能超时 | 同步重建，应用层重试 |
+| 10,000 - 50,000 实体 | 30 秒 - 3 分钟 | 频繁超时 | 建议使用后台任务 |
+| > 50,000 实体 | > 3 分钟 | 几乎必定超时 | **强制使用后台任务** |
 
 **后台重建机制**（推荐用于大数据量）：
 
@@ -166,36 +166,52 @@ c4a local status
 **后台重建的实现原理**：
 
 ```typescript
-// 1. 创建临时向量虚拟表
-// 注意：sqlite-vec 虚拟表不支持复合主键，使用组合字符串作为主键
-CREATE VIRTUAL TABLE vectors_temp USING vec0(
-    vector_key TEXT PRIMARY KEY,   -- 组合键："{source_project}:{entity_id}:{proposal_id}"
-    entity_id TEXT,
-    source_project TEXT,
-    proposal_id TEXT,
-    embedding FLOAT[384]
-);
+// 1. 创建临时 USearch 索引
+import { Index } from 'usearch';
+
+const tempIndex = new Index({
+  metric: 'cos',
+  connectivity: 16,
+  dimensions: 384,
+});
+const tempKeyMap = new Map<bigint, string>();
 
 // 2. 后台线程重建向量索引
 async function rebuildVectorsInBackground() {
   const entities = await db.query('SELECT * FROM entities');
+  let nextKey = 1n;
 
   for (const batch of chunk(entities, 1000)) {
     // 批量生成 embedding
     const embeddings = await generateEmbeddings(batch);
 
-    // 写入临时表（不阻塞主表）
-    await db.query('INSERT INTO vectors_temp VALUES ...', embeddings);
+    // 写入临时索引（不阻塞主索引）
+    for (let i = 0; i < batch.length; i++) {
+      const entity = batch[i];
+      const compositeId = `${entity.source_project}:${entity.id}:${entity.proposal_id}`;
+      tempIndex.add(nextKey, embeddings[i]);
+      tempKeyMap.set(nextKey, compositeId);
+      nextKey++;
+    }
 
     // 更新进度
     updateProgress(batch.length);
   }
 
-  // 3. 原子性切换（使用事务）
-  await db.transaction(async (tx) => {
-    await tx.query('DROP TABLE vectors');
-    await tx.query('ALTER TABLE vectors_temp RENAME TO vectors');
-  });
+  // 3. 原子性切换
+  tempIndex.save('c4a.usearch.tmp');
+  // 保存映射表
+  await Bun.write('c4a.keymap.json.tmp', JSON.stringify({
+    nextKey: nextKey.toString(),
+    entries: Array.from(tempKeyMap.entries()).map(([k, v]) => [k.toString(), v]),
+  }));
+
+  // 原子性重命名
+  await rename('c4a.usearch.tmp', 'c4a.usearch');
+  await rename('c4a.keymap.json.tmp', 'c4a.keymap.json');
+
+  // 4. 重新加载主索引
+  VectorStore.getInstance().load();
 
   console.log('向量索引重建完成，语义搜索已恢复');
 }
@@ -433,52 +449,55 @@ c4a local status
 ```json
 {
   "dependencies": {
-    "better-sqlite3": "^9.0.0",
-    "@xenova/transformers": "^2.10.0"
-  },
-  "optionalDependencies": {
-    "sqlite-vec": "^0.1.0"
+    "usearch": "^2.0.0",
+    "@xenova/transformers": "^2.17.2"
   }
 }
 ```
 
+> **说明**：SQLite 通过 Bun 内置的 `bun:sqlite` 模块访问，无需额外依赖。
+
 **运行时兼容性说明**：
 
-| 运行时 | better-sqlite3 | sqlite-vec | 说明 |
+| 运行时 | bun:sqlite | USearch (WASM) | 说明 |
 |--------|:-------------:|:----------:|------|
-| **Bun** | ⚠️ 需验证 | ⚠️ 需验证 | 原生扩展兼容性存在不确定性 |
-| **Node.js** | ✅ 完全支持 | ✅ 完全支持 | 推荐的回退方案 |
+| **Bun** | ✅ 内置支持 | ✅ 完全支持 | 推荐运行时 |
+| **Node.js** | ❌ 不支持 | ✅ 完全支持 | 需使用其他 SQLite 库 |
 
-> **注意**：Local 模式默认使用 Bun 运行时。若 Bun 与原生扩展（better-sqlite3、sqlite-vec）存在兼容性问题，可回退到 Node.js 运行时。代码使用标准 Node.js API，无需修改即可在两种运行时间切换。
+> **注意**：Local 模式使用 Bun 运行时，SQLite 通过 `bun:sqlite` 内置模块访问，向量搜索使用 USearch (WASM)，两者均为 Bun 原生支持。
 
 ### 7.2 初始化流程
 
 ```typescript
-import Database from 'better-sqlite3';
+import { Database } from 'bun:sqlite';
+import { Index } from 'usearch';
 import { pipeline } from '@xenova/transformers';
 
 class LiteStore {
+  private db: Database;
+  private vectorStore: VectorStore;
   private graph: InMemoryGraph;
   private embedder: any;
 
   async init(dbPath: string) {
-    // 1. 初始化数据库连接（使用单例）
-    // 注意：DatabaseConnection 单例会自动处理连接管理
-    const db = DatabaseConnection.getInstance();
+    // 1. 初始化 SQLite 数据库连接
+    this.db = new Database(dbPath);
+    this.db.exec('PRAGMA journal_mode=WAL');
+    this.db.exec('PRAGMA busy_timeout=5000');
 
-    // 2. 加载 sqlite-vec 扩展
-    try {
-      db.loadExtension('vec0');
-    } catch (err) {
-      console.warn('sqlite-vec 扩展未安装，向量搜索不可用');
-    }
-
-    // 3. 创建表结构
+    // 2. 创建表结构
     this.createTables();
+
+    // 3. 初始化 USearch 向量索引
+    this.vectorStore = new VectorStore({
+      dimensions: 384,
+      indexPath: dbPath.replace('.db', '.usearch'),
+    });
+    this.vectorStore.load();
 
     // 4. 加载内存图
     this.graph = new InMemoryGraph();
-    this.graph.load(db);
+    this.graph.load(this.db);
 
     // 5. 初始化 Embedding 模型
     this.embedder = await pipeline(
@@ -488,10 +507,8 @@ class LiteStore {
   }
 
   private createTables() {
-    const db = DatabaseConnection.getInstance();
-    // 创建核心表（见 2.1 节）
-    // 创建向量表（见 2.2.1 节）
-    // 创建缓存表（见 2.2.2 节）
+    // 创建核心表（见 sqlite-schema.md §2.1）
+    // 创建缓存表（见 sqlite-schema.md §2.3.3）
   }
 }
 ```
@@ -538,7 +555,6 @@ class LiteStore {
 | 并发写入 | SQLite 不支持高并发写入 | 使用写队列串行化 |
 | 向量搜索性能 | 大规模数据下性能下降 | 切换到 Server 模式 |
 | 内存占用 | 图数据全部加载到内存 | 定期清理缓存 |
-| 跨平台扩展 | sqlite-vec 需要编译 | 提供预编译二进制 |
 
 ### 8.2 最佳实践
 

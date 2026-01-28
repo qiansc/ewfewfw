@@ -13,6 +13,7 @@ import type {
   ImpactNode,
 } from '../adapter.js';
 import type { AdapterContext } from './types.js';
+import { expandEntityCacheKeys, normalizeProject, toEntityCacheKey } from './cache-keys.js';
 
 // ============================================================
 // QueryDeps 操作
@@ -25,9 +26,13 @@ export async function queryDeps(ctx: AdapterContext, params: DepsParams): Promis
   const proposalId = params.proposal_id ?? null;
   const depth = params.depth || 1;
   const direction = params.direction || 'both';
+  const normalizedProject = normalizeProject(
+    params.source_project ?? ctx.config.defaultProject ?? null
+  );
+  const cacheProposal = proposalId ?? '';
 
   // 查缓存
-  const cacheKey = `deps:${params.id}:${direction}:${depth}:${proposalId}`;
+  const cacheKey = `deps:${toEntityCacheKey(normalizedProject, params.id)}:${direction}:${depth}:${cacheProposal}`;
   const cached = ctx.cache.get(cacheKey);
   if (cached) {
     return cached as DepsNode[];
@@ -40,17 +45,21 @@ export async function queryDeps(ctx: AdapterContext, params: DepsParams): Promis
   }
 
   // 使用内存图查询依赖
-  const results = ctx.graph.queryDeps(null, params.id, direction, depth);
+  const results = ctx.graph.queryDeps(normalizedProject, params.id, direction, depth);
 
   const depsNodes = results.map((r) => ({
     id: r.id,
+    source_project: r.project,
     type: 'component' as EntityType,
     distance: r.distance,
     relation_type: 'depends_on',
   }));
 
   // 写缓存（包含相关实体用于失效）
-  const relatedEntities = [params.id, ...results.map(r => r.id)];
+  const relatedEntities = [
+    ...expandEntityCacheKeys(normalizedProject, params.id),
+    ...results.flatMap((r) => expandEntityCacheKeys(r.project, r.id)),
+  ];
   ctx.cache.set(cacheKey, depsNodes, relatedEntities);
 
   return depsNodes;
@@ -66,9 +75,13 @@ export async function queryDeps(ctx: AdapterContext, params: DepsParams): Promis
 export async function queryImpact(ctx: AdapterContext, params: ImpactParams): Promise<ImpactNode[]> {
   const proposalId = params.proposal_id ?? null;
   const depth = params.depth || 2;
+  const normalizedProject = normalizeProject(
+    params.source_project ?? ctx.config.defaultProject ?? null
+  );
+  const cacheProposal = proposalId ?? '';
 
   // 查缓存
-  const cacheKey = `impact:${params.id}:${depth}:${proposalId}`;
+  const cacheKey = `impact:${toEntityCacheKey(normalizedProject, params.id)}:${depth}:${cacheProposal}`;
   const cached = ctx.cache.get(cacheKey);
   if (cached) {
     return cached as ImpactNode[];
@@ -81,17 +94,21 @@ export async function queryImpact(ctx: AdapterContext, params: ImpactParams): Pr
   }
 
   // 影响分析：查询下游依赖
-  const results = ctx.graph.queryDeps(null, params.id, 'downstream', depth);
+  const results = ctx.graph.queryDeps(normalizedProject, params.id, 'downstream', depth);
 
   const impactNodes = results.map((r) => ({
     id: r.id,
+    source_project: r.project,
     type: 'component' as EntityType,
     distance: r.distance,
     impact_level: (r.distance === 1 ? 'direct' : 'indirect') as 'direct' | 'indirect',
   }));
 
   // 写缓存
-  const relatedEntities = [params.id, ...results.map(r => r.id)];
+  const relatedEntities = [
+    ...expandEntityCacheKeys(normalizedProject, params.id),
+    ...results.flatMap((r) => expandEntityCacheKeys(r.project, r.id)),
+  ];
   ctx.cache.set(cacheKey, impactNodes, relatedEntities);
 
   return impactNodes;

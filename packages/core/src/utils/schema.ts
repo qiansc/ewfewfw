@@ -6,7 +6,7 @@
  */
 
 import { getAjv, getValidator, clearCache } from '../validator/ajvInstance.js';
-import type { EntityType } from '../types/base.js';
+import type { EntityType, SchemaType } from '../types/base.js';
 
 // ============================================================================
 // 验证结果类型
@@ -28,16 +28,16 @@ export interface ValidationResult {
 // ============================================================================
 
 const SCHEMA_MAP: Record<string, string> = {
-  product: 'c4a-product.schema.json',
-  system: 'c4a-system.schema.json',
-  container: 'c4a-container.schema.json',
-  component: 'c4a-component.schema.json',
-  process: 'c4a-process.schema.json',
-  sor: 'c4a-sor.schema.json',
-  adr: 'c4a-adr.schema.json',
-  contract: 'c4a-contract.schema.json',
-  feat: 'c4a-feat.schema.json',
-  checklist: 'c4a-checklist.schema.json',
+  product: 'https://context4ai.org/schemas/c4a-product.schema.json',
+  system: 'https://context4ai.org/schemas/c4a-system.schema.json',
+  container: 'https://context4ai.org/schemas/c4a-container.schema.json',
+  component: 'https://context4ai.org/schemas/c4a-component.schema.json',
+  process: 'https://context4ai.org/schemas/c4a-process.schema.json',
+  sor: 'https://context4ai.org/schemas/c4a-sor.schema.json',
+  adr: 'https://context4ai.org/schemas/c4a-adr.schema.json',
+  contract: 'https://context4ai.org/schemas/c4a-contract.schema.json',
+  feat: 'https://context4ai.org/schemas/c4a-feat.schema.json',
+  checklist: 'https://context4ai.org/schemas/c4a-checklist.schema.json',
 };
 
 // ============================================================================
@@ -94,21 +94,18 @@ export function validateEntity(
   type: EntityType | 'checklist',
 ): ValidationResult {
   // 优先使用 validator 模块的预编译验证器
-  const validatorType = type === 'checklist' ? null : type;
-  if (validatorType && ['product', 'system', 'container', 'component', 'process', 'sor', 'adr', 'contract'].includes(validatorType)) {
-    const validator = getValidator(validatorType as 'product' | 'system' | 'container' | 'component' | 'process' | 'sor' | 'adr' | 'contract');
-    if (validator) {
-      const valid = validator(data);
-      if (valid) {
-        return { valid: true, errors: [] };
-      }
-      const errors: ValidationError[] = (validator.errors || []).map((err: any) => ({
-        path: err.instancePath || '/',
-        message: err.message || 'Unknown error',
-        keyword: err.keyword,
-      }));
-      return { valid: false, errors };
+  const validator = getValidator(type as SchemaType);
+  if (validator) {
+    const valid = validator(data);
+    if (valid) {
+      return { valid: true, errors: [] };
     }
+    const errors: ValidationError[] = (validator.errors || []).map((err: any) => ({
+      path: err.instancePath || '/',
+      message: err.message || 'Unknown error',
+      keyword: err.keyword,
+    }));
+    return { valid: false, errors };
   }
 
   // 回退到通用 Schema 验证

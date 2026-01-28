@@ -70,7 +70,7 @@ export async function sync(ctx: AdapterContext, params: SyncParams): Promise<Syn
         // 检查是否已存在
         const existing = db.prepare(`
           SELECT content_hash FROM metadata
-          WHERE entity_id = ? AND source_project = ? AND proposal_id IS NULL
+          WHERE entity_id = ? AND source_project = ? AND (proposal_id IS NULL OR proposal_id = '')
         `).get(entityId, sourceProject) as { content_hash: string } | undefined;
 
         if (existing) {
@@ -103,7 +103,7 @@ export async function sync(ctx: AdapterContext, params: SyncParams): Promise<Syn
       FROM entities e
       JOIN metadata m ON e.source_project = m.source_project
         AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
-      WHERE e.proposal_id IS NULL ${statusCondition}
+    WHERE (e.proposal_id IS NULL OR e.proposal_id = '') ${statusCondition}
     `).all() as Array<{
       id: string;
       type: string;
@@ -221,7 +221,7 @@ export async function planSync(ctx: AdapterContext, params: PlanSyncParams): Pro
     FROM entities e
     JOIN metadata m ON e.source_project = m.source_project
       AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
-    WHERE e.proposal_id IS ? ${statusCondition}
+    WHERE (e.proposal_id = ? OR e.proposal_id IS NULL OR e.proposal_id = '') ${statusCondition}
   `).all(proposalId) as Array<{
     id: string;
     type: EntityType;
@@ -478,12 +478,12 @@ function insertEntity(
 
   db.prepare(`
     INSERT INTO entities (id, source_project, proposal_id, type, data)
-    VALUES (?, ?, NULL, ?, ?)
+    VALUES (?, ?, '', ?, ?)
   `).run(entityId, sourceProject, entityType, JSON.stringify(data));
 
   db.prepare(`
     INSERT INTO metadata (entity_id, source_project, proposal_id, status, content_hash, created_at, updated_at)
-    VALUES (?, ?, NULL, 'published', ?, ?, ?)
+    VALUES (?, ?, '', 'published', ?, ?, ?)
   `).run(entityId, sourceProject, contentHash, now, now);
 }
 
@@ -502,11 +502,11 @@ function updateEntity(
 
   db.prepare(`
     UPDATE entities SET type = ?, data = ?
-    WHERE id = ? AND source_project = ? AND proposal_id IS NULL
+    WHERE id = ? AND source_project = ? AND (proposal_id IS NULL OR proposal_id = '')
   `).run(entityType, JSON.stringify(data), entityId, sourceProject);
 
   db.prepare(`
     UPDATE metadata SET content_hash = ?, updated_at = ?
-    WHERE entity_id = ? AND source_project = ? AND proposal_id IS NULL
+    WHERE entity_id = ? AND source_project = ? AND (proposal_id IS NULL OR proposal_id = '')
   `).run(contentHash, now, entityId, sourceProject);
 }

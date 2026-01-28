@@ -24,7 +24,7 @@ export interface LiteAdapterConfig {
 
   /**
    * 是否启用向量搜索
-   * 默认: true (如果 sqlite-vec 可用)
+   * 默认: true (如果 USearch 可用)
    */
   enableVectorSearch?: boolean;
 }
@@ -70,6 +70,8 @@ export interface AdapterContext {
 // ============================================================
 
 export interface ParsedRelation {
+  fromProject?: string;
+  fromId?: string;
   toProject: string;
   toId: string;
   relType: string;

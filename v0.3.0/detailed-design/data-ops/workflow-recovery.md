@@ -171,26 +171,26 @@ async def update_workflow_step(
 
 ```typescript
 // mcp-local 内部实现
-import Database from 'better-sqlite3';
+import { Database } from 'bun:sqlite';
 
 function updateWorkflowStep(
-  db: Database.Database,
+  db: Database,
   featId: string,
   stepId: string,
   status: string,
   metadata: Record<string, unknown>
 ): void {
   // 读取当前 workflow_steps
-  const feat = db.prepare('SELECT data FROM entities WHERE id = ?').get(featId);
+  const feat = db.prepare('SELECT data FROM entities WHERE id = ?').get(featId) as { data: string };
   const data = JSON.parse(feat.data);
-  
+
   // 更新特定步骤
   const step = data.workflow_steps?.find((s: any) => s.id === stepId);
   if (step) {
     step.status = status;
     step.metadata = { ...step.metadata, ...metadata };
   }
-  
+
   // 保存（SQLite 单库事务保证原子性）
   db.prepare('UPDATE entities SET data = ?, updated_at = ? WHERE id = ?')
     .run(JSON.stringify(data), new Date().toISOString(), featId);
