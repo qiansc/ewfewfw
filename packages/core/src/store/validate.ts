@@ -12,6 +12,7 @@
 
 import { SQLiteStore } from './sqlite-store.js';
 import type { EntityType, EntityStatus } from './adapter.js';
+import { ERROR_MESSAGES, MIGRATE_ERROR_CODES as MIGRATE_ERROR_CODE_MAP } from '../types/errors.js';
 
 // ============================================================
 // 错误码定义
@@ -23,51 +24,51 @@ import type { EntityType, EntityStatus } from './adapter.js';
  * 设计文档: appendix.md §A.9.7
  */
 export const MIGRATE_ERROR_CODES = {
-  'C4A-MIGRATE-001': {
-    code: 'C4A-MIGRATE-001',
-    message: '缺少 source_project 字段',
+  [MIGRATE_ERROR_CODE_MAP.MISSING_SOURCE_PROJECT]: {
+    code: MIGRATE_ERROR_CODE_MAP.MISSING_SOURCE_PROJECT,
+    message: ERROR_MESSAGES[MIGRATE_ERROR_CODE_MAP.MISSING_SOURCE_PROJECT].zh,
     fix: '使用 repair 自动补全',
     autoFix: true,
   },
-  'C4A-MIGRATE-002': {
-    code: 'C4A-MIGRATE-002',
-    message: '缺少 source_repo 字段',
+  [MIGRATE_ERROR_CODE_MAP.MISSING_SOURCE_REPO]: {
+    code: MIGRATE_ERROR_CODE_MAP.MISSING_SOURCE_REPO,
+    message: ERROR_MESSAGES[MIGRATE_ERROR_CODE_MAP.MISSING_SOURCE_REPO].zh,
     fix: '使用 repair 自动补全',
     autoFix: true,
   },
-  'C4A-MIGRATE-003': {
-    code: 'C4A-MIGRATE-003',
-    message: 'source_project 格式不正确',
+  [MIGRATE_ERROR_CODE_MAP.INVALID_SOURCE_PROJECT_FORMAT]: {
+    code: MIGRATE_ERROR_CODE_MAP.INVALID_SOURCE_PROJECT_FORMAT,
+    message: ERROR_MESSAGES[MIGRATE_ERROR_CODE_MAP.INVALID_SOURCE_PROJECT_FORMAT].zh,
     fix: '使用 repair 自动修复格式',
     autoFix: true,
   },
-  'C4A-MIGRATE-004': {
-    code: 'C4A-MIGRATE-004',
-    message: 'source_repo 格式建议改进',
+  [MIGRATE_ERROR_CODE_MAP.SOURCE_REPO_FORMAT_SUGGESTION]: {
+    code: MIGRATE_ERROR_CODE_MAP.SOURCE_REPO_FORMAT_SUGGESTION,
+    message: ERROR_MESSAGES[MIGRATE_ERROR_CODE_MAP.SOURCE_REPO_FORMAT_SUGGESTION].zh,
     fix: '手动修改为 owner/repo 格式',
     autoFix: false,
   },
-  'C4A-MIGRATE-005': {
-    code: 'C4A-MIGRATE-005',
-    message: 'Domain/Enterprise 层级不应有 source_project',
+  [MIGRATE_ERROR_CODE_MAP.NON_PROJECT_SCOPE_HAS_SOURCE_PROJECT]: {
+    code: MIGRATE_ERROR_CODE_MAP.NON_PROJECT_SCOPE_HAS_SOURCE_PROJECT,
+    message: ERROR_MESSAGES[MIGRATE_ERROR_CODE_MAP.NON_PROJECT_SCOPE_HAS_SOURCE_PROJECT].zh,
     fix: '使用 repair 自动移除',
     autoFix: true,
   },
-  'C4A-MIGRATE-006': {
-    code: 'C4A-MIGRATE-006',
-    message: 'Domain/Enterprise 层级不应有 source_repo',
+  [MIGRATE_ERROR_CODE_MAP.NON_PROJECT_SCOPE_HAS_SOURCE_REPO]: {
+    code: MIGRATE_ERROR_CODE_MAP.NON_PROJECT_SCOPE_HAS_SOURCE_REPO,
+    message: ERROR_MESSAGES[MIGRATE_ERROR_CODE_MAP.NON_PROJECT_SCOPE_HAS_SOURCE_REPO].zh,
     fix: '使用 repair 自动移除',
     autoFix: true,
   },
-  'C4A-MIGRATE-007': {
-    code: 'C4A-MIGRATE-007',
-    message: 'external 实体不应有 source_project',
+  [MIGRATE_ERROR_CODE_MAP.EXTERNAL_ENTITY_HAS_SOURCE_PROJECT]: {
+    code: MIGRATE_ERROR_CODE_MAP.EXTERNAL_ENTITY_HAS_SOURCE_PROJECT,
+    message: ERROR_MESSAGES[MIGRATE_ERROR_CODE_MAP.EXTERNAL_ENTITY_HAS_SOURCE_PROJECT].zh,
     fix: '使用 repair 自动移除',
     autoFix: true,
   },
-  'C4A-MIGRATE-008': {
-    code: 'C4A-MIGRATE-008',
-    message: 'external 实体缺少 external_url',
+  [MIGRATE_ERROR_CODE_MAP.EXTERNAL_ENTITY_MISSING_URL]: {
+    code: MIGRATE_ERROR_CODE_MAP.EXTERNAL_ENTITY_MISSING_URL,
+    message: ERROR_MESSAGES[MIGRATE_ERROR_CODE_MAP.EXTERNAL_ENTITY_MISSING_URL].zh,
     fix: '手动添加外部系统 URL',
     autoFix: false,
   },
@@ -171,7 +172,7 @@ export class DataValidator {
     // 构建查询
     let query = `
       SELECT e.id, e.type, e.scope, e.data,
-             m.source_project, m.source_repo, m.status
+             m.source_project, m.source_repo, m.external_url, m.status
       FROM entities e
       JOIN metadata m ON e.source_project = m.source_project
         AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
@@ -202,6 +203,7 @@ export class DataValidator {
       data: string;
       source_project: string | null;
       source_repo: string | null;
+      external_url: string | null;
       status: EntityStatus;
     }
 
@@ -241,11 +243,14 @@ export class DataValidator {
       scope: string | null;
       source_project: string | null;
       source_repo: string | null;
+      external_url: string | null;
     },
     data: Record<string, unknown>
   ): ValidationIssue[] {
     const issues: ValidationIssue[] = [];
     const isExternal = data.external === true;
+    const externalUrl = entity.external_url
+      ?? (typeof data.external_url === 'string' ? data.external_url : null);
     const isNonProjectScope = entity.scope && NON_PROJECT_SCOPES.includes(entity.scope);
     const isProjectLevel = PROJECT_LEVEL_TYPES.includes(entity.type);
 
@@ -256,7 +261,7 @@ export class DataValidator {
         issues.push(this.createIssue(entity, 'C4A-MIGRATE-007', 'warning'));
       }
       // external 实体应有 external_url
-      if (!data.external_url) {
+      if (!externalUrl) {
         issues.push(this.createIssue(entity, 'C4A-MIGRATE-008', 'warning'));
       }
       return issues;
@@ -318,7 +323,14 @@ export class DataValidator {
   /**
    * 格式化验证结果
    */
-  static formatResult(result: ValidationResult): string {
+  static formatResult(
+    result: ValidationResult,
+    format: 'text' | 'json' = 'text'
+  ): string {
+    if (format === 'json') {
+      return JSON.stringify(result, null, 2);
+    }
+
     const lines: string[] = [];
 
     lines.push('=== 数据完整性校验 ===');

@@ -5,12 +5,14 @@
  *
  * 核心特性:
  * - 使用 @xenova/transformers 本地生成向量
+ * - 使用 USearch 保存/检索向量索引
  * - 支持 Feat 版本隔离 (Copy-on-Write)
  * - Merge View 语义搜索
  */
 
-import type Database from 'better-sqlite3';
+import type { Database } from 'bun:sqlite';
 import type { FeatureExtractionPipeline } from '@xenova/transformers';
+import type { VectorSearchHit, VectorStore } from './usearch-store.js';
 
 // 模型配置
 const MODEL_NAME = 'Xenova/all-MiniLM-L6-v2';
@@ -89,6 +91,15 @@ export function isEmbedderReady(): boolean {
   return embedder !== null;
 }
 
+/**
+ * 测试辅助：注入/重置 embedder
+ */
+export function setEmbedderForTest(value: FeatureExtractionPipeline | null): void {
+  embedder = value;
+  isInitializing = false;
+  initPromise = null;
+}
+
 // ============================================================
 // 向量搜索实现 (设计文档 §3.2)
 // ============================================================
@@ -102,101 +113,151 @@ export interface VectorSearchResult {
   distance: number;
 }
 
+type Candidate = {
+  key: string;
+  sourceProject: string;
+  entityId: string;
+  proposalId: string | null;
+  distance: number;
+  priority: number;
+};
+
 /**
  * 语义搜索 (带 Feat 版本隔离)
  *
  * 设计文档: vector-search.md L62-120
  *
  * 核心逻辑:
- * 1. 使用 Window Function 实现 Merge View
+ * 1. USearch 向量召回
  * 2. Feat 优先 → 主分支兜底
  * 3. 每个实体只保留优先级最高的版本
  *
  * @param db - SQLite 数据库连接
+ * @param vectorStore - USearch 向量索引
  * @param query - 搜索查询文本
  * @param currentProposalId - 当前 Feat ID (null 表示主分支)
  * @param limit - 返回结果数量限制
  */
 export async function semanticSearch(
-  db: Database.Database,
+  db: Database,
+  vectorStore: VectorStore,
   query: string,
   currentProposalId: string | null,
   limit: number = 10
 ): Promise<VectorSearchResult[]> {
   const embedding = await generateEmbedding(query);
+  const searchLimit = Math.max(limit * 3, limit);
+  const hits = vectorStore.search(embedding, searchLimit);
 
-  // 注意: 此实现需要 sqlite-vec 扩展
-  // 如果扩展未加载，将回退到全表扫描
-  if (currentProposalId === null) {
-    // 主分支模式: 只搜索主分支
-    return db.prepare(`
-      SELECT
-        e.id,
-        e.source_project,
-        e.proposal_id,
-        e.type,
-        e.data,
-        vec_distance_cosine(v.embedding, ?) as distance
-      FROM entities e
-      JOIN vectors v ON
-        e.source_project = v.source_project AND
-        e.id = v.entity_id AND
-        e.proposal_id IS NULL AND v.proposal_id IS NULL
-      WHERE e.proposal_id IS NULL
-      ORDER BY distance ASC
-      LIMIT ?
-    `).all(embedding, limit) as VectorSearchResult[];
+  const candidates = filterCandidates(hits, currentProposalId);
+  const merged = mergeByEntity(candidates);
+  const sorted = merged.sort((a, b) => a.distance - b.distance).slice(0, limit);
+
+  const results: VectorSearchResult[] = [];
+  for (const candidate of sorted) {
+    const row = loadEntity(db, candidate);
+    if (!row) continue;
+    results.push({
+      id: row.id,
+      source_project: row.source_project,
+      proposal_id: normalizeProposalId(row.proposal_id),
+      type: row.type,
+      data: row.data,
+      distance: candidate.distance,
+    });
   }
 
-  // Feat 模式: 实现 Merge View
-  return db.prepare(`
-    WITH ranked_entities AS (
-      SELECT
-        e.id,
-        e.source_project,
-        e.proposal_id,
-        e.type,
-        e.data,
-        v.embedding,
-        vec_distance_cosine(v.embedding, ?) as distance,
-        ROW_NUMBER() OVER (
-          PARTITION BY e.source_project, e.id
-          ORDER BY
-            CASE
-              WHEN e.proposal_id = ? THEN 1
-              WHEN e.proposal_id IS NULL THEN 2
-              ELSE 3
-            END
-        ) as rn
+  return results;
+}
+
+function filterCandidates(
+  hits: VectorSearchHit[],
+  currentProposalId: string | null
+): Candidate[] {
+  return hits
+    .map((hit) => {
+      const parsed = parseVectorKey(hit.key);
+      const proposalId = parsed.proposalId ?? null;
+      const priority = getPriority(proposalId, currentProposalId);
+      if (priority === null) return null;
+      return {
+        key: hit.key,
+        sourceProject: parsed.sourceProject,
+        entityId: parsed.entityId,
+        proposalId,
+        distance: hit.distance,
+        priority,
+      };
+    })
+    .filter((item): item is Candidate => item !== null);
+}
+
+function getPriority(proposalId: string | null, currentProposalId: string | null): number | null {
+  if (currentProposalId === null) {
+    return proposalId === null || proposalId === '' ? 1 : null;
+  }
+  if (proposalId === currentProposalId) return 1;
+  if (proposalId === null || proposalId === '') return 2;
+  return null;
+}
+
+function mergeByEntity(candidates: Candidate[]): Candidate[] {
+  const byEntity = new Map<string, Candidate>();
+  for (const candidate of candidates) {
+    const entityKey = `${candidate.sourceProject}:${candidate.entityId}`;
+    const existing = byEntity.get(entityKey);
+    if (!existing) {
+      byEntity.set(entityKey, candidate);
+      continue;
+    }
+    if (
+      candidate.priority < existing.priority ||
+      (candidate.priority === existing.priority && candidate.distance < existing.distance)
+    ) {
+      byEntity.set(entityKey, candidate);
+    }
+  }
+  return Array.from(byEntity.values());
+}
+
+function loadEntity(db: Database, candidate: Candidate): {
+  id: string;
+  source_project: string;
+  proposal_id: string | null;
+  type: string;
+  data: string;
+} | null {
+  const dbProposalId = candidate.proposalId ?? '';
+  const row = db.prepare(`
+      SELECT e.id, e.source_project, e.proposal_id, e.type, e.data
       FROM entities e
-      JOIN vectors v ON
-        e.source_project = v.source_project AND
-        e.id = v.entity_id AND
-        ((e.proposal_id IS NULL AND v.proposal_id IS NULL) OR e.proposal_id = v.proposal_id)
-      WHERE
-        (e.proposal_id = ? OR e.proposal_id IS NULL)
-    )
-    SELECT
-      id,
-      source_project,
-      proposal_id,
-      type,
-      data,
-      distance
-    FROM ranked_entities
-    WHERE rn = 1
-    ORDER BY distance ASC
-    LIMIT ?
-  `).all(
-    embedding,
-    currentProposalId,
-    currentProposalId,
-    limit
-  ) as VectorSearchResult[];
+      JOIN metadata m ON e.source_project = m.source_project
+        AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+      WHERE e.source_project = ?
+        AND e.id = ?
+        AND (e.proposal_id = ? OR (e.proposal_id IS NULL AND ? = ''))
+        AND m.status NOT IN ('archived', 'deprecated')
+      LIMIT 1
+    `).get(candidate.sourceProject, candidate.entityId, dbProposalId, dbProposalId) as
+    | {
+        id: string;
+        source_project: string;
+        proposal_id: string | null;
+        type: string;
+        data: string;
+      }
+    | undefined;
+
+  return row ?? null;
+}
+
+function normalizeProposalId(value: string | null): string | null {
+  if (value === '') return null;
+  return value;
 }
 
 /**
- * 生成向量键 (用于 vectors 表主键)
+ * 生成向量键 (用于 USearch key 映射)
  *
  * 格式: "{source_project}:{entity_id}:{proposal_id}"
  * proposal_id 为 NULL 时使用空字符串

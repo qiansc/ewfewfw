@@ -32,20 +32,20 @@
 | entity_history 表 | L166-188 | sqlite-store.ts L178-199 | ✅ |
 | feat_history 表 | L219-231 | sqlite-store.ts L202-215 | ✅ |
 
-### §2.3 Local 模式特有表 (L249-299)
+### §2.3 Local 模式特有表 (L291-495)
 
 | 设计项 | 行号 | 实现文件 | 状态 |
 |--------|------|----------|:----:|
-| vectors 表 (sqlite-vec) | L254-267 | sqlite-store.ts L230-239 (注释) | ✅ |
-| graph_cache 表 | L281-291 | sqlite-store.ts L218-228 | ✅ |
+| vectors 表 (USearch) | L293-320 | usearch-store.ts (独立文件) | ✅ |
+| graph_cache 表 | L475-489 | sqlite-store.ts L218-228 | ✅ |
 
-### §3 Merge View 模式 (L300-370)
+### §3 Merge View 模式 (L498-569)
 
 | 设计项 | 行号 | 实现文件 | 状态 |
 |--------|------|----------|:----:|
-| Merge View 核心原则 | L304-310 | sqlite-store.ts L246-254 | ✅ |
-| 实体 Merge View SQL | L314-332 | sqlite-store.ts L258-285 | ✅ |
-| 关系 Merge View SQL | L334-352 | sqlite-store.ts L292-317 | ✅ |
+| Merge View 核心原则 | L502-508 | sqlite-store.ts L246-254 | ✅ |
+| 实体 Merge View SQL | L512-531 | sqlite-store.ts L258-285 | ✅ |
+| 关系 Merge View SQL | L533-552 | sqlite-store.ts L292-317 | ✅ |
 
 ---
 
@@ -63,9 +63,9 @@
 
 | 文件 | 行数 | 说明 |
 |------|------|------|
-| `packages/mcp-dsl/src/store/sqlite-store.ts` | ~330 | SQLite Store 核心实现 |
-| `packages/mcp-dsl/src/store/index.ts` | ~8 | Store 模块导出 |
-| `packages/mcp-dsl/package.json` | +2 deps | 添加 better-sqlite3 依赖 |
+| `packages/core/src/store/sqlite-store.ts` | ~330 | SQLite Store 核心实现 |
+| `packages/core/src/store/index.ts` | ~8 | Store 模块导出 |
+| `packages/core/package.json` | +2 deps | 添加 usearch 依赖 |
 
 ---
 
@@ -99,7 +99,7 @@
 
 ## 已知限制
 
-1. **vectors 表**: 需要 sqlite-vec 扩展，暂以注释形式保留创建语句
+1. **vectors 索引**: 使用 USearch (WASM) 独立存储，不依赖 SQLite 扩展
 2. **类型定义**: 返回类型使用 `unknown[]`，后续需要定义具体类型
 3. **事务支持**: 未实现事务封装，需要在后续任务中添加
 

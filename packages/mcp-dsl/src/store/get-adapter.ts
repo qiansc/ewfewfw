@@ -52,7 +52,6 @@ export interface C4AConfig {
  */
 const CONFIG_PATHS = [
   '.context/.c4a.yaml',
-  '.context/.c4a.yml',
 ];
 
 /**

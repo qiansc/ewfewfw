@@ -118,7 +118,7 @@ Local Mode 使用 SQLite + InMemoryGraph 替代 Server Mode 的 Neo4j + Milvus�
 
 | 工具 | Server Mode | Local Mode | 差异说明 |
 |------|-------------|------------|----------|
-| `c4a_query_search` | Milvus 向量搜索 | sqlite-vec 向量搜索（可降级到全文搜索） | 降级时召回质量下降 |
+| `c4a_query_search` | Milvus 向量搜索 | USearch 向量搜索（可降级到全文搜索） | 降级时召回质量下降 |
 | `c4a_query_deps` | Neo4j Cypher，depth ≤ 5 | InMemoryGraph 遍历，depth ≤ 5 | 功能一致 |
 | `c4a_query_impact` | Neo4j 图遍历 | InMemoryGraph 简化版 | 返回直接下游 + 警告 |
 

@@ -81,7 +81,7 @@
 | 文件 | 说明 |
 |------|------|
 | [local-mode/sqlite-schema.md](./detailed-design/local-mode/sqlite-schema.md) | SQLite 表结构设计 |
-| [local-mode/vector-search.md](./detailed-design/local-mode/vector-search.md) | 向量搜索实现（sqlite-vec） |
+| [local-mode/vector-search.md](./detailed-design/local-mode/vector-search.md) | 向量搜索实现（USearch） |
 | [local-mode/graph-query.md](./detailed-design/local-mode/graph-query.md) | 图查询实现（内存图） |
 | [local-mode/mode-switch.md](./detailed-design/local-mode/mode-switch.md) | 模式切换机制 |
 | [local-mode/appendix.md](./detailed-design/local-mode/appendix.md) | 附录（配置、迁移） |

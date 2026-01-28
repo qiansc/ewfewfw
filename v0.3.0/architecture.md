@@ -27,7 +27,7 @@
 | 资源占用 | ~200MB | ~2GB | ~50MB (CLI only) |
 | 启动时间 | <1s | 30-60s | <1s |
 
-> ¹ Local 模式默认使用 Bun 运行时。若 Bun 与原生扩展（better-sqlite3、sqlite-vec）存在兼容性问题，可回退到 Node.js 运行时。详见 [mode-switch.md §7.1](./detailed-design/local-mode/mode-switch.md#71-依赖库)。
+> ¹ Local 模式使用 Bun 运行时，SQLite 通过 `bun:sqlite` 内置模块访问，向量搜索使用 USearch (WASM)。详见 [mode-switch.md §7.1](./detailed-design/local-mode/mode-switch.md#71-依赖库)。
 
 **Remote 模式说明**：
 - 不安装本地存储，使用项目配置的远程 MCP 服务
@@ -833,7 +833,7 @@ rel_type: CORRESPONDS
 |------|------|------|
 | 文档存储 | SQLite | 单文件，零依赖 |
 | 图存储 | SQLite relations 表 + 内存图 | 查询时加载到内存 |
-| 向量存储 | SQLite + sqlite-vec | 纯 C 实现，零依赖 |
+| 向量存储 | USearch (WASM) | 独立索引文件，Bun/Node.js 兼容 |
 | Embedding | @xenova/transformers | 本地 ONNX 模型，384 维 |
 
 > **详细设计**：向量存储选型、SQLite 表结构、图查询实现等请参考 [detailed-design/local-mode.md](./detailed-design/local-mode.md)

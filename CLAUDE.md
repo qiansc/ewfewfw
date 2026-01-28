@@ -44,19 +44,33 @@ const content = await file.text();
 
 ### ESM 模块导入规则 (必须遵守)
 
-使用 CommonJS 模块（如 `better-sqlite3`、`ajv`）时，注意导入语法：
+使用 CommonJS 模块（如 `ajv`）时，注意导入语法：
 
 ```typescript
 // ❌ 错误：namespace import 在 ESM 中无法正确获取 default export
-import * as Database from 'better-sqlite3';
-new Database('test.db');  // Error: not constructable
+import * as Ajv from 'ajv';
+new Ajv();  // Error: not constructable
 
 // ✅ 正确：使用 default import
-import Database from 'better-sqlite3';
-new Database('test.db');  // OK
+import Ajv from 'ajv';
+new Ajv();  // OK
 
 // 如果只需要类型，使用 type import
-import type Database from 'better-sqlite3';
+import type { ValidateFunction } from 'ajv';
+```
+
+### SQLite 访问规则 (必须遵守)
+
+Local 模式使用 Bun 内置的 `bun:sqlite` 模块访问 SQLite：
+
+```typescript
+// ✅ 正确：使用 bun:sqlite
+import { Database } from 'bun:sqlite';
+const db = new Database('c4a.db');
+
+// 向量搜索使用 USearch (WASM)
+import { Index } from 'usearch';
+const index = new Index({ metric: 'cos', dimensions: 384 });
 ```
 
 ### Zod Schema 与 MCP SDK 规则 (必须遵守)

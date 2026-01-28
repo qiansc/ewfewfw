@@ -12,6 +12,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { LiteAdapter } from './lite-adapter.js';
+import { ServerAdapter } from './server-adapter.js';
 import type { LiteAdapterConfig } from './lite-adapter.js';
 import type { StorageAdapter } from './adapter.js';
 
@@ -52,7 +53,6 @@ export interface C4AConfig {
  */
 const CONFIG_PATHS = [
   '.context/.c4a.yaml',
-  '.context/.c4a.yml',
 ];
 
 /**
@@ -111,10 +111,11 @@ export function getAdapter(options?: {
         enableVectorSearch: options?.config?.enableVectorSearch,
       });
     } else {
-      // Server 模式暂未实现
-      throw new Error(
-        `Server mode not yet implemented. Configure server.url in .context/.c4a.yaml`
-      );
+      const serverConfig = config.server;
+      if (!serverConfig?.url) {
+        throw new Error('Server mode requires server.url in .context/.c4a.yaml');
+      }
+      adapterInstance = new ServerAdapter(serverConfig);
     }
   }
 

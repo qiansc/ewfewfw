@@ -1,0 +1,517 @@
+/**
+ * LiteAdapter 关系解析与保存
+ */
+
+import { randomUUID } from 'node:crypto';
+import type { EntityType } from '../adapter.js';
+import { parseReference } from '../../types/relations.js';
+import type { AdapterContext, ParsedRelation } from './types.js';
+import { expandEntityCacheKeys } from './cache-keys.js';
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function normalizeRelationType(value: string | undefined, fallback: string): string {
+  if (!value) return fallback;
+  return value.toUpperCase().replace(/-/g, '_');
+}
+
+function normalizeProperties(input: Record<string, unknown>): Record<string, unknown> | undefined {
+  const entries = Object.entries(input).filter(([, value]) => value !== undefined);
+  if (entries.length === 0) return undefined;
+  return Object.fromEntries(entries);
+}
+
+function toDbValue(value: string | null | undefined): string {
+  return value ?? '';
+}
+
+function buildRelationKey(
+  fromProject: string,
+  fromId: string,
+  toProject: string,
+  toId: string,
+  relType: string
+): string {
+  return `${fromProject}|${fromId}|${toProject}|${toId}|${relType}`;
+}
+
+function resolveTarget(ref: string, sourceProject: string): {
+  toProject: string;
+  toId: string;
+  properties?: Record<string, unknown>;
+} {
+  const resolved = parseReference(ref);
+  const properties: Record<string, unknown> = {};
+  let toProject = sourceProject;
+  let toId = resolved.entity_id;
+
+  if (resolved.type === 'project') {
+    toProject = resolved.project_id ?? sourceProject;
+    properties.target_project = resolved.project_id;
+  } else if (resolved.type === 'repo') {
+    properties.target_repo = resolved.repo_id;
+    toProject = '';
+    toId = resolved.entity_id;
+
+    if (resolved.entity_id.startsWith('project:')) {
+      const nested = parseReference(resolved.entity_id);
+      if (nested.type === 'project') {
+        toProject = nested.project_id ?? '';
+        toId = nested.entity_id;
+        properties.target_project = nested.project_id;
+      }
+    }
+  } else if (resolved.type === 'scope') {
+    toProject = '';
+    properties.target_scope = resolved.scope;
+  }
+
+  return {
+    toProject,
+    toId,
+    properties: normalizeProperties(properties),
+  };
+}
+
+/**
+ * 从 DSL data 中解析关系
+ */
+export function parseRelations(
+  data: Record<string, unknown>,
+  sourceProject: string,
+  entityId: string,
+  entityType: EntityType
+): ParsedRelation[] {
+  const relations: ParsedRelation[] = [];
+  const relationKeys = new Set<string>();
+  let handledRelationships = false;
+
+  const pushRelation = (relation: ParsedRelation) => {
+    const fromProject = relation.fromProject ?? sourceProject;
+    const fromId = relation.fromId ?? entityId;
+    const key = `${fromProject}|${fromId}|${relation.toProject}|${relation.toId}|${relation.relType}`;
+    if (relationKeys.has(key)) return;
+    relationKeys.add(key);
+    relations.push(relation);
+  };
+
+  const addOutgoing = (targetRef: string, relType: string, props?: Record<string, unknown>) => {
+    const resolved = resolveTarget(targetRef, sourceProject);
+    pushRelation({
+      toProject: resolved.toProject,
+      toId: resolved.toId,
+      relType,
+      properties: normalizeProperties({
+        ...resolved.properties,
+        ...props,
+      }),
+    });
+  };
+
+  const addIncoming = (sourceRef: string, relType: string, props?: Record<string, unknown>) => {
+    const resolved = resolveTarget(sourceRef, sourceProject);
+    pushRelation({
+      fromProject: resolved.toProject,
+      fromId: resolved.toId,
+      toProject: sourceProject,
+      toId: entityId,
+      relType,
+      properties: normalizeProperties({
+        ...resolved.properties,
+        ...props,
+      }),
+    });
+  };
+
+  const relationships = data.relationships;
+
+  if (entityType === 'system' && isPlainObject(relationships)) {
+    handledRelationships = true;
+    const rels = relationships as {
+      consumers?: Array<Record<string, unknown>>;
+      dependencies?: Array<Record<string, unknown>>;
+    };
+
+    for (const dep of rels.dependencies || []) {
+      const target = typeof dep === 'string' ? dep : (dep?.id as string | undefined);
+      if (!target) continue;
+      addOutgoing(target, 'DEPENDS_ON', {
+        description: isPlainObject(dep) ? dep.description : undefined,
+        technology: isPlainObject(dep) ? dep.technology : undefined,
+        criticality: isPlainObject(dep) ? dep.criticality : undefined,
+        external: isPlainObject(dep) ? dep.external : undefined,
+        external_info: isPlainObject(dep) ? dep.external_info : undefined,
+      });
+    }
+
+    for (const consumer of rels.consumers || []) {
+      const source = typeof consumer === 'string' ? consumer : (consumer?.id as string | undefined);
+      if (!source) continue;
+      addIncoming(source, 'DEPENDS_ON', {
+        origin: 'system_consumers',
+        consumer_type: isPlainObject(consumer) ? consumer.type : undefined,
+        description: isPlainObject(consumer) ? consumer.description : undefined,
+      });
+    }
+  }
+
+  if (entityType === 'container' && Array.isArray(relationships)) {
+    handledRelationships = true;
+    for (const rel of relationships) {
+      if (typeof rel === 'string') {
+        addOutgoing(rel, 'DEPENDS_ON');
+        continue;
+      }
+      if (!isPlainObject(rel)) continue;
+      const target = (rel.to as string | undefined) ?? (rel.target as string | undefined);
+      if (!target) continue;
+      addOutgoing(target, 'DEPENDS_ON', {
+        description: rel.description,
+        technology: rel.technology,
+        async: rel.async,
+        external: rel.external,
+        external_info: rel.external_info,
+      });
+    }
+  }
+
+  if (entityType === 'component' && Array.isArray(relationships)) {
+    handledRelationships = true;
+    for (const rel of relationships) {
+      if (typeof rel === 'string') {
+        addOutgoing(rel, 'DEPENDS_ON');
+        continue;
+      }
+      if (!isPlainObject(rel)) continue;
+      const target = (rel.to as string | undefined) ?? (rel.target as string | undefined);
+      if (!target) continue;
+      addOutgoing(target, 'DEPENDS_ON', {
+        description: rel.description,
+      });
+    }
+  }
+
+  const systemData = isPlainObject(data.system) ? (data.system as Record<string, unknown>) : null;
+  const sorData = isPlainObject(data.sor) ? (data.sor as Record<string, unknown>) : null;
+  const correspondsTo =
+    (systemData?.corresponds_to as string | undefined) ||
+    (sorData?.corresponds_to as string | undefined);
+
+  if (correspondsTo) {
+    addOutgoing(correspondsTo, 'CORRESPONDS');
+  }
+
+  // 兼容旧格式：数组形式 [{ target, type, ... }]
+  if (!handledRelationships && Array.isArray(relationships)) {
+    for (const rel of relationships) {
+      if (!isPlainObject(rel)) continue;
+      const target = (rel.target as string | undefined) ?? (rel.to as string | undefined);
+      if (!target) continue;
+      const relType = normalizeRelationType(rel.type as string | undefined, 'DEPENDS_ON');
+      addOutgoing(target, relType, rel.properties as Record<string, unknown> | undefined);
+    }
+  }
+
+  // 兼容旧格式：对象形式 { dependencies: [...], uses: [...] }
+  if (!handledRelationships && isPlainObject(relationships)) {
+    for (const [relTypeKey, targets] of Object.entries(relationships)) {
+      if (!Array.isArray(targets)) continue;
+      const relType = normalizeRelationType(relTypeKey, 'DEPENDS_ON');
+      for (const target of targets) {
+        if (typeof target !== 'string') continue;
+        addOutgoing(target, relType);
+      }
+    }
+  }
+
+  return relations;
+}
+
+/**
+ * 保存关系到数据库并更新内存图
+ */
+export function saveRelations(
+  ctx: AdapterContext,
+  sourceProject: string | null | undefined,
+  entityId: string,
+  proposalId: string | null,
+  relations: ParsedRelation[]
+): void {
+  const db = ctx.store.getDatabase();
+  const now = new Date().toISOString();
+  const dbProposalId = proposalId ?? '';
+  const dbSourceProject = sourceProject ?? '';
+  const proposalClause = dbProposalId === '' ? '(proposal_id = ? OR proposal_id IS NULL)' : 'proposal_id = ?';
+  const toGraphProject = (value: string | null | undefined): string | null =>
+    value === '' || value === null || value === undefined ? null : value;
+
+  const normalizedRelations = relations.map((rel) => {
+    const fromProject = toDbValue(rel.fromProject ?? sourceProject);
+    const fromId = rel.fromId ?? entityId;
+    return {
+      ...rel,
+      fromProject,
+      fromId,
+      toProject: toDbValue(rel.toProject),
+      toId: rel.toId,
+      relType: rel.relType,
+    };
+  });
+
+  const desiredRelationKeys = new Set(
+    normalizedRelations.map((rel) =>
+      buildRelationKey(rel.fromProject, rel.fromId, rel.toProject, rel.toId, rel.relType)
+    )
+  );
+
+  const deletedRelations: Array<{
+    from_project: string;
+    from_id: string;
+    to_project: string;
+    to_id: string;
+    rel_type: string;
+    properties: Record<string, unknown> | null;
+  }> = [];
+
+  if (proposalId) {
+    const mainOutgoing = db.prepare(`
+      SELECT from_project, from_id, to_project, to_id, rel_type, properties
+      FROM relations
+      WHERE (proposal_id IS NULL OR proposal_id = '')
+        AND IFNULL(from_project, '') = ?
+        AND from_id = ?
+        AND (status IS NULL OR status != 'deleted')
+    `).all(dbSourceProject, entityId) as Array<{
+      from_project: string | null;
+      from_id: string;
+      to_project: string | null;
+      to_id: string;
+      rel_type: string;
+      properties: string | null;
+    }>;
+
+    const mainConsumers = db.prepare(`
+      SELECT from_project, from_id, to_project, to_id, rel_type, properties
+      FROM relations
+      WHERE (proposal_id IS NULL OR proposal_id = '')
+        AND IFNULL(to_project, '') = ?
+        AND to_id = ?
+        AND rel_type = 'DEPENDS_ON'
+        AND (status IS NULL OR status != 'deleted')
+    `).all(dbSourceProject, entityId) as Array<{
+      from_project: string | null;
+      from_id: string;
+      to_project: string | null;
+      to_id: string;
+      rel_type: string;
+      properties: string | null;
+    }>;
+
+    const deletedKeys = new Set<string>();
+    const parseProps = (value: string | null): Record<string, unknown> | null => {
+      if (!value) return null;
+      try {
+        return JSON.parse(value) as Record<string, unknown>;
+      } catch {
+        return null;
+      }
+    };
+
+    for (const rel of mainOutgoing) {
+      const fromProject = toDbValue(rel.from_project);
+      const toProject = toDbValue(rel.to_project);
+      const key = buildRelationKey(fromProject, rel.from_id, toProject, rel.to_id, rel.rel_type);
+      if (desiredRelationKeys.has(key) || deletedKeys.has(key)) continue;
+      deletedKeys.add(key);
+      deletedRelations.push({
+        from_project: fromProject,
+        from_id: rel.from_id,
+        to_project: toProject,
+        to_id: rel.to_id,
+        rel_type: rel.rel_type,
+        properties: parseProps(rel.properties),
+      });
+    }
+
+    for (const rel of mainConsumers) {
+      const parsed = parseProps(rel.properties);
+      if (!parsed || parsed.origin !== 'system_consumers') continue;
+      const fromProject = toDbValue(rel.from_project);
+      const toProject = toDbValue(rel.to_project);
+      const key = buildRelationKey(fromProject, rel.from_id, toProject, rel.to_id, rel.rel_type);
+      if (desiredRelationKeys.has(key) || deletedKeys.has(key)) continue;
+      deletedKeys.add(key);
+      deletedRelations.push({
+        from_project: fromProject,
+        from_id: rel.from_id,
+        to_project: toProject,
+        to_id: rel.to_id,
+        rel_type: rel.rel_type,
+        properties: parsed,
+      });
+    }
+  }
+
+  // 删除由系统 consumers 生成的反向关系
+  const incomingCandidates = db.prepare(`
+    SELECT id, from_project, from_id, to_project, to_id, rel_type, properties
+    FROM relations
+    WHERE to_project = ? AND to_id = ? AND rel_type = 'DEPENDS_ON' AND ${proposalClause}
+  `).all(dbSourceProject, entityId, dbProposalId) as Array<{
+    id: string;
+    from_project: string;
+    from_id: string;
+    to_project: string;
+    to_id: string;
+    rel_type: string;
+    properties: string | null;
+  }>;
+
+  const incomingToDelete = incomingCandidates
+    .filter((row) => {
+      if (!row.properties) return false;
+      try {
+        const parsed = JSON.parse(row.properties) as Record<string, unknown>;
+        return parsed.origin === 'system_consumers';
+      } catch {
+        return false;
+      }
+    })
+    .map((row) => row.id);
+
+  const incomingToDeleteSet = new Set(incomingToDelete);
+  for (const row of incomingCandidates) {
+    if (!incomingToDeleteSet.has(row.id)) continue;
+    ctx.graph.removeRelation(
+      toGraphProject(row.from_project),
+      row.from_id,
+      toGraphProject(row.to_project),
+      row.to_id,
+      row.rel_type
+    );
+  }
+
+  if (incomingToDelete.length > 0) {
+    const placeholders = incomingToDelete.map(() => '?').join(', ');
+    db.prepare(`DELETE FROM relations WHERE id IN (${placeholders})`).run(...incomingToDelete);
+  }
+
+  // 先查询旧关系，用于增量更新内存图
+  const oldRelations = db.prepare(`
+    SELECT to_project, to_id, rel_type FROM relations
+    WHERE from_project = ? AND from_id = ? AND ${proposalClause}
+  `).all(dbSourceProject, entityId, dbProposalId) as Array<{
+    to_project: string;
+    to_id: string;
+    rel_type: string;
+  }>;
+
+  // 从内存图中移除旧关系
+  for (const rel of oldRelations) {
+    ctx.graph.removeRelation(
+      toGraphProject(sourceProject),
+      entityId,
+      toGraphProject(rel.to_project),
+      rel.to_id,
+      rel.rel_type
+    );
+  }
+
+  // 删除数据库中的旧关系
+  db.prepare(`
+    DELETE FROM relations
+    WHERE from_project = ? AND from_id = ? AND ${proposalClause}
+  `).run(dbSourceProject, entityId, dbProposalId);
+
+  // 插入新关系
+  const insertStmt = db.prepare(`
+    INSERT INTO relations (id, proposal_id, from_project, from_id, to_project, to_id, rel_type, status, properties, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  for (const rel of normalizedRelations) {
+    const fromProject = rel.fromProject;
+    const fromId = rel.fromId;
+    const relId = randomUUID();
+    insertStmt.run(
+      relId,
+      dbProposalId,
+      fromProject,
+      fromId,
+      rel.toProject,
+      rel.toId,
+      rel.relType,
+      'active',
+      rel.properties ? JSON.stringify(rel.properties) : null,
+      now,
+      now
+    );
+
+    // 更新内存图
+    ctx.graph.addRelation(
+      toGraphProject(fromProject),
+      fromId,
+      toGraphProject(rel.toProject),
+      rel.toId,
+      rel.relType
+    );
+  }
+
+  if (proposalId && deletedRelations.length > 0) {
+    for (const rel of deletedRelations) {
+      const relId = randomUUID();
+      insertStmt.run(
+        relId,
+        dbProposalId,
+        rel.from_project,
+        rel.from_id,
+        rel.to_project,
+        rel.to_id,
+        rel.rel_type,
+        'deleted',
+        rel.properties ? JSON.stringify(rel.properties) : null,
+        now,
+        now
+      );
+
+      ctx.graph.removeRelation(
+        toGraphProject(rel.from_project),
+        rel.from_id,
+        toGraphProject(rel.to_project),
+        rel.to_id,
+        rel.rel_type
+      );
+    }
+  }
+
+  const cacheKeys = new Set<string>();
+  const addCacheKeys = (project: string | null, id: string) => {
+    for (const key of expandEntityCacheKeys(project, id)) {
+      cacheKeys.add(key);
+    }
+  };
+
+  const sourceProjectKey = toGraphProject(dbSourceProject);
+  addCacheKeys(sourceProjectKey, entityId);
+
+  for (const rel of normalizedRelations) {
+    addCacheKeys(toGraphProject(rel.fromProject), rel.fromId);
+    addCacheKeys(toGraphProject(rel.toProject), rel.toId);
+  }
+
+  for (const rel of oldRelations) {
+    addCacheKeys(sourceProjectKey, entityId);
+    addCacheKeys(toGraphProject(rel.to_project), rel.to_id);
+  }
+
+  for (const rel of deletedRelations) {
+    addCacheKeys(toGraphProject(rel.from_project), rel.from_id);
+    addCacheKeys(toGraphProject(rel.to_project), rel.to_id);
+  }
+
+  for (const key of cacheKeys) {
+    ctx.cache.invalidate(key);
+  }
+}

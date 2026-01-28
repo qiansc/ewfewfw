@@ -88,6 +88,8 @@
 | `packages/core/src/utils/logger.ts` | 日志系统 | ✅ |
 | `packages/core/src/utils/schema.ts` | JSON Schema 验证 | ✅ |
 
+**补充（2026-01-28）**：已补齐 Part 01 的 schema/logger/base/feat 测试覆盖并通过全量测试。
+
 ---
 
 ## Part 02: 三模式架构
@@ -115,7 +117,7 @@
 | 2.19 | feat 机制 | [x] | CoW + 变更管控 + 工作流程 |
 | 2.20 | 合并策略 | [x] | 自动合并 + 人工介入 |
 | 2.21 | 跨项目 feat | [x] | 中心化数据库架构 |
-| 2.22 | 清理 legacy 配置路径 | [ ] | 移除 .c4a.yaml / .c4a.yml 兼容 |
+| 2.22 | 清理 legacy 配置路径 | [x] | 仅保留 .context/.c4a.yaml |
 
 **相关设计文档：**
 
@@ -270,48 +272,72 @@
 | 6.5 | relations 表 | [x] | 关系存储 + 无外键 |
 | 6.6 | entity_history 表 | [x] | 变更历史 |
 | 6.7 | feat_history 表 | [x] | 发布历史（回滚支持） |
-| 6.8 | vectors 表 | [x] | sqlite-vec 向量索引 |
+| 6.8 | vectors 表 | [x] | USearch 向量索引 |
 | 6.9 | graph_cache 表 | [x] | 图查询缓存 |
 | 6.10 | Merge View 模式 | [x] | Feat 优先 + 主分支兜底 |
-| 6.11 | Embedding 生成 | [ ] | @xenova/transformers |
-| 6.12 | 向量搜索实现 | [ ] | Feat 版本隔离 |
+| 6.11 | Embedding 生成 | [x] | @xenova/transformers |
+| 6.12 | 向量搜索实现 | [x] | Feat 版本隔离 |
 | 6.13 | 写队列设计 | [x] | WriteQueue + 背压控制 |
 | 6.14 | 单例连接管理 | [x] | SQLiteStore 单例 |
-| 6.15 | 向量索引维护 | [ ] | 增量更新 + 批量重建 |
+| 6.15 | 向量索引维护 | [x] | 增量更新 + 批量重建 |
 | 6.16 | InMemoryGraph 构建 | [x] | 邻接表 + RWLock |
 | 6.17 | 图增量更新 | [x] | 实体变更时增量更新 |
 | 6.18 | GraphQueryCache | [x] | 两层缓存 + 反向索引 |
 | 6.19 | 模式配置 | [x] | .c4a.yaml mode 设置 |
-| 6.20 | Local→Server 切换 | [ ] | 备份 + 导出 + 冲突 (挂起) |
-| 6.21 | Server→Local 切换 | [ ] | 导入 + 向量重建 (挂起) |
-| 6.22 | 数据兼容性 | [ ] | 格式一致性保证 |
-| 6.23 | 导出/导入格式 | [ ] | JSON 格式规范 |
+| 6.20 | Local→Server 切换 | [ ] | 占位提示 + Server API 依赖 (挂起) |
+| 6.21 | Server→Local 切换 | [ ] | Local 导入/向量重建完成，Server 备份依赖 (挂起) |
+| 6.22 | 数据兼容性 | [x] | 格式一致性保证 |
+| 6.23 | 导出/导入格式 | [x] | JSON 格式规范 |
 | 6.24 | 性能基准测试 | [ ] | 测试环境 + 指标 (挂起) |
 | 6.25 | 实现建议 | [x] | 依赖 + 初始化 + 错误处理 |
-| 6.26 | 已知限制 | [ ] | 限制说明 + 最佳实践 |
-| 6.27 | 未来优化 | [ ] | 短期/长期优化路线 |
-| 6.28 | FAQ: sqlite-vec 降级 | [ ] | 无扩展时降级策略 |
-| 6.29 | FAQ: 模式选择指南 | [ ] | Local vs Server 选择 |
-| 6.30 | 数据完整性检查 | [ ] | validate 命令 |
-| 6.31 | 数据修复命令 | [ ] | repair 命令 |
-| 6.32 | 错误码定义 | [ ] | C4A-MIGRATE-001~008 |
-| 6.33 | 数据示例 | [ ] | Domain/Enterprise/Project |
+| 6.26 | 已知限制 | [x] | 限制说明 + 最佳实践 |
+| 6.27 | 未来优化 | [x] | 短期/长期优化路线 |
+| 6.28 | FAQ: USearch 降级 | [x] | 无扩展时降级策略 |
+| 6.29 | FAQ: 模式选择指南 | [x] | Local vs Server 选择 |
+| 6.30 | 数据完整性检查 | [x] | validate 命令 |
+| 6.31 | 数据修复命令 | [x] | repair 命令 |
+| 6.32 | 错误码定义 | [x] | C4A-MIGRATE-001~008 |
+| 6.33 | 数据示例 | [x] | Domain/Enterprise/Project |
 
-**进度**: 17/33 已完成，3 挂起 (依赖 Part 13)
+**进度**: 30/33 已完成，3 挂起 (依赖 Part 13)
 
 **P0 待修复**:
-- P0-Fix1: crud-operations.ts 未调用 converter.ts
-- P0-Fix2: parseRelations 不符合 DSL Schema
+- ✅ P0-Fix1: crud-operations.ts 未调用 converter.ts（已修复）
+- ✅ P0-Fix2: parseRelations 不符合 DSL Schema（已修复）
+
+**补充修复**:
+- ✅ 图查询缓存加入 source_project 维度（避免跨项目污染）
+- ✅ 缓存失效粒度调整为 source_project:id
+- ✅ LocalRestore 数据兼容性修复（ADR title/name、Contract component_id、kind/scope/perspective 归一化）
+- ✅ 迁移错误码统一引用 errors.ts（避免重复定义）
+- ✅ DataValidator 支持 JSON 格式输出（--format=json）
+- ✅ LocalBackup 归一化 legacy 字段（ADR title/name、Contract component_id、kind/scope/perspective）
+- ✅ includeVectors 显式报错（向量不导出，恢复时重建）
+- ✅ list 查询补齐 Merge View（避免 feat+主分支重复计数/展示）
+- ✅ 关系变更后图查询缓存失效补齐（Relation 变更影响 cache）
+- ✅ LocalRestore 支持 null source_project/relations 兼容（全局实体导入）
+- ✅ LocalRestore 进度回调（onProgress）补齐（本地侧可观测性增强）
+- ✅ LocalBackup 进度回调（onProgress）补齐
+- ✅ LocalRestore 冲突统计摘要（conflict_summary）补齐
+- ✅ LocalRestore 冲突摘要补齐 target 维度（feat/entity）
+- ✅ LocalRestore 冲突摘要补齐 target×resolution 维度
+- ✅ 冲突摘要格式化工具（formatConflictSummary）
+- ✅ LocalRestore 冲突摘要补齐 entity_type 维度
+- ✅ LocalRestore 冲突摘要补齐 status 维度
+- ✅ LocalRestore 冲突摘要补齐 feat_status 维度
+- ✅ ServerAdapter 占位实现，Server 模式明确抛错（等待 Part 13）
+- ✅ 单元测试补齐（向量索引维护 + ServerAdapter 占位）
+- ✅ 与 Part 01/02 类型一致性已核对
 
 **相关设计文档：**
 
 | 功能 | 文件 | 章节 | 行号 | 已读 | 已实现 |
 |------|------|------|------|:----:|:------:|
 | 6.1-6.10 | `detailed-design/local-mode/sqlite-schema.md` | 全文 | L1-370 | [x] | [x] |
-| 6.11-6.15 | `detailed-design/local-mode/vector-search.md` | 全文 | L1-598 | [x] | 🔶 |
+| 6.11-6.15 | `detailed-design/local-mode/vector-search.md` | 全文 | L1-576 | [x] | [x] |
 | 6.16-6.18 | `detailed-design/local-mode/graph-query.md` | 全文 | L1-308 | [x] | [x] |
 | 6.19-6.27 | `detailed-design/local-mode/mode-switch.md` | 全文 | L1-454 | [x] | 🔶 |
-| 6.28-6.33 | `detailed-design/local-mode/appendix.md` | 全文 | L1-628 | [x] | 🔶 |
+| 6.28-6.33 | `detailed-design/local-mode/appendix.md` | 全文 | L1-628 | [x] | [x] |
 
 ---
 

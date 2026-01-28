@@ -1,22 +1,22 @@
 ## 附录：常见问题
 
-### Q1: sqlite-vec 扩展安装失败怎么办？
+### Q1: 向量搜索不可用怎么办？
 
-**A**: 系统会自动降级，按优先级尝试：向量搜索 → FTS5 全文搜索 → LIKE 模糊匹配。
+**A**: 系统会自动降级，按优先级尝试：USearch 向量搜索 → FTS5 全文搜索 → LIKE 模糊匹配。
 
 **三级降级策略**：
 
 | 级别 | 搜索方式 | 触发条件 | 性能 | 质量 |
 |:----:|---------|---------|------|------|
-| 1 | sqlite-vec 向量搜索 | 扩展可用 | ~50ms | 语义匹配，最佳 |
-| 2 | FTS5 全文搜索 | sqlite-vec 不可用，FTS5 可用 | ~20ms | 关键词匹配，下降约 30% |
-| 3 | LIKE 模糊匹配 | sqlite-vec 和 FTS5 均不可用 | ~500ms | 子串匹配，最差 |
+| 1 | USearch 向量搜索 | 索引文件可用 | ~50ms | 语义匹配，最佳 |
+| 2 | FTS5 全文搜索 | USearch 不可用，FTS5 可用 | ~20ms | 关键词匹配，下降约 30% |
+| 3 | LIKE 模糊匹配 | USearch 和 FTS5 均不可用 | ~500ms | 子串匹配，最差 |
 
 **降级策略详情**：
 
 | 维度 | 说明 |
 |------|------|
-| **检测时机** | MCP Server 初始化时依次检查 sqlite-vec 和 FTS5 可用性 |
+| **检测时机** | MCP Server 初始化时依次检查 USearch 索引和 FTS5 可用性 |
 | **用户提示** | 首次使用时显示警告，说明当前搜索模式 |
 | **FTS5 不可用原因** | 某些 SQLite 编译禁用 FTS5（如精简版发行版） |
 | **最终降级** | FTS5 也不可用时，降级到 LIKE 模糊匹配（性能较差） |
@@ -35,13 +35,13 @@
 $ c4a init
 
 ✅ 数据库初始化成功
-⚠️ sqlite-vec 扩展不可用
+⚠️ USearch 向量索引不可用
    - 语义搜索已降级到全文搜索
    - 智能召回质量将下降约 30%
-   - 建议安装: brew install sqlite-vec (macOS) / apt install sqlite-vec (Linux)
+   - 运行 `c4a local rebuild-vectors` 重建向量索引
 
 # 或（极端情况）
-⚠️ sqlite-vec 和 FTS5 均不可用
+⚠️ USearch 和 FTS5 均不可用
    - 搜索已降级到 LIKE 模糊匹配（性能较差）
    - 建议使用标准 SQLite 发行版
 ```
@@ -54,7 +54,7 @@ $ c4a init
   success: true,
   degraded: true,
   degraded_reason: "VECTOR_SEARCH_UNAVAILABLE",
-  degraded_message: "sqlite-vec 不可用，使用全文搜索替代，结果按关键词匹配而非语义相似度排序",
+  degraded_message: "USearch 索引不可用，使用全文搜索替代，结果按关键词匹配而非语义相似度排序",
   search_mode: "fulltext",  // "vector" | "fulltext" | "like"
   items: [...]
 }
@@ -64,7 +64,7 @@ $ c4a init
   success: true,
   degraded: true,
   degraded_reason: "FULLTEXT_SEARCH_UNAVAILABLE",
-  degraded_message: "sqlite-vec 和 FTS5 均不可用，使用 LIKE 模糊匹配替代，性能较差且仅支持子串匹配",
+  degraded_message: "USearch 和 FTS5 均不可用，使用 LIKE 模糊匹配替代，性能较差且仅支持子串匹配",
   search_mode: "like",
   items: [...]
 }
@@ -75,17 +75,20 @@ $ c4a init
 ```typescript
 // MCP Server 初始化时检测
 class LiteStore {
-  private vectorSearchEnabled: boolean = false;
+  private vectorStore: VectorStore | null = null;
   private ftsEnabled: boolean = false;  // FTS5 需要探测，某些 SQLite 编译可能禁用
 
   async init() {
-    // 1. 尝试加载 sqlite-vec 扩展
+    // 1. 尝试加载 USearch 向量索引
     try {
-      this.db.loadExtension('vec0');
-      this.vectorSearchEnabled = true;
+      this.vectorStore = new VectorStore({
+        dimensions: 384,
+        indexPath: this.dbPath.replace('.db', '.usearch'),
+      });
+      this.vectorStore.load();
     } catch (e) {
       console.warn('⚠️ 向量搜索不可用，尝试降级到 FTS5 全文搜索');
-      this.vectorSearchEnabled = false;
+      this.vectorStore = null;
     }
 
     // 2. 探测 FTS5 可用性（某些 SQLite 编译可能禁用）
@@ -109,7 +112,7 @@ class LiteStore {
   }
 
   async search(query: string, limit: number = 10) {
-    if (this.vectorSearchEnabled) {
+    if (this.vectorStore) {
       return this.vectorSearch(query, limit);
     } else if (this.ftsEnabled) {
       return this.ftsSearch(query, limit);

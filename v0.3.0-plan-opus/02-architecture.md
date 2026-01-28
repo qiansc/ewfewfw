@@ -32,7 +32,7 @@
 | 2.18b | 表结构设计 | [x] | configs/entities/metadata/relations/vectors |
 | 2.18c | 示例数据 | [x] | 典型 Container 实体示例 |
 | 2.18d | data 字段结构 | [x] | 各实体类型的 data 字段定义 |
-| 2.18e | Local 模式技术栈 | [x] | SQLite + sqlite-vec + transformers |
+| 2.18e | Local 模式技术栈 | [x] | SQLite + USearch + transformers |
 | 2.18f | 数据流设计 | [x] | 写入流程 + 同步与备份 |
 | 2.18g | CLI 架构 | [x] | 用户 CLI + 开发 CLI 设计 |
 | 2.19 | feat 机制 | [x] | CoW + 变更管控 + 工作流程 |
@@ -89,10 +89,13 @@
 | 配置解析 | `packages/core/src/utils/config.ts` | .c4a.yaml 解析（mode: local/server/remote） | ✅ |
 | 目录结构 | `packages/core/src/utils/path.ts` | .context/ + business/technical/feat 路径计算 | ✅ |
 | ID 生成 | `packages/core/src/utils/id.ts` | ID 生成与验证 | ✅ |
+| 适配器配置 | `packages/core/src/store/get-adapter.ts` | 仅识别 .context/.c4a.yaml | ✅ |
 | Schema 验证 | `packages/core/src/utils/schema.ts` | JSON Schema 验证（复用 validator 模块） | ✅ |
 | 验证器 | `packages/core/src/validator/index.ts` | DSL 验证器（validateDSL, validateDSLAuto） | ✅ |
 | 单元测试 | `packages/core/src/utils/__tests__/path.test.ts` | 路径计算测试（30 cases） | ✅ |
 | 单元测试 | `packages/core/src/utils/__tests__/config.test.ts` | 配置解析测试（8 cases） | ✅ |
+| 单元测试 | `packages/core/src/store/__tests__/get-adapter.test.ts` | 仅 .c4a.yaml 生效（忽略 .c4a.yml） | ✅ |
+| 本地视图 | `packages/cli/src/mcp/store/featChecklist.ts` | 渲染 checklist.md 只读视图 | ✅ |
 
 ---
 
@@ -137,4 +140,3 @@
 1. 运行 `git diff --name-only` 查看所有未提交变更
 2. 打开 `v0.3.0/architecture.md` 逐行对照检查
 3. 确认设计文档中定义的每个章节的内容都实现，代码与设计完全一致
-

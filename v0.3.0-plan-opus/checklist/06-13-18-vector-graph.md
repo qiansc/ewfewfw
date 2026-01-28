@@ -84,12 +84,12 @@
 
 | 文件 | 行数 | 说明 |
 |------|------|------|
-| `packages/mcp-dsl/src/store/write-queue.ts` | ~191 | 写队列实现 |
-| `packages/mcp-dsl/src/store/sqlite-store.ts` | ~527 | SQLite Store（新增单例 + 向量维护） |
-| `packages/mcp-dsl/src/store/in-memory-graph.ts` | ~328 | 内存图实现 |
-| `packages/mcp-dsl/src/store/graph-query-cache.ts` | ~158 | 图查询缓存实现 |
-| `packages/mcp-dsl/src/store/index.ts` | ~27 | Store 模块导出（更新） |
-| `packages/mcp-dsl/package.json` | +1 dep | 添加 @xenova/transformers 依赖 |
+| `packages/core/src/store/write-queue.ts` | ~191 | 写队列实现 |
+| `packages/core/src/store/sqlite-store.ts` | ~527 | SQLite Store（新增单例 + 向量维护） |
+| `packages/core/src/store/in-memory-graph.ts` | ~328 | 内存图实现 |
+| `packages/core/src/store/graph-query-cache.ts` | ~158 | 图查询缓存实现 |
+| `packages/core/src/store/index.ts` | ~27 | Store 模块导出（更新） |
+| `packages/core/package.json` | +1 dep | 添加 @xenova/transformers 依赖 |
 
 ---
 
@@ -131,7 +131,7 @@
 
 ## 已知限制
 
-1. **vectors 表**: 需要 sqlite-vec 扩展，SQL 语句已准备但未实际创建虚拟表
+1. **vectors 索引**: 使用 USearch (WASM) 独立存储，不依赖 SQLite 扩展
 2. **RWLock**: 设计文档提到的读写锁未实现（简化为单线程模型）
 3. **连接池**: 未实现连接池，使用单例模式（适用于单进程场景）
 

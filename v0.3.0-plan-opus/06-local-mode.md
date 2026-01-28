@@ -27,7 +27,9 @@
 | `store/adapter.ts` | StorageAdapter 接口 + 类型定义 | ~1136 | ✅ | 完整 |
 | `store/sqlite-store.ts` | SQLite 底层存储 | ~577 | ✅ | 完整 |
 | `store/lite-adapter.ts` | LiteAdapter 主入口 | - | ✅ | 完整 |
-| `store/lite-adapter/crud-operations.ts` | save/read/list/delete | ~982 | ⚠️ | P0-Fix1/2 待修复 |
+| `store/lite-adapter/crud-save.ts` | save | ~416 | ✅ | 已拆分并修复 P0-Fix |
+| `store/lite-adapter/crud-read.ts` | read/list/delete | ~533 | ✅ | 已拆分并修复 P0-Fix |
+| `store/lite-adapter/relations.ts` | 关系解析/保存 | ~487 | ✅ | 已拆分并修复 P0-Fix |
 | `store/lite-adapter/feat-operations.ts` | feat 生命周期 | - | ✅ | 完整 |
 | `store/lite-adapter/sync-operations.ts` | sync/planSync | - | ✅ | 完整 |
 | `store/lite-adapter/graph-operations.ts` | queryDeps/queryImpact | - | ✅ | 完整 |
@@ -38,10 +40,14 @@
 | `store/in-memory-graph.ts` | InMemoryGraph | - | ✅ | 完整 |
 | `store/graph-query-cache.ts` | GraphQueryCache | - | ✅ | 完整 |
 | `store/write-queue.ts` | WriteQueue | - | ✅ | 完整 |
-| `store/vector-search.ts` | VectorSearch | ~230 | 🔶 | 框架完成，待集成测试 |
-| `store/mode-switch.ts` | 模式切换 | ~636 | 🔶 | Local 部分完成，Server API 挂起 |
-| `store/validate.ts` | 数据验证 | ~389 | 🔶 | 框架完成，待完善检查项 |
-| `store/repair.ts` | 数据修复 | ~370 | 🔶 | 框架完成，待完善修复逻辑 |
+| `store/vector-search.ts` | VectorSearch | ~230 | ✅ | USearch 已集成 |
+| `store/mode-switch.ts` | 模式切换（入口） | ~15 | 🔶 | 重新导出拆分后的实现 |
+| `store/modeSwitchTypes.ts` | 模式切换类型定义 | ~132 | ✅ | 类型与导出格式 |
+| `store/modeSwitchBackup.ts` | Local 备份 | ~196 | 🔶 | Local 部分完成 |
+| `store/modeSwitchRestore.ts` | Local 恢复 | ~573 | 🔶 | Local 部分完成，Server API 挂起 |
+| `store/server-adapter.ts` | Server 适配器占位 | ~160 | 🔶 | 占位提示，等待 Part 13 |
+| `store/validate.ts` | 数据验证 | ~389 | ✅ | 已完成 |
+| `store/repair.ts` | 数据修复 | ~370 | ✅ | 已完成 |
 | `store/get-adapter.ts` | 适配器工厂 | - | ✅ | 完整 |
 
 **状态说明**:
@@ -98,32 +104,32 @@ Part 06 是 Local 模式的核心实现，定义 StorageAdapter 接口并实现 
 | 6.5 | relations 表 | [x] | 关系存储 + 无外键约束 |
 | 6.6 | entity_history 表 | [x] | 变更历史 |
 | 6.7 | feat_history 表 | [x] | 发布历史（回滚支持） |
-| 6.8 | vectors 表 | [x] | sqlite-vec 向量索引 |
+| 6.8 | 向量索引（USearch） | [x] | USearch 索引文件 + keymap |
 | 6.9 | graph_cache 表 | [x] | 图查询缓存 |
 | 6.10 | Merge View 模式 | [x] | Feat 优先 + 主分支兜底 |
-| 6.11 | Embedding 生成 | [ ] | @xenova/transformers 集成 |
-| 6.12 | 向量搜索实现 | [ ] | Feat 版本隔离 |
+| 6.11 | Embedding 生成 | [x] | @xenova/transformers 集成 |
+| 6.12 | 向量搜索实现 | [x] | Feat 版本隔离 |
 | 6.13 | 写队列设计 | [x] | WriteQueue + 背压控制 |
 | 6.14 | 单例连接管理 | [x] | SQLiteStore 单例 |
-| 6.15 | 向量索引维护 | [ ] | 增量更新 + 批量重建 |
+| 6.15 | 向量索引维护 | [x] | 增量更新 + 批量重建 |
 | 6.16 | InMemoryGraph 构建 | [x] | 邻接表 + RWLock |
 | 6.17 | 图增量更新 | [x] | 实体变更时增量更新 |
 | 6.18 | GraphQueryCache | [x] | 两层缓存 + 反向索引 |
 | 6.19 | 模式配置 | [x] | .c4a.yaml mode 设置 |
-| 6.20 | Local→Server 切换 | [ ] | 备份 + 导出 + 冲突处理 |
-| 6.21 | Server→Local 切换 | [ ] | 导入 + 向量重建 |
-| 6.22 | 数据兼容性 | [ ] | 格式一致性保证 |
-| 6.23 | 导出/导入格式 | [ ] | JSON 格式规范 |
+| 6.20 | Local→Server 切换 | [ ] | 占位提示 + Server API 依赖 |
+| 6.21 | Server→Local 切换 | [ ] | Local 导入 + 向量重建（Server 备份依赖） |
+| 6.22 | 数据兼容性 | [x] | 格式一致性保证 |
+| 6.23 | 导出/导入格式 | [x] | JSON 格式规范 |
 | 6.24 | 性能基准测试 | [ ] | 测试环境 + 指标 |
 | 6.25 | 实现建议 | [x] | 依赖 + 初始化 + 错误处理 |
-| 6.26 | 已知限制 | [ ] | 限制说明 + 最佳实践 |
-| 6.27 | 未来优化 | [ ] | 短期/长期优化路线 |
-| 6.28 | FAQ: sqlite-vec 降级 | [ ] | 无扩展时降级策略 |
-| 6.29 | FAQ: 模式选择指南 | [ ] | Local vs Server 选择 |
-| 6.30 | 数据完整性检查 | [ ] | validate 命令 |
-| 6.31 | 数据修复命令 | [ ] | repair 命令 |
-| 6.32 | 错误码定义 | [ ] | C4A-MIGRATE-001~008 |
-| 6.33 | 数据示例 | [ ] | Domain/Enterprise/Project |
+| 6.26 | 已知限制 | [x] | 限制说明 + 最佳实践 |
+| 6.27 | 未来优化 | [x] | 短期/长期优化路线 |
+| 6.28 | FAQ: USearch 降级 | [x] | USearch 不可用时降级策略 |
+| 6.29 | FAQ: 模式选择指南 | [x] | Local vs Server 选择 |
+| 6.30 | 数据完整性检查 | [x] | validate 命令 |
+| 6.31 | 数据修复命令 | [x] | repair 命令 |
+| 6.32 | 错误码定义 | [x] | C4A-MIGRATE-001~008 |
+| 6.33 | 数据示例 | [x] | Domain/Enterprise/Project |
 
 ---
 
@@ -138,32 +144,32 @@ Part 06 是 Local 模式的核心实现，定义 StorageAdapter 接口并实现 
 | 6.5 | relations 表 | `sqlite-schema.md` | §2.1 核心表 | L143-165 | [x] | [x] |
 | 6.6 | entity_history 表 | `sqlite-schema.md` | §2.2 实体变更历史表 | L205-230 | [x] | [x] |
 | 6.7 | feat_history 表 | `sqlite-schema.md` | §2.2.1 Feat 发布历史表 | L257-292 | [x] | [x] |
-| 6.8 | vectors 表 | `sqlite-schema.md` | §2.3.1 向量索引表 | L293-320 | [x] | [x] |
+| 6.8 | 向量索引（USearch） | `sqlite-schema.md` | §2.3.1 向量索引（USearch） | L293-329 | [x] | [x] |
 | 6.9 | graph_cache 表 | `sqlite-schema.md` | §2.3.3 图查询缓存表 | L465-486 | [x] | [x] |
 | 6.10 | Merge View 模式 | `sqlite-schema.md` | §3 Merge View 模式 | L488-559 | [x] | [x] |
-| 6.11 | Embedding 生成 | `vector-search.md` | §3.1 Embedding 生成 | L3-29 | [x] | [ ] |
-| 6.12 | 向量搜索实现 | `vector-search.md` | §3.2 向量搜索 | L30-360 | [x] | [ ] |
-| 6.13 | 写队列设计 | `vector-search.md` | §3.3.3 写操作串行化 | L361-512 | [x] | [x] |
-| 6.14 | 单例连接管理 | `vector-search.md` | §3.4 向量索引维护 | L513-552 | [x] | [x] |
-| 6.15 | 向量索引维护 | `vector-search.md` | §3.4 向量索引维护 | L555-636 | [x] | [ ] |
+| 6.11 | Embedding 生成 | `vector-search.md` | §3.1 Embedding 生成 | L3-33 | [x] | [x] |
+| 6.12 | 向量搜索实现 | `vector-search.md` | §3.2 向量搜索 | L35-240 | [x] | [x] |
+| 6.13 | 写队列设计 | `vector-search.md` | §3.3.3 写操作串行化 | L312-441 | [x] | [x] |
+| 6.14 | 单例连接管理 | `vector-search.md` | §3.4 向量索引维护 | L466-505 | [x] | [x] |
+| 6.15 | 向量索引维护 | `vector-search.md` | §3.4 向量索引维护 | L506-556 | [x] | [x] |
 | 6.16 | InMemoryGraph 构建 | `graph-query.md` | §4.1 内存图构建 | L3-258 | [x] | [x] |
 | 6.17 | 图增量更新 | `graph-query.md` | §4.1 内存图更新机制 | L259-298 | [x] | [x] |
 | 6.18 | GraphQueryCache | `graph-query.md` | §4.2 图查询缓存 | L299-373 | [x] | [x] |
 | 6.19 | 模式配置 | `mode-switch.md` | §5.1 配置方式 | L3-18 | [x] | [x] |
 | 6.20 | Local→Server 切换 | `mode-switch.md` | §5.2.1 Local → Server | L19-83 | [x] | [ ] |
 | 6.21 | Server→Local 切换 | `mode-switch.md` | §5.2.2 Server → Local | L84-283 | [x] | [ ] |
-| 6.22 | 数据兼容性 | `mode-switch.md` | §5.3 数据兼容性 | L284-293 | [x] | [ ] |
-| 6.23 | 导出/导入格式 | `mode-switch.md` | §5.4 导出/导入格式 | L294-399 | [x] | [ ] |
+| 6.22 | 数据兼容性 | `mode-switch.md` | §5.3 数据兼容性 | L284-293 | [x] | [x] |
+| 6.23 | 导出/导入格式 | `mode-switch.md` | §5.4 导出/导入格式 | L294-399 | [x] | [x] |
 | 6.24 | 性能基准测试 | `mode-switch.md` | §6 性能基准 | L400-428 | [x] | [ ] |
 | 6.25 | 实现建议 | `mode-switch.md` | §7 实现建议 | L429-531 | [x] | [x] |
-| 6.26 | 已知限制 | `mode-switch.md` | §8 限制和注意事项 | L532-551 | [x] | [ ] |
-| 6.27 | 未来优化 | `mode-switch.md` | §9 未来优化方向 | L552-566 | [x] | [ ] |
-| 6.28 | FAQ: sqlite-vec 降级 | `appendix.md` | Q1 sqlite-vec 降级 | L3-163 | [x] | [ ] |
-| 6.29 | FAQ: 模式选择指南 | `appendix.md` | Q2 模式选择 | L164-245 | [x] | [ ] |
-| 6.30 | 数据完整性检查 | `appendix.md` | §A.9.3 数据完整性检查 | L246-309 | [x] | [ ] |
-| 6.31 | 数据修复命令 | `appendix.md` | §A.9.3.2 repair 命令 | L310-546 | [x] | [ ] |
-| 6.32 | 错误码定义 | `appendix.md` | §A.9.7 错误码参考 | L547-561 | [x] | [ ] |
-| 6.33 | 数据示例 | `appendix.md` | 附录：数据示例 | L562-714 | [x] | [ ] |
+| 6.26 | 已知限制 | `mode-switch.md` | §8 限制和注意事项 | L532-551 | [x] | [x] |
+| 6.27 | 未来优化 | `mode-switch.md` | §9 未来优化方向 | L552-566 | [x] | [x] |
+| 6.28 | FAQ: USearch 降级 | `appendix.md` | Q1 USearch 降级 | L3-120 | [x] | [x] |
+| 6.29 | FAQ: 模式选择指南 | `appendix.md` | Q2 模式选择 | L164-245 | [x] | [x] |
+| 6.30 | 数据完整性检查 | `appendix.md` | §A.9.3 数据完整性检查 | L246-309 | [x] | [x] |
+| 6.31 | 数据修复命令 | `appendix.md` | §A.9.3.2 repair 命令 | L310-546 | [x] | [x] |
+| 6.32 | 错误码定义 | `appendix.md` | §A.9.7 错误码参考 | L547-561 | [x] | [x] |
+| 6.33 | 数据示例 | `appendix.md` | 附录：数据示例 | L562-714 | [x] | [x] |
 
 ---
 
@@ -174,21 +180,27 @@ Part 06 是 Local 模式的核心实现，定义 StorageAdapter 接口并实现 
 | 接口定义 | `packages/core/src/store/adapter.ts` | StorageAdapter 接口 + 所有类型定义 | ✅ | |
 | SQLite 存储 | `packages/core/src/store/sqlite-store.ts` | SQLite 底层存储实现 | ✅ | |
 | Lite 适配器 | `packages/core/src/store/lite-adapter.ts` | LiteAdapter 主入口 | ✅ | |
-| CRUD 操作 | `packages/core/src/store/lite-adapter/crud-operations.ts` | save/read/list/delete | ⚠️ | P0-Fix1/2 待修复 |
+| CRUD 操作 | `packages/core/src/store/lite-adapter/crud-save.ts` | save | ✅ | 已拆分并修复 P0-Fix |
+| CRUD 操作 | `packages/core/src/store/lite-adapter/crud-read.ts` | read/list/delete | ✅ | 已拆分并修复 P0-Fix |
+| 关系解析 | `packages/core/src/store/lite-adapter/relations.ts` | 关系解析/保存 | ✅ | 已拆分并修复 P0-Fix |
 | Feat 操作 | `packages/core/src/store/lite-adapter/feat-operations.ts` | feat 生命周期管理 | ✅ | |
 | 同步操作 | `packages/core/src/store/lite-adapter/sync-operations.ts` | sync/planSync | ✅ | |
 | 图操作 | `packages/core/src/store/lite-adapter/graph-operations.ts` | queryDeps/queryImpact | ✅ | |
-| 搜索操作 | `packages/core/src/store/lite-adapter/search-operations.ts` | search (向量/全文) | 🔶 | 依赖 6.11/6.12 |
+| 搜索操作 | `packages/core/src/store/lite-adapter/search-operations.ts` | search (向量/全文) | ✅ | |
 | 工具操作 | `packages/core/src/store/lite-adapter/utils-operations.ts` | readHistory/backup/restore | ✅ | |
 | 辅助函数 | `packages/core/src/store/lite-adapter/helpers.ts` | parseContent/formatContent/computeHash | ✅ | |
 | 类型定义 | `packages/core/src/store/lite-adapter/types.ts` | 内部类型定义 | ✅ | |
 | 内存图 | `packages/core/src/store/in-memory-graph.ts` | InMemoryGraph 实现 | ✅ | |
 | 图缓存 | `packages/core/src/store/graph-query-cache.ts` | GraphQueryCache 实现 | ✅ | |
 | 写队列 | `packages/core/src/store/write-queue.ts` | WriteQueue + 背压控制 | ✅ | |
-| 向量搜索 | `packages/core/src/store/vector-search.ts` | VectorSearch 实现 | 🔶 | 框架完成，待集成测试 |
-| 模式切换 | `packages/core/src/store/mode-switch.ts` | Local↔Server 切换 | 🔶 | Local 部分完成，Server API 挂起 |
-| 数据验证 | `packages/core/src/store/validate.ts` | 数据完整性检查 | 🔶 | 框架完成，待完善 |
-| 数据修复 | `packages/core/src/store/repair.ts` | 数据修复命令 | 🔶 | 框架完成，待完善 |
+| 向量搜索 | `packages/core/src/store/vector-search.ts` | VectorSearch 实现 | ✅ | USearch 已集成 |
+| 模式切换（入口） | `packages/core/src/store/mode-switch.ts` | Local↔Server 切换 | 🔶 | 重新导出拆分后的实现 |
+| 模式切换类型 | `packages/core/src/store/modeSwitchTypes.ts` | 类型定义 | ✅ | 导出/导入格式 |
+| 模式切换备份 | `packages/core/src/store/modeSwitchBackup.ts` | Local 备份 | 🔶 | Local 部分完成 |
+| 模式切换恢复 | `packages/core/src/store/modeSwitchRestore.ts` | Local 恢复 | 🔶 | Local 部分完成，Server API 挂起 |
+| Server 适配器 | `packages/core/src/store/server-adapter.ts` | Server 占位适配器 | 🔶 | 占位提示，等待 Part 13 |
+| 数据验证 | `packages/core/src/store/validate.ts` | 数据完整性检查 | ✅ | 已完成 |
+| 数据修复 | `packages/core/src/store/repair.ts` | 数据修复命令 | ✅ | 已完成 |
 | 适配器工厂 | `packages/core/src/store/get-adapter.ts` | getAdapter() 工厂函数 | ✅ | |
 | 导出入口 | `packages/core/src/store/index.ts` | 模块导出 | ✅ | |
 
@@ -359,26 +371,26 @@ feat 内保存 → status = draft (强制)
 
 | 问题 | 优先级 | 状态 | 影响范围 |
 |------|:------:|:----:|----------|
-| P0-Fix1: DSL 转换缺失 | P0 | 待修复 | 数据损坏，查询失效 |
-| P0-Fix2: 关系解析不匹配 | P0 | 待修复 | 关系数据丢失 |
+| P0-Fix1: DSL 转换缺失 | P0 | ✅ 已修复 | 数据损坏，查询失效 |
+| P0-Fix2: 关系解析不匹配 | P0 | ✅ 已修复 | 关系数据丢失 |
 | P1-Fix1: Status 逻辑 | P1 | ✅ 已确认正确 | 无需修改 |
 | D1: 关系单一性约束 | 设计 | ✅ 已更新 | sqlite-schema.md L132-158 |
 | D2: 关系删除遮蔽 | 设计 | ✅ 已更新 | graph-query.md L33-99, cross-reference.md L697-700 |
 | D3: 导出格式完整字段 | 设计 | ✅ 已更新 | mode-switch.md L282-360 |
 | D4: UNIQUE约束NULL处理 | 设计 | ✅ 已更新 | sqlite-schema.md L155-158 (COALESCE索引) |
-| D5: 向量搜索状态过滤 | 设计 | ✅ 已更新 | vector-search.md L62-128 |
+| D5: 向量搜索状态过滤 | 设计 | ✅ 已更新 | vector-search.md L134-189 |
 | D6: 图查询实体状态过滤 | 设计 | ✅ 已更新 | graph-query.md L33-99 |
 | D7: 后台重建写入路由 | 设计 | ✅ 已更新 | mode-switch.md L154-252 (双写+切换+回滚) |
 | D8: 图查询proposal_id过度绑定 | 设计 | ✅ 已更新 | graph-query.md L33-99 (Merge View实体选择) |
-| D9: 向量搜索简化版状态过滤 | 设计 | ✅ 已更新 | vector-search.md L131-199 |
+| D9: 向量搜索简化版状态过滤 | 设计 | ✅ 已更新 | vector-search.md L206-224 |
 | D10: 文档编码损坏 | 文档 | ✅ 已修复 | sqlite-schema.md L34 |
-| D11: sqlite-vec 复合主键冲突 | 设计 | ✅ 已更新 | sqlite-schema.md L260-285 (使用 vector_key 单列主键) |
+| D11: USearch 复合 ID 设计 | 设计 | ✅ 已更新 | sqlite-schema.md L293-320 (使用 composite_id 映射) |
 | D12: 向量导出矛盾 | 设计 | ✅ 已更新 | mode-switch.md L323-360 (不导出向量，导入时重建) |
 | D13: CLI 并发访问表述 | 设计 | ✅ 已更新 | sqlite-schema.md L27 (明确单进程架构，请求通过 MCP Server) |
-| D14: sqlite-vec 检测时机 | 设计 | ✅ 已更新 | appendix.md L11 (MCP Server 初始化时检测) |
+| D14: USearch 检测时机 | 设计 | ✅ 已更新 | appendix.md L11 (MCP Server 初始化时检测) |
 | D15: 运维工具 MCP 暴露 | 设计 | ✅ 已确认 | architecture.md L857-868 (方案 A: MCP 工具供 CLI 内部调用) |
 | D16: 全文搜索降级方案 | 设计 | ✅ 已更新 | sqlite-schema.md L283-411, appendix.md L56-145 (引入 FTS5 表结构) |
-| D17: 索引命名不一致 | 设计 | ✅ 已更新 | sqlite-schema.md L272, vector-search.md L263 (统一为 idx_vectors_lookup) |
+| D17: 索引命名不一致 | 设计 | ✅ 已更新 | sqlite-schema.md L272 (统一为 idx_vectors_lookup) |
 | D18: FTS5 tokenizer 配置无效 | 设计 | ✅ 已更新 | sqlite-schema.md L294, L298-311 (改为 unicode61，添加 tokenizer 选择说明) |
 | D19: FTS 查询 ORDER BY rank 错误 | 设计 | ✅ 已更新 | sqlite-schema.md L366-402, appendix.md L105-145 (使用 bm25() 函数) |
 | D20: FTS5 可用性假设 | 设计 | ✅ 已更新 | appendix.md L64-103 (添加 probeFTS5() 探测，降级到 LIKE) |
@@ -393,14 +405,14 @@ feat 内保存 → status = draft (强制)
 | D29: FTS5 别名不一致 | 设计 | ✅ 已更新 | sqlite-schema.md L378, L400; appendix.md L132, L154 (统一使用 fts 别名) |
 | D30: 后台重建降级说明不完整 | 文档 | ✅ 已更新 | mode-switch.md L137 (补充 FTS5 不可用时降级到 LIKE) |
 | D31: source_project NOT NULL 与 Domain/Enterprise 冲突 | 设计 | ✅ 已更新 | sqlite-schema.md L93-103, L113-115, L134-152, L267-270 (允许 NULL 表示全局实体) |
-| D32: vector_key 写入缺失 | 设计 | ✅ 已更新 | vector-search.md L577-590 (补充 makeVectorKey 函数和写入逻辑) |
+| D32: vector_key 写入缺失 | 设计 | ✅ 已更新 | vector-search.md L506-544 (补充向量写入逻辑) |
 | D33: 备份导出向量矛盾 | 文档 | ✅ 已更新 | appendix.md L417-426 (删除"导出向量"，与 mode-switch.md 保持一致) |
 | D34: Bun 运行时兼容性风险 | 文档 | ✅ 已更新 | mode-switch.md L407-419 (添加运行时兼容性说明和回退方案) |
 | D35: 实体唯一性约束描述错误 | 设计 | ✅ 已更新 | architecture.md L356-380, L627, L714 (修正为 source_project,id,proposal_id 三元组) |
 | D36: FTS5 触发器 source_project NULL 处理 | 设计 | ✅ 已更新 | sqlite-schema.md L344, L361 (添加 source_project IS NULL 判断) |
 | D37: 向量重建时间说明不清晰 | 文档 | ✅ 已更新 | mode-switch.md L105-121 (区分 SQLite 批量插入和 Embedding 生成两阶段) |
 | D38: InMemoryGraph 缓存失效局限性 | 文档 | ✅ 已更新 | graph-query.md L171-182 (添加 key.includes() 误匹配风险说明) |
-| D39: vectors 索引重复定义 | 文档 | ✅ 已更新 | vector-search.md L262-269 (改为引用 sqlite-schema.md 定义) |
+| D39: vectors 索引重复定义 | 文档 | ✅ 已更新 | sqlite-schema.md L331-344 (vectors 索引定义) |
 | D40: configs 表用途不明确 | 文档 | ✅ 已更新 | sqlite-schema.md L83-97 (补充用途说明和与 .c4a.yaml 的关系) |
 | D41: external 实体 source_project 说明缺失 | 文档 | ✅ 已更新 | appendix.md L663-684 (添加 external 实体字段说明) |
 | D42: relations.status 与 metadata.status 混淆 | 文档 | ✅ 已更新 | mode-switch.md L355 (添加说明区分两种 status) |
@@ -411,16 +423,33 @@ feat 内保存 → status = draft (强制)
 | D47: NULL 语义未贯穿查询示例 | 设计 | ✅ 已更新 | sqlite-schema.md, vector-search.md, graph-query.md (统一使用空字符串比较) |
 | D48: entity_history 表 source_project NOT NULL | 设计 | ✅ 已更新 | sqlite-schema.md L211-233 (改用空字符串哨兵值) |
 | D49: 向量重建阻塞语义不一致 | 文档 | ✅ 已更新 | mode-switch.md L389-401 (明确默认同步阻塞，大数据量提示后台) |
-| D50: 并发模型描述错误 | 设计 | ✅ 已更新 | vector-search.md L288-345 (修正为多进程模型，依赖 SQLite WAL 和文件锁) |
+| D50: 并发模型描述错误 | 设计 | ✅ 已更新 | vector-search.md L242-310 (修正为多进程模型，依赖 SQLite WAL 和文件锁) |
 | D51: Checklist 同步断层未说明 | 文档 | ✅ 已更新 | mode-switch.md L345-367 (添加 Checklist 数据处理说明和协作注意事项) |
-| D52: vector-search.md 方案2/3 NULL 引用 | 设计 | ✅ 已更新 | vector-search.md L132-253 (UNION 方案和主分支搜索改用空字符串) |
-| D53: vector-search.md 测试用例 NULL 引用 | 文档 | ✅ 已更新 | vector-search.md L275-289 (测试用例注释改用空字符串说明) |
+| D52: vector-search.md 方案2/3 NULL 引用 | 设计 | ✅ 已更新 | vector-search.md L134-216 (主分支搜索改用空字符串) |
+| D53: vector-search.md 测试用例 NULL 引用 | 文档 | ✅ 已更新 | vector-search.md L226-239 (测试用例注释改用空字符串说明) |
 | D54: sqlite-schema.md 并发模型描述错误 | 设计 | ✅ 已更新 | sqlite-schema.md L27-52 (修正为多进程并发模型) |
 | D55: appendix.md FTS 降级示例 NULL 引用 | 设计 | ✅ 已更新 | appendix.md L123-161 (ftsSearch 函数改用空字符串哨兵值) |
 | D56: appendix.md 数据示例 null 引用 | 文档 | ✅ 已更新 | appendix.md L562-715 (数据示例改用空字符串，添加哨兵值说明) |
 | D57: graph-query.md NodeKey 哨兵值转换 | 文档 | ✅ 已更新 | graph-query.md L11-19 (添加 makeNodeKey 函数的哨兵值转换说明) |
 | D58: architecture.md NULL 引用 | 设计 | ✅ 已更新 | architecture.md L358-390, L792-799, L1118-1134 (唯一性约束、metadata 示例、查询策略添加哨兵值说明) |
 | D59: appendix.md external 实体示例 | 文档 | ✅ 已更新 | appendix.md L672-695 (external 实体 source_project/source_repo 改用空字符串) |
+| D60: 图查询缓存缺少项目维度 | 实现 | ✅ 已修复 | graph-operations.ts (缓存 key 加入 source_project) |
+| D61: 缓存失效粒度过粗 | 实现 | ✅ 已修复 | crud-read.ts + cache-keys.ts (按 source_project:id 失效) |
+| D62: 导出数据兼容旧字段 | 实现 | ✅ 已修复 | modeSwitchRestore.ts (ADR title/name, Contract component_id, kind/scope/perspective 归一化) |
+| D63: 向量索引维护执行方式调整 | 文档 | ✅ 已更新 | vector-search.md/实现一致（改为异步重建，不阻塞保存） |
+| D64: 文件 I/O API 兼容性调整 | 文档 | ✅ 已更新 | modeSwitchBackup.ts/utilsBackup.ts（统一 Node fs 写入） |
+| D63: list 查询未应用 Merge View | 实现 | ✅ 已修复 | crud-read.ts (列表/计数/分组走 Merge View) |
+| D64: 关系变更未失效图查询缓存 | 实现 | ✅ 已修复 | relations.ts (关系写入后失效相关缓存) |
+| D65: 导入全局项目字段兼容 | 实现 | ✅ 已修复 | modeSwitchRestore.ts (metadata/relations null → '') |
+| D66: restore 缺少进度回调 | 实现 | ✅ 已修复 | modeSwitchRestore.ts + modeSwitchTypes.ts (onProgress 回调) |
+| D67: backup 缺少进度回调 | 实现 | ✅ 已修复 | modeSwitchBackup.ts + modeSwitchTypes.ts (onProgress 回调) |
+| D68: 冲突统计摘要缺失 | 实现 | ✅ 已修复 | modeSwitchRestore.ts + modeSwitchTypes.ts (conflict_summary) |
+| D69: 冲突摘要缺少 target 维度 | 实现 | ✅ 已修复 | modeSwitchRestore.ts + modeSwitchTypes.ts (by_target 统计) |
+| D70: 冲突摘要缺少 target×resolution 维度 | 实现 | ✅ 已修复 | modeSwitchRestore.ts + modeSwitchTypes.ts (by_target_resolution 统计) |
+| D71: 缺少摘要格式化函数 | 实现 | ✅ 已修复 | modeSwitchSummary.ts (formatConflictSummary) |
+| D72: 冲突摘要缺少 entity_type 维度 | 实现 | ✅ 已修复 | modeSwitchRestore.ts + modeSwitchTypes.ts (by_entity_type 统计) |
+| D73: 冲突摘要缺少 status 维度 | 实现 | ✅ 已修复 | modeSwitchRestore.ts + modeSwitchTypes.ts (by_status/by_target_status 统计) |
+| D74: 冲突摘要缺少 feat_status 维度 | 实现 | ✅ 已修复 | modeSwitchRestore.ts + modeSwitchTypes.ts (by_feat_status 统计) |
 
 ---
 
@@ -450,16 +479,16 @@ feat 内保存 → status = draft (强制)
 | # | 任务 | 外部依赖 | 内部依赖 | 可独立执行 | 执行范围 |
 |---|------|----------|----------|:----------:|----------|
 | 6.11 | Embedding 生成 | @xenova/transformers | P0-Fix1/2 | ✅ | Part 06 |
-| 6.12 | 向量搜索实现 | sqlite-vec | 6.11 | ✅ | Part 06 |
+| 6.12 | 向量搜索实现 | USearch | 6.11 | ✅ | Part 06 |
 | 6.15 | 向量索引维护 | 无 | 6.11, 6.12 | ✅ | Part 06 |
-| 6.20 | Local→Server 切换 | Server API | 6.23 | ⚠️ | 挂起 (需 Part 13) |
-| 6.21 | Server→Local 切换 | Server API | 6.15, 6.23 | ⚠️ | 挂起 (需 Part 13) |
+| 6.20 | Local→Server 切换 | Server API | 6.23 | ⚠️ | 挂起 (占位提示，需 Part 13) |
+| 6.21 | Server→Local 切换 | Server API | 6.15, 6.23 | ⚠️ | 挂起 (Local 导入/向量重建完成，需 Part 13) |
 | 6.22 | 数据兼容性 | 无 | 6.23 | ✅ | Part 06 |
 | 6.23 | 导出/导入格式 | 无 | 无 | ✅ | Part 06 |
 | 6.24 | 性能基准测试 | 无 | 全部 | ⚠️ | 挂起 (最后执行) |
 | 6.26 | 已知限制 | 无 | 无 | ✅ | Part 06 (文档) |
 | 6.27 | 未来优化 | 无 | 无 | ✅ | Part 06 (文档) |
-| 6.28 | sqlite-vec 降级 | 无 | 6.12 | ✅ | Part 06 |
+| 6.28 | USearch 降级 | 无 | 6.12 | ✅ | Part 06 |
 | 6.29 | 模式选择指南 | 无 | 无 | ✅ | Part 06 (文档) |
 | 6.30 | 数据完整性检查 | 无 | 无 | ✅ | Part 06 |
 | 6.31 | 数据修复命令 | 无 | 6.30 | ✅ | Part 06 |
@@ -476,6 +505,8 @@ feat 内保存 → status = draft (强制)
 | 6.21 Server→Local 切换 | 需要 Server 模式 API (mcp-data) | Part 13 Server 模式实现后 |
 | 6.24 性能基准测试 | 需要所有功能完成后统一测试 | Part 06 其他任务完成后 |
 
+> 备注：已提供 ServerAdapter 占位实现（明确抛错提示），用于在 Part 13 完成前阻止误用。
+
 ---
 
 ## 待实现任务
@@ -484,12 +515,12 @@ feat 内保存 → status = draft (强制)
 
 | 任务 | 描述 | 依赖 | 状态 |
 |------|------|------|:----:|
-| P0-Fix1 | 修复 DSL 转换缺失 (调用 converter.ts) | Part 02 ✅ | 待执行 |
-| P0-Fix2 | 修复关系解析 (按 DSL Schema 重构 parseRelations) | Part 01 ✅ | 待执行 |
-| 6.11 | Embedding 生成 (@xenova/transformers) | P0-Fix1/2 | 待执行 |
-| 6.12 | 向量搜索实现 (Feat 版本隔离) | 6.11 | 待执行 |
-| 6.15 | 向量索引维护 (增量更新 + 批量重建) | 6.11, 6.12 | 待执行 |
-| 6.28 | sqlite-vec 降级策略 | 6.12 | 待执行 |
+| P0-Fix1 | 修复 DSL 转换缺失 (调用 converter.ts) | Part 02 ✅ | 已完成 |
+| P0-Fix2 | 修复关系解析 (按 DSL Schema 重构 parseRelations) | Part 01 ✅ | 已完成 |
+| 6.11 | Embedding 生成 (@xenova/transformers) | P0-Fix1/2 | ✅ 已完成 |
+| 6.12 | 向量搜索实现 (Feat 版本隔离) | 6.11 | ✅ 已完成 |
+| 6.15 | 向量索引维护 (增量更新 + 批量重建) | 6.11, 6.12 | ✅ 已完成 |
+| 6.28 | USearch 降级策略 | 6.12 | ✅ 已完成 |
 
 > ⚠️ **执行顺序说明**：必须先完成 P0-Fix1/2，否则后续写入的数据都是损坏的，会导致向量搜索无法正确索引、图查询关系不完整。
 
@@ -498,20 +529,20 @@ feat 内保存 → status = draft (强制)
 | 任务 | 描述 | 依赖 | 状态 |
 |------|------|------|:----:|
 | P1-Fix1 | Status 逻辑 | P0-Fix1 | ✅ 已确认正确，无需修改 |
-| 6.23 | 导出/导入格式 (JSON 规范) | 无 | 待执行 |
-| 6.22 | 数据兼容性保证 | 6.23 | 待执行 |
-| 6.30 | 数据完整性检查 (validate) | 无 | 待执行 |
-| 6.31 | 数据修复命令 (repair) | 6.30 | 待执行 |
-| 6.32 | 错误码定义 | 无 | 待执行 |
+| 6.23 | 导出/导入格式 (JSON 规范) | 无 | 已完成 |
+| 6.22 | 数据兼容性保证 | 6.23 | 已完成 |
+| 6.30 | 数据完整性检查 (validate) | 无 | 已完成 |
+| 6.31 | 数据修复命令 (repair) | 6.30 | 已完成 |
+| 6.32 | 错误码定义 | 无 | 已完成 |
 
 ### 低优先级 (P2) - 本次执行 (文档)
 
 | 任务 | 描述 | 依赖 | 状态 |
 |------|------|------|:----:|
-| 6.26 | 已知限制说明 | 无 | 待执行 |
-| 6.27 | 未来优化路线 | 无 | 待执行 |
-| 6.29 | 模式选择指南 | 无 | 待执行 |
-| 6.33 | 数据示例 | 无 | 待执行 |
+| 6.26 | 已知限制说明 | 无 | 已完成 |
+| 6.27 | 未来优化路线 | 无 | 已完成 |
+| 6.29 | 模式选择指南 | 无 | 已完成 |
+| 6.33 | 数据示例 | 无 | 已完成 |
 
 ### 挂起 (Deferred) - 依赖 Part 13
 
@@ -545,8 +576,8 @@ Phase 2: 向量搜索 (6.11, 6.12, 6.15, 6.28)
 ├── 6.15 向量索引维护
 │   └── 增量更新
 │   └── 批量重建
-└── 6.28 sqlite-vec 降级
-    └── 检测扩展可用性
+└── 6.28 USearch 降级
+    └── 检测索引可用性
     └── 降级到全文搜索
 
 Phase 3: 数据操作 (6.23, 6.22, 6.30, 6.31, 6.32)
@@ -605,19 +636,19 @@ cd packages/core && bun run build
 
 ### Part 06 本次执行范围
 
-- [ ] P0-Fix1: converter.ts 在 save 操作中被正确调用
-- [ ] P0-Fix2: parseRelations 按 DSL Schema 正确解析关系
-- [ ] 6.11: Embedding 生成功能可用
-- [ ] 6.12: 向量搜索支持 Feat 版本隔离
-- [ ] 6.15: 向量索引增量更新和批量重建
-- [ ] 6.28: sqlite-vec 不可用时降级到全文搜索
-- [ ] 6.23: 导出/导入 JSON 格式定义完成
-- [ ] 6.22: Local/Server 数据格式兼容
-- [ ] 6.30: validate 命令可用
-- [ ] 6.31: repair 命令可用
-- [ ] 6.32: 错误码定义完成
-- [ ] 单元测试覆盖核心逻辑
-- [ ] 与 Part 01/02 类型一致
+- [x] P0-Fix1: converter.ts 在 save 操作中被正确调用
+- [x] P0-Fix2: parseRelations 按 DSL Schema 正确解析关系
+- [x] 6.11: Embedding 生成功能可用
+- [x] 6.12: 向量搜索支持 Feat 版本隔离
+- [x] 6.15: 向量索引增量更新和批量重建
+- [x] 6.28: USearch 不可用时降级到全文搜索
+- [x] 6.23: 导出/导入 JSON 格式定义完成
+- [x] 6.22: Local/Server 数据格式兼容
+- [x] 6.30: validate 命令可用
+- [x] 6.31: repair 命令可用
+- [x] 6.32: 错误码定义完成
+- [x] 单元测试覆盖核心逻辑
+- [x] 与 Part 01/02 类型一致
 
 ### 挂起任务 (Part 13 后执行)
 
@@ -631,12 +662,12 @@ cd packages/core && bun run build
 
 | 类别 | 数量 | 说明 |
 |------|:----:|------|
-| 已完成 | 17 | 6.1-6.10, 6.13-6.14, 6.16-6.19, 6.25 |
-| 本次执行 | 15 | P0-Fix1/2, 6.11-6.12, 6.15, 6.22-6.23, 6.26-6.33 |
+| 已完成 | 30 | 6.1-6.14, 6.16-6.19, 6.22-6.23, 6.25-6.27, 6.29-6.33, P0-Fix1/2 |
+| 本次执行 | 4 | 错误码统一/validate JSON 输出/备份转换/ includeVectors 处理 |
 | 挂起 | 3 | 6.20, 6.21, 6.24 (依赖 Part 13) |
 | **总计** | **35** | 33 原任务 + 2 P0-Fix |
 
 **详细统计**:
-- 已完成 (17): 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.13, 6.14, 6.16, 6.17, 6.18, 6.19, 6.25
-- 本次执行 (15): P0-Fix1, P0-Fix2, 6.11, 6.12, 6.15, 6.22, 6.23, 6.26, 6.27, 6.28, 6.29, 6.30, 6.31, 6.32, 6.33
+- 已完成 (30): 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.13, 6.14, 6.16, 6.17, 6.18, 6.19, 6.22, 6.23, 6.25, 6.26, 6.27, 6.29, 6.30, 6.31, 6.32, 6.33, P0-Fix1, P0-Fix2
+- 本次执行 (4): 迁移错误码统一（errors.ts）、validate JSON 输出、备份数据归一化、includeVectors 显式报错
 - 挂起 (3): 6.20, 6.21, 6.24

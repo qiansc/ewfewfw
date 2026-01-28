@@ -102,8 +102,11 @@ export const MIGRATE_ERROR_CODES = {
   MISSING_SOURCE_PROJECT: 'C4A-MIGRATE-001', // 缺少 source_project 字段
   MISSING_SOURCE_REPO: 'C4A-MIGRATE-002', // 缺少 source_repo 字段
   INVALID_SOURCE_PROJECT_FORMAT: 'C4A-MIGRATE-003', // source_project 格式不正确
-  SCOPE_PROJECT_MISMATCH: 'C4A-MIGRATE-004', // scope 与 source_project 不匹配
-  EXTERNAL_ENTITY_MISSING_URL: 'C4A-MIGRATE-005', // external 实体缺少 external_url
+  SOURCE_REPO_FORMAT_SUGGESTION: 'C4A-MIGRATE-004', // source_repo 格式建议改进
+  NON_PROJECT_SCOPE_HAS_SOURCE_PROJECT: 'C4A-MIGRATE-005', // Domain/Enterprise 层级不应有 source_project
+  NON_PROJECT_SCOPE_HAS_SOURCE_REPO: 'C4A-MIGRATE-006', // Domain/Enterprise 层级不应有 source_repo
+  EXTERNAL_ENTITY_HAS_SOURCE_PROJECT: 'C4A-MIGRATE-007', // external 实体不应有 source_project
+  EXTERNAL_ENTITY_MISSING_URL: 'C4A-MIGRATE-008', // external 实体缺少 external_url
 } as const;
 
 /**
@@ -172,6 +175,9 @@ export const ERROR_CODE_TO_HTTP_STATUS: Record<ErrorCode, number> = {
   'C4A-MIGRATE-003': 422,
   'C4A-MIGRATE-004': 422,
   'C4A-MIGRATE-005': 422,
+  'C4A-MIGRATE-006': 422,
+  'C4A-MIGRATE-007': 422,
+  'C4A-MIGRATE-008': 422,
 };
 
 // ============================================================================
@@ -229,8 +235,20 @@ export const ERROR_MESSAGES: Record<ErrorCode, { zh: string; en: string }> = {
   'C4A-MIGRATE-001': { zh: '缺少 source_project 字段', en: 'Missing source_project field' },
   'C4A-MIGRATE-002': { zh: '缺少 source_repo 字段', en: 'Missing source_repo field' },
   'C4A-MIGRATE-003': { zh: 'source_project 格式不正确', en: 'Invalid source_project format' },
-  'C4A-MIGRATE-004': { zh: 'scope 与 source_project 不匹配', en: 'Scope and source_project mismatch' },
-  'C4A-MIGRATE-005': { zh: 'external 实体缺少 external_url', en: 'External entity missing external_url' },
+  'C4A-MIGRATE-004': { zh: 'source_repo 格式建议改进', en: 'source_repo format should be owner/repo' },
+  'C4A-MIGRATE-005': {
+    zh: 'Domain/Enterprise 层级不应有 source_project',
+    en: 'Domain/Enterprise scope should not have source_project',
+  },
+  'C4A-MIGRATE-006': {
+    zh: 'Domain/Enterprise 层级不应有 source_repo',
+    en: 'Domain/Enterprise scope should not have source_repo',
+  },
+  'C4A-MIGRATE-007': {
+    zh: 'external 实体不应有 source_project',
+    en: 'External entity should not have source_project',
+  },
+  'C4A-MIGRATE-008': { zh: 'external 实体缺少 external_url', en: 'External entity missing external_url' },
 };
 
 // ============================================================================

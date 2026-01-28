@@ -10,9 +10,31 @@
  * - 移除错误的层级字段
  */
 
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { SQLiteStore } from './sqlite-store.js';
 import { DataValidator, type ValidationIssue, type MigrateErrorCode } from './validate.js';
 import type { EntityType } from './adapter.js';
+import { parseYAML } from '../utils/yaml.js';
+import { CONFIG_FILENAME, CONTEXT_ROOT_DIR } from '../utils/path.js';
+
+interface LocalProjectConfig {
+  project_id?: string;
+  repo_id?: string;
+}
+
+function loadLocalProjectConfig(basePath: string = process.cwd()): LocalProjectConfig | null {
+  const configPath = join(basePath, CONTEXT_ROOT_DIR, CONFIG_FILENAME);
+  if (!existsSync(configPath)) {
+    return null;
+  }
+  try {
+    const content = readFileSync(configPath, 'utf-8');
+    return parseYAML<LocalProjectConfig>(content);
+  } catch {
+    return null;
+  }
+}
 
 // ============================================================
 // 类型定义
@@ -89,6 +111,7 @@ export class DataRepair {
    * 修复数据完整性问题
    */
   repair(options: RepairOptions = {}): RepairResult {
+    this.ensureConfig();
     const dryRun = options.dryRun ?? false;
     const actions: RepairAction[] = [];
     const manualRequired: RepairAction[] = [];
@@ -366,5 +389,21 @@ export class DataRepair {
     }
 
     return lines.join('\n');
+  }
+
+  private ensureConfig(): void {
+    if (this.config.projectId && this.config.repoId) {
+      return;
+    }
+    const fileConfig = loadLocalProjectConfig();
+    if (!fileConfig) {
+      return;
+    }
+    if (!this.config.projectId && fileConfig.project_id) {
+      this.config.projectId = fileConfig.project_id;
+    }
+    if (!this.config.repoId && fileConfig.repo_id) {
+      this.config.repoId = fileConfig.repo_id;
+    }
   }
 }
