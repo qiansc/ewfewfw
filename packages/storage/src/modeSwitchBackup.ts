@@ -20,7 +20,7 @@ import type {
   BackupProgress,
 } from './modeSwitchTypes.js';
 import { EXPORT_VERSION } from './modeSwitchTypes.js';
-import * as converter from '../utils/converter.js';
+import * as converter from '@c4a/core';
 
 type ConvertedEntity = Record<string, unknown> & {
   id?: string;
@@ -39,28 +39,28 @@ function pickString(value: unknown): string | undefined {
 
 function toInternalEntity(rawData: Record<string, unknown>): ConvertedEntity | null {
   if (converter.isProductDSL(rawData)) {
-    return converter.dslToProduct(rawData) as ConvertedEntity;
+    return converter.dslToProduct(rawData) as unknown as ConvertedEntity;
   }
   if (converter.isSystemDSL(rawData)) {
-    return converter.dslToSystem(rawData) as ConvertedEntity;
+    return converter.dslToSystem(rawData) as unknown as ConvertedEntity;
   }
   if (converter.isContainerDSL(rawData)) {
-    return converter.dslToContainer(rawData) as ConvertedEntity;
+    return converter.dslToContainer(rawData) as unknown as ConvertedEntity;
   }
   if (converter.isComponentDSL(rawData)) {
-    return converter.dslToComponent(rawData) as ConvertedEntity;
+    return converter.dslToComponent(rawData) as unknown as ConvertedEntity;
   }
   if (converter.isProcessDSL(rawData)) {
-    return converter.dslToProcess(rawData) as ConvertedEntity;
+    return converter.dslToProcess(rawData) as unknown as ConvertedEntity;
   }
   if (converter.isSoRDSL(rawData)) {
-    return converter.dslToSoR(rawData) as ConvertedEntity;
+    return converter.dslToSoR(rawData) as unknown as ConvertedEntity;
   }
   if (converter.isADRDSL(rawData)) {
-    return converter.dslToADR(rawData) as ConvertedEntity;
+    return converter.dslToADR(rawData) as unknown as ConvertedEntity;
   }
   if (converter.isContractDSL(rawData)) {
-    return converter.dslToContract(rawData) as ConvertedEntity;
+    return converter.dslToContract(rawData) as unknown as ConvertedEntity;
   }
   return null;
 }

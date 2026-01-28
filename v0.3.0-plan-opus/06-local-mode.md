@@ -177,32 +177,32 @@ Part 06 是 Local 模式的核心实现，定义 StorageAdapter 接口并实现 
 
 | 产物类型 | 文件路径 | 说明 | 状态 | 备注 |
 |---------|---------|------|:----:|------|
-| 接口定义 | `packages/core/src/store/adapter.ts` | StorageAdapter 接口 + 所有类型定义 | ✅ | |
-| SQLite 存储 | `packages/core/src/store/sqlite-store.ts` | SQLite 底层存储实现 | ✅ | |
-| Lite 适配器 | `packages/core/src/store/lite-adapter.ts` | LiteAdapter 主入口 | ✅ | |
-| CRUD 操作 | `packages/core/src/store/lite-adapter/crud-save.ts` | save | ✅ | 已拆分并修复 P0-Fix |
-| CRUD 操作 | `packages/core/src/store/lite-adapter/crud-read.ts` | read/list/delete | ✅ | 已拆分并修复 P0-Fix |
-| 关系解析 | `packages/core/src/store/lite-adapter/relations.ts` | 关系解析/保存 | ✅ | 已拆分并修复 P0-Fix |
-| Feat 操作 | `packages/core/src/store/lite-adapter/feat-operations.ts` | feat 生命周期管理 | ✅ | |
-| 同步操作 | `packages/core/src/store/lite-adapter/sync-operations.ts` | sync/planSync | ✅ | |
-| 图操作 | `packages/core/src/store/lite-adapter/graph-operations.ts` | queryDeps/queryImpact | ✅ | |
-| 搜索操作 | `packages/core/src/store/lite-adapter/search-operations.ts` | search (向量/全文) | ✅ | |
-| 工具操作 | `packages/core/src/store/lite-adapter/utils-operations.ts` | readHistory/backup/restore | ✅ | |
-| 辅助函数 | `packages/core/src/store/lite-adapter/helpers.ts` | parseContent/formatContent/computeHash | ✅ | |
-| 类型定义 | `packages/core/src/store/lite-adapter/types.ts` | 内部类型定义 | ✅ | |
-| 内存图 | `packages/core/src/store/in-memory-graph.ts` | InMemoryGraph 实现 | ✅ | |
-| 图缓存 | `packages/core/src/store/graph-query-cache.ts` | GraphQueryCache 实现 | ✅ | |
-| 写队列 | `packages/core/src/store/write-queue.ts` | WriteQueue + 背压控制 | ✅ | |
-| 向量搜索 | `packages/core/src/store/vector-search.ts` | VectorSearch 实现 | ✅ | USearch 已集成 |
-| 模式切换（入口） | `packages/core/src/store/mode-switch.ts` | Local↔Server 切换 | 🔶 | 重新导出拆分后的实现 |
-| 模式切换类型 | `packages/core/src/store/modeSwitchTypes.ts` | 类型定义 | ✅ | 导出/导入格式 |
-| 模式切换备份 | `packages/core/src/store/modeSwitchBackup.ts` | Local 备份 | 🔶 | Local 部分完成 |
-| 模式切换恢复 | `packages/core/src/store/modeSwitchRestore.ts` | Local 恢复 | 🔶 | Local 部分完成，Server API 挂起 |
-| Server 适配器 | `packages/core/src/store/server-adapter.ts` | Server 占位适配器 | 🔶 | 占位提示，等待 Part 13 |
-| 数据验证 | `packages/core/src/store/validate.ts` | 数据完整性检查 | ✅ | 已完成 |
-| 数据修复 | `packages/core/src/store/repair.ts` | 数据修复命令 | ✅ | 已完成 |
-| 适配器工厂 | `packages/core/src/store/get-adapter.ts` | getAdapter() 工厂函数 | ✅ | |
-| 导出入口 | `packages/core/src/store/index.ts` | 模块导出 | ✅ | |
+| 接口定义 | `packages/storage/src/adapter.ts` | StorageAdapter 接口 + 所有类型定义 | ✅ | |
+| SQLite 存储 | `packages/storage/src/sqlite-store.ts` | SQLite 底层存储实现 | ✅ | |
+| Lite 适配器 | `packages/storage/src/lite-adapter.ts` | LiteAdapter 主入口 | ✅ | |
+| CRUD 操作 | `packages/storage/src/lite-adapter/crud-save.ts` | save | ✅ | 已拆分并修复 P0-Fix |
+| CRUD 操作 | `packages/storage/src/lite-adapter/crud-read.ts` | read/list/delete | ✅ | 已拆分并修复 P0-Fix |
+| 关系解析 | `packages/storage/src/lite-adapter/relations.ts` | 关系解析/保存 | ✅ | 已拆分并修复 P0-Fix |
+| Feat 操作 | `packages/storage/src/lite-adapter/feat-operations.ts` | feat 生命周期管理 | ✅ | |
+| 同步操作 | `packages/storage/src/lite-adapter/sync-operations.ts` | sync/planSync | ✅ | |
+| 图操作 | `packages/storage/src/lite-adapter/graph-operations.ts` | queryDeps/queryImpact | ✅ | |
+| 搜索操作 | `packages/storage/src/lite-adapter/search-operations.ts` | search (向量/全文) | ✅ | |
+| 工具操作 | `packages/storage/src/lite-adapter/utils-operations.ts` | readHistory/backup/restore | ✅ | |
+| 辅助函数 | `packages/storage/src/lite-adapter/helpers.ts` | parseContent/formatContent/computeHash | ✅ | |
+| 类型定义 | `packages/storage/src/lite-adapter/types.ts` | 内部类型定义 | ✅ | |
+| 内存图 | `packages/storage/src/in-memory-graph.ts` | InMemoryGraph 实现 | ✅ | |
+| 图缓存 | `packages/storage/src/graph-query-cache.ts` | GraphQueryCache 实现 | ✅ | |
+| 写队列 | `packages/storage/src/write-queue.ts` | WriteQueue + 背压控制 | ✅ | |
+| 向量搜索 | `packages/storage/src/vector-search.ts` | VectorSearch 实现 | ✅ | USearch 已集成 |
+| 模式切换（入口） | `packages/storage/src/mode-switch.ts` | Local↔Server 切换 | 🔶 | 重新导出拆分后的实现 |
+| 模式切换类型 | `packages/storage/src/modeSwitchTypes.ts` | 类型定义 | ✅ | 导出/导入格式 |
+| 模式切换备份 | `packages/storage/src/modeSwitchBackup.ts` | Local 备份 | 🔶 | Local 部分完成 |
+| 模式切换恢复 | `packages/storage/src/modeSwitchRestore.ts` | Local 恢复 | 🔶 | Local 部分完成，Server API 挂起 |
+| Server 适配器 | `packages/storage/src/server-adapter.ts` | Server 占位适配器 | 🔶 | 占位提示，等待 Part 13 |
+| 数据验证 | `packages/storage/src/validate.ts` | 数据完整性检查 | ✅ | 已完成 |
+| 数据修复 | `packages/storage/src/repair.ts` | 数据修复命令 | ✅ | 已完成 |
+| 适配器工厂 | `packages/storage/src/get-adapter.ts` | getAdapter() 工厂函数 | ✅ | |
+| 导出入口 | `packages/storage/src/index.ts` | 模块导出 | ✅ | |
 
 **状态说明**:
 - ✅ 完整: 功能已实现，可直接使用
@@ -233,8 +233,8 @@ Part 06 是 Local 模式的核心实现，定义 StorageAdapter 接口并实现 
 `crud-operations.ts` 的 `doSave` 方法直接将传入的 DSL 对象存入数据库的 `data` 字段，未调用 `converter.ts` 进行 DSL → 内部结构转换。
 
 **代码位置**：
-- [crud-operations.ts:94-101](packages/core/src/store/lite-adapter/crud-operations.ts#L94-L101): 直接使用 `params.data`
-- [crud-operations.ts:252-261](packages/core/src/store/lite-adapter/crud-operations.ts#L252-L261): 直接从 `data` 取值写入数据库
+- [crud-operations.ts:94-101](packages/storage/src/lite-adapter/crud-operations.ts#L94-L101): 直接使用 `params.data`
+- [crud-operations.ts:252-261](packages/storage/src/lite-adapter/crud-operations.ts#L252-L261): 直接从 `data` 取值写入数据库
 
 **当前代码**：
 ```typescript
@@ -289,7 +289,7 @@ async function doSave(ctx, params) {
 `parseRelations` 函数只支持简单的 `relationships` 数组或 `{ type: [targets] }` 对象，与实际 DSL Schema 定义不匹配。
 
 **代码位置**：
-- [crud-operations.ts:815-879](packages/core/src/store/lite-adapter/crud-operations.ts#L815-L879): `parseRelations` 函数
+- [crud-operations.ts:815-879](packages/storage/src/lite-adapter/crud-operations.ts#L815-L879): `parseRelations` 函数
 
 **Schema 定义 vs 当前解析**：
 
@@ -388,7 +388,7 @@ feat 内保存 → status = draft (强制)
 | D12: 向量导出矛盾 | 设计 | ✅ 已更新 | mode-switch.md L323-360 (不导出向量，导入时重建) |
 | D13: CLI 并发访问表述 | 设计 | ✅ 已更新 | sqlite-schema.md L27 (明确单进程架构，请求通过 MCP Server) |
 | D14: USearch 检测时机 | 设计 | ✅ 已更新 | appendix.md L11 (MCP Server 初始化时检测) |
-| D15: 运维工具 MCP 暴露 | 设计 | ✅ 已确认 | architecture.md L857-868 (方案 A: MCP 工具供 CLI 内部调用) |
+| D15: 运维工具 MCP 暴露 | 设计 | ✅ 已确认 | architecture.md L870-881 (方案 A: MCP 工具供 CLI 内部调用) |
 | D16: 全文搜索降级方案 | 设计 | ✅ 已更新 | sqlite-schema.md L283-411, appendix.md L56-145 (引入 FTS5 表结构) |
 | D17: 索引命名不一致 | 设计 | ✅ 已更新 | sqlite-schema.md L272 (统一为 idx_vectors_lookup) |
 | D18: FTS5 tokenizer 配置无效 | 设计 | ✅ 已更新 | sqlite-schema.md L294, L298-311 (改为 unicode61，添加 tokenizer 选择说明) |
@@ -431,7 +431,7 @@ feat 内保存 → status = draft (强制)
 | D55: appendix.md FTS 降级示例 NULL 引用 | 设计 | ✅ 已更新 | appendix.md L123-161 (ftsSearch 函数改用空字符串哨兵值) |
 | D56: appendix.md 数据示例 null 引用 | 文档 | ✅ 已更新 | appendix.md L562-715 (数据示例改用空字符串，添加哨兵值说明) |
 | D57: graph-query.md NodeKey 哨兵值转换 | 文档 | ✅ 已更新 | graph-query.md L11-19 (添加 makeNodeKey 函数的哨兵值转换说明) |
-| D58: architecture.md NULL 引用 | 设计 | ✅ 已更新 | architecture.md L358-390, L792-799, L1118-1134 (唯一性约束、metadata 示例、查询策略添加哨兵值说明) |
+| D58: architecture.md NULL 引用 | 设计 | ✅ 已更新 | architecture.md L358-390, L805-812, L1131-1147 (唯一性约束、metadata 示例、查询策略添加哨兵值说明) |
 | D59: appendix.md external 实体示例 | 文档 | ✅ 已更新 | appendix.md L672-695 (external 实体 source_project/source_repo 改用空字符串) |
 | D60: 图查询缓存缺少项目维度 | 实现 | ✅ 已修复 | graph-operations.ts (缓存 key 加入 source_project) |
 | D61: 缓存失效粒度过粗 | 实现 | ✅ 已修复 | crud-read.ts + cache-keys.ts (按 source_project:id 失效) |
@@ -450,6 +450,10 @@ feat 内保存 → status = draft (强制)
 | D72: 冲突摘要缺少 entity_type 维度 | 实现 | ✅ 已修复 | modeSwitchRestore.ts + modeSwitchTypes.ts (by_entity_type 统计) |
 | D73: 冲突摘要缺少 status 维度 | 实现 | ✅ 已修复 | modeSwitchRestore.ts + modeSwitchTypes.ts (by_status/by_target_status 统计) |
 | D74: 冲突摘要缺少 feat_status 维度 | 实现 | ✅ 已修复 | modeSwitchRestore.ts + modeSwitchTypes.ts (by_feat_status 统计) |
+| D75: 保存关系缺少事务原子性 | 实现 | ✅ 已修复 | crud-save.ts (关系保存纳入事务) |
+| D76: 关系保存缺少显式事务 | 实现 | ✅ 已修复 | relations.ts (支持复用事务/批量写入) |
+| D77: 向量索引写盘频率过高 | 实现 | ✅ 已修复 | usearch-store.ts/sqlite-store.ts (延迟保存 + bulk + flush) |
+| D78: restore/rebuild 全量加载 OOM 风险 | 实现 | ✅ 已修复 | modeSwitchRestore.ts/sqlite-store.ts (流式解析 + iterate) |
 
 ---
 
@@ -663,11 +667,11 @@ cd packages/core && bun run build
 | 类别 | 数量 | 说明 |
 |------|:----:|------|
 | 已完成 | 30 | 6.1-6.14, 6.16-6.19, 6.22-6.23, 6.25-6.27, 6.29-6.33, P0-Fix1/2 |
-| 本次执行 | 4 | 错误码统一/validate JSON 输出/备份转换/ includeVectors 处理 |
+| 本次执行 | 8 | 错误码统一/validate JSON 输出/备份转换/includeVectors 处理/事务原子性/关系保存事务化/向量写盘节流/restore 流式解析 |
 | 挂起 | 3 | 6.20, 6.21, 6.24 (依赖 Part 13) |
 | **总计** | **35** | 33 原任务 + 2 P0-Fix |
 
 **详细统计**:
 - 已完成 (30): 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.13, 6.14, 6.16, 6.17, 6.18, 6.19, 6.22, 6.23, 6.25, 6.26, 6.27, 6.29, 6.30, 6.31, 6.32, 6.33, P0-Fix1, P0-Fix2
-- 本次执行 (4): 迁移错误码统一（errors.ts）、validate JSON 输出、备份数据归一化、includeVectors 显式报错
+- 本次执行 (8): 迁移错误码统一（errors.ts）、validate JSON 输出、备份数据归一化、includeVectors 显式报错、保存关系事务原子性、关系保存批量事务、向量索引写盘节流、restore 流式解析
 - 挂起 (3): 6.20, 6.21, 6.24

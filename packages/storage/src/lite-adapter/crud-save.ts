@@ -7,8 +7,8 @@ import { generateEmbedding, generateVectorKey } from '../vector-search.js';
 import type { EntityStatus, SaveParams, SaveResult, Warning } from '../adapter.js';
 import type { AdapterContext } from './types.js';
 import { computeHash, generateSearchText, parseContent } from './helpers.js';
-import { parseRelations, saveRelations } from './relations.js';
-import * as converter from '../../utils/converter.js';
+import { parseRelations, persistRelations, updateGraph, type RelationsChangeSet } from './relations.js';
+import * as converter from '@c4a/core';
 
 // ============================================================
 // Diff helpers
@@ -53,28 +53,28 @@ type ConvertedEntity = Record<string, unknown> & {
 
 function toInternalEntity(rawData: Record<string, unknown>): ConvertedEntity | null {
   if (converter.isProductDSL(rawData)) {
-    return converter.dslToProduct(rawData) as ConvertedEntity;
+    return converter.dslToProduct(rawData) as unknown as ConvertedEntity;
   }
   if (converter.isSystemDSL(rawData)) {
-    return converter.dslToSystem(rawData) as ConvertedEntity;
+    return converter.dslToSystem(rawData) as unknown as ConvertedEntity;
   }
   if (converter.isContainerDSL(rawData)) {
-    return converter.dslToContainer(rawData) as ConvertedEntity;
+    return converter.dslToContainer(rawData) as unknown as ConvertedEntity;
   }
   if (converter.isComponentDSL(rawData)) {
-    return converter.dslToComponent(rawData) as ConvertedEntity;
+    return converter.dslToComponent(rawData) as unknown as ConvertedEntity;
   }
   if (converter.isProcessDSL(rawData)) {
-    return converter.dslToProcess(rawData) as ConvertedEntity;
+    return converter.dslToProcess(rawData) as unknown as ConvertedEntity;
   }
   if (converter.isSoRDSL(rawData)) {
-    return converter.dslToSoR(rawData) as ConvertedEntity;
+    return converter.dslToSoR(rawData) as unknown as ConvertedEntity;
   }
   if (converter.isADRDSL(rawData)) {
-    return converter.dslToADR(rawData) as ConvertedEntity;
+    return converter.dslToADR(rawData) as unknown as ConvertedEntity;
   }
   if (converter.isContractDSL(rawData)) {
-    return converter.dslToContract(rawData) as ConvertedEntity;
+    return converter.dslToContract(rawData) as unknown as ConvertedEntity;
   }
   return null;
 }
@@ -286,6 +286,9 @@ async function doSave(ctx: AdapterContext, params: SaveParams): Promise<SaveResu
   const perspective = pickString(converted?.perspective ?? storedData.perspective);
 
   // 使用事务保存
+  const relations = parseRelations(rawData, sourceProject, id, params.type);
+  let relationChangeset: RelationsChangeSet | null = null;
+
   const transaction = db.transaction(() => {
     // 插入/更新 entities 表
     db.prepare(`
@@ -341,14 +344,17 @@ async function doSave(ctx: AdapterContext, params: SaveParams): Promise<SaveResu
       updatedBy,
       now
     );
+    // 保存关系（包含在同一事务中）
+    if (relations.length > 0) {
+      relationChangeset = persistRelations(ctx, sourceProject, id, proposalId, relations);
+    }
   });
 
   transaction();
 
-  // 解析并保存关系（使用原始 DSL 数据）
-  const relations = parseRelations(rawData, sourceProject, id, params.type);
-  if (relations.length > 0) {
-    saveRelations(ctx, sourceProject, id, proposalId, relations);
+  // 事务成功后，更新内存图
+  if (relationChangeset) {
+    updateGraph(ctx, relationChangeset);
   }
 
   // 向量索引增量维护（异步执行，不阻塞保存）
@@ -401,7 +407,11 @@ async function updateVectorIndex(
     const dbSourceProject = sourceProject ?? '';
     const vectorKey = generateVectorKey(dbSourceProject, entityId, dbProposalId);
     vectorStore.add(vectorKey, embedding);
-    vectorStore.save();
+    // 显式保存（因为 usearch-store.ts 中 add 不会自动保存，依赖外部调用 flush 或 save）
+    // 实际上 usearch-store.ts 有 markDirty 实现 debounce 自动保存，
+    // 这里调用 add 就会触发 markDirty。
+    // 如果需要立即持久化，可以调用 flush()，但为了性能，依赖 debounce 即可。
+    // Issue 3 要求避免高频保存，现有的 debounce 机制已经满足。
   } catch {
     // 向量写入失败，忽略
   }

@@ -94,8 +94,11 @@ export async function loadConfig(projectRoot?: string): Promise<C4AConfig> {
     const content = await readFile(configPath, 'utf-8');
     const config = parseYAML<C4AConfig>(content);
     return mergeConfig(DEFAULT_CONFIG, config);
-  } catch {
-    return { ...DEFAULT_CONFIG };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+      return { ...DEFAULT_CONFIG };
+    }
+    throw error;
   }
 }
 

@@ -8,7 +8,7 @@ import type {
   StoreFeatLifecycleInput,
   StoreFeatLifecycleResult,
 } from "../storeSchemas.js";
-import { getAdapter } from "@c4a/core/store";
+import { getAdapter } from "@c4a/storage";
 
 /**
  * c4a_store_feat_lifecycle 处理函数

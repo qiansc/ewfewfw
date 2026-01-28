@@ -63,8 +63,8 @@
 
 | 文件 | 行数 | 说明 |
 |------|------|------|
-| `packages/core/src/store/sqlite-store.ts` | ~330 | SQLite Store 核心实现 |
-| `packages/core/src/store/index.ts` | ~8 | Store 模块导出 |
+| `packages/storage/src/sqlite-store.ts` | ~330 | SQLite Store 核心实现 |
+| `packages/storage/src/index.ts` | ~8 | Store 模块导出 |
 | `packages/core/package.json` | +2 deps | 添加 usearch 依赖 |
 
 ---

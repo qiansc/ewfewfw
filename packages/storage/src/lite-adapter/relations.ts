@@ -4,7 +4,7 @@
 
 import { randomUUID } from 'node:crypto';
 import type { EntityType } from '../adapter.js';
-import { parseReference } from '../../types/relations.js';
+import { parseReference } from '@c4a/core/types';
 import type { AdapterContext, ParsedRelation } from './types.js';
 import { expandEntityCacheKeys } from './cache-keys.js';
 
@@ -229,16 +229,23 @@ export function parseRelations(
   return relations;
 }
 
+export interface RelationsChangeSet {
+  added: Array<{ fromProject: string; fromId: string; toProject: string; toId: string; relType: string }>;
+  removed: Array<{ fromProject: string; fromId: string; toProject: string; toId: string; relType: string }>;
+  cacheKeys: string[];
+}
+
 /**
- * 保存关系到数据库并更新内存图
+ * 持久化关系到数据库 (不更新内存图)
+ * 必须在事务中调用
  */
-export function saveRelations(
+export function persistRelations(
   ctx: AdapterContext,
   sourceProject: string | null | undefined,
   entityId: string,
   proposalId: string | null,
   relations: ParsedRelation[]
-): void {
+): RelationsChangeSet {
   const db = ctx.store.getDatabase();
   const now = new Date().toISOString();
   const dbProposalId = proposalId ?? '';
@@ -274,6 +281,12 @@ export function saveRelations(
     rel_type: string;
     properties: Record<string, unknown> | null;
   }> = [];
+
+  const changeSet: RelationsChangeSet = {
+    added: [],
+    removed: [],
+    cacheKeys: [],
+  };
 
   if (proposalId) {
     const mainOutgoing = db.prepare(`
@@ -384,13 +397,13 @@ export function saveRelations(
   const incomingToDeleteSet = new Set(incomingToDelete);
   for (const row of incomingCandidates) {
     if (!incomingToDeleteSet.has(row.id)) continue;
-    ctx.graph.removeRelation(
-      toGraphProject(row.from_project),
-      row.from_id,
-      toGraphProject(row.to_project),
-      row.to_id,
-      row.rel_type
-    );
+    changeSet.removed.push({
+      fromProject: toDbValue(row.from_project),
+      fromId: row.from_id,
+      toProject: toDbValue(row.to_project),
+      toId: row.to_id,
+      relType: row.rel_type,
+    });
   }
 
   if (incomingToDelete.length > 0) {
@@ -398,7 +411,7 @@ export function saveRelations(
     db.prepare(`DELETE FROM relations WHERE id IN (${placeholders})`).run(...incomingToDelete);
   }
 
-  // 先查询旧关系，用于增量更新内存图
+  // 先查询旧关系，用于增量更新内存图 (如果是直接删除模式)
   const oldRelations = db.prepare(`
     SELECT to_project, to_id, rel_type FROM relations
     WHERE from_project = ? AND from_id = ? AND ${proposalClause}
@@ -408,15 +421,14 @@ export function saveRelations(
     rel_type: string;
   }>;
 
-  // 从内存图中移除旧关系
   for (const rel of oldRelations) {
-    ctx.graph.removeRelation(
-      toGraphProject(sourceProject),
-      entityId,
-      toGraphProject(rel.to_project),
-      rel.to_id,
-      rel.rel_type
-    );
+    changeSet.removed.push({
+      fromProject: dbSourceProject,
+      fromId: entityId,
+      toProject: toDbValue(rel.to_project),
+      toId: rel.to_id,
+      relType: rel.rel_type,
+    });
   }
 
   // 删除数据库中的旧关系
@@ -449,14 +461,13 @@ export function saveRelations(
       now
     );
 
-    // 更新内存图
-    ctx.graph.addRelation(
-      toGraphProject(fromProject),
+    changeSet.added.push({
+      fromProject,
       fromId,
-      toGraphProject(rel.toProject),
-      rel.toId,
-      rel.relType
-    );
+      toProject: rel.toProject,
+      toId: rel.toId,
+      relType: rel.relType,
+    });
   }
 
   if (proposalId && deletedRelations.length > 0) {
@@ -476,16 +487,17 @@ export function saveRelations(
         now
       );
 
-      ctx.graph.removeRelation(
-        toGraphProject(rel.from_project),
-        rel.from_id,
-        toGraphProject(rel.to_project),
-        rel.to_id,
-        rel.rel_type
-      );
+      changeSet.removed.push({
+        fromProject: rel.from_project,
+        fromId: rel.from_id,
+        toProject: rel.to_project,
+        toId: rel.to_id,
+        relType: rel.rel_type,
+      });
     }
   }
 
+  // Cache keys
   const cacheKeys = new Set<string>();
   const addCacheKeys = (project: string | null, id: string) => {
     for (const key of expandEntityCacheKeys(project, id)) {
@@ -511,7 +523,64 @@ export function saveRelations(
     addCacheKeys(toGraphProject(rel.to_project), rel.to_id);
   }
 
-  for (const key of cacheKeys) {
+  changeSet.cacheKeys = Array.from(cacheKeys);
+  return changeSet;
+}
+
+/**
+ * 更新内存图和缓存
+ */
+export function updateGraph(ctx: AdapterContext, changeset: RelationsChangeSet): void {
+  const toGraphProject = (value: string | null | undefined): string | null =>
+    value === '' || value === null || value === undefined ? null : value;
+
+  for (const rel of changeset.removed) {
+    ctx.graph.removeRelation(
+      toGraphProject(rel.fromProject),
+      rel.fromId,
+      toGraphProject(rel.toProject),
+      rel.toId,
+      rel.relType
+    );
+  }
+
+  for (const rel of changeset.added) {
+    ctx.graph.addRelation(
+      toGraphProject(rel.fromProject),
+      rel.fromId,
+      toGraphProject(rel.toProject),
+      rel.toId,
+      rel.relType
+    );
+  }
+
+  for (const key of changeset.cacheKeys) {
     ctx.cache.invalidate(key);
   }
+}
+
+/**
+ * 保存关系到数据库并更新内存图 (旧版兼容接口)
+ * @deprecated 请使用 persistRelations 和 updateGraph 分开处理
+ */
+export function saveRelations(
+  ctx: AdapterContext,
+  sourceProject: string | null | undefined,
+  entityId: string,
+  proposalId: string | null,
+  relations: ParsedRelation[],
+  options?: { inTransaction?: boolean }
+): void {
+  const run = (): void => {
+    const changeset = persistRelations(ctx, sourceProject, entityId, proposalId, relations);
+    updateGraph(ctx, changeset);
+  };
+
+  if (options?.inTransaction) {
+    run();
+    return;
+  }
+
+  const db = ctx.store.getDatabase();
+  db.transaction(run)();
 }

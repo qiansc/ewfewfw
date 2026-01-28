@@ -5,7 +5,7 @@
  * 基于设计文档：v0.3.0/detailed-design/mcp/store-sync.md §3.5
  */
 import type { StoreSyncInput, StoreSyncResult } from "../storeSchemas.js";
-import { getAdapter } from "@c4a/core/store";
+import { getAdapter } from "@c4a/storage";
 
 /**
  * c4a_store_sync 处理函数

@@ -8,7 +8,7 @@ import type {
   StoreUpdateWorkflowStepInput,
   StoreUpdateWorkflowStepResult,
 } from "../storeSchemas.js";
-import { getAdapter } from "@c4a/core/store";
+import { getAdapter } from "@c4a/storage";
 
 /**
  * c4a_store_update_workflow_step 处理函数

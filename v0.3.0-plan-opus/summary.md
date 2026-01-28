@@ -10,7 +10,7 @@
 
 | 原位置 | 新位置 | 说明 |
 |--------|--------|------|
-| `mcp-dsl/src/store/*` | `packages/core/src/store/` | StorageAdapter + SQLiteStore + LiteAdapter |
+| `mcp-dsl/src/store/*` | `packages/storage/src/` | StorageAdapter + SQLiteStore + LiteAdapter |
 | `mcp-dsl/src/tools/store/*` | `packages/cli/src/mcp/store/` | MCP Store 工具 handlers |
 | `mcp-dsl/src/schemas/storeSchemas.ts` | `packages/cli/src/mcp/storeSchemas.ts` | Zod Schema 定义 |
 | `mcp-dsl/src/server.ts` | `packages/cli/src/mcp/server.ts` | MCP Server 工厂函数 |
@@ -138,9 +138,9 @@
 | 2.14 | `architecture.md` | §2.8 子 .context | L616-628 | [x] | [x] |
 | 2.15-2.17 | `architecture.md` | §3 数据模型 | L629-684 | [x] | [x] |
 | 2.18 | `architecture.md` | §3.4.1 跨层级引用 | L700-731 | [x] | [x] |
-| 2.19 | `architecture.md` | §7 feat 机制 | L965-1078 | [x] | [x] |
-| 2.20 | `architecture.md` | §7.5 合并策略 | L1083-1091 | [x] | [x] |
-| 2.21 | `architecture.md` | §7.7 跨项目 feat | L1098-1107 | [x] | [x] |
+| 2.19 | `architecture.md` | §7 feat 机制 | L988-1101 | [x] | [x] |
+| 2.20 | `architecture.md` | §7.5 合并策略 | L1106-1114 | [x] | [x] |
+| 2.21 | `architecture.md` | §7.7 跨项目 feat | L1121-1130 | [x] | [x] |
 
 **实现产物：**
 
@@ -328,6 +328,11 @@
 - ✅ ServerAdapter 占位实现，Server 模式明确抛错（等待 Part 13）
 - ✅ 单元测试补齐（向量索引维护 + ServerAdapter 占位）
 - ✅ 与 Part 01/02 类型一致性已核对
+- ✅ 保存关系纳入事务（避免实体/关系不一致）
+- ✅ 关系保存批量事务化（避免逐条隐式事务性能问题）
+- ✅ 向量索引写盘节流（延迟保存/批量重建 flush）
+- ✅ LocalRestore 大文件流式解析（降低 OOM 风险）
+- ✅ rebuildVectorIndex 改为迭代遍历（降低 OOM 风险）
 
 **相关设计文档：**
 
@@ -748,6 +753,8 @@ Part 06 不仅实现 SQLite 存储，还需要提供 **StorageAdapter 接口**�
 ---
 
 ## Release Checklist
+
+- **补充（2026-01-28）**：修复配置加载异常处理、getAdapter 配置变更失效与 Checklist 解析/并发冲突保护，并补齐对应测试。
 
 - [ ] 单机模式 (Local Mode) 完整闭环，无 Docker 依赖
 - [ ] 核心 Skills (/c4a:feat/specify/plan) 可流畅运行

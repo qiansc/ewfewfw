@@ -2,9 +2,9 @@
  * AJV 实例单例，预编译 Schema
  */
 import AjvModule from "ajv";
-import addFormats from "ajv-formats";
+import addFormatsModule from "ajv-formats";
 import type { ValidateFunction } from "ajv";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import type { SchemaType } from "../types/base.js";
@@ -33,6 +33,9 @@ export function getAjv(): AjvInstance {
     });
 
     // 添加格式验证支持（uri, date, email 等）
+    const addFormats = (
+      (addFormatsModule as unknown as { default?: unknown }).default ?? addFormatsModule
+    ) as (ajv: AjvInstance) => AjvInstance;
     addFormats(ajvInstance);
 
     loadSchemas(ajvInstance);
@@ -44,27 +47,19 @@ export function getAjv(): AjvInstance {
  * 加载所有 JSON Schema
  */
 function loadSchemas(ajv: AjvInstance): void {
-  const schemaFiles = [
-    "c4a-common.schema.json",
-    "c4a-product.schema.json",
-    "c4a-system.schema.json",
-    "c4a-container.schema.json",
-    "c4a-component.schema.json",
-    "c4a-process.schema.json",
-    "c4a-sor.schema.json",
-    "c4a-adr.schema.json",
-    "c4a-contract.schema.json",
-    "c4a-feat.schema.json",
-    "c4a-checklist.schema.json",
-  ];
+  const schemaFiles = readdirSync(SCHEMA_DIR)
+    .filter((file) => file.endsWith(".schema.json"))
+    .sort();
 
   for (const file of schemaFiles) {
     const schemaPath = join(SCHEMA_DIR, file);
     try {
       const schema = JSON.parse(readFileSync(schemaPath, "utf-8"));
       ajv.addSchema(schema);
-    } catch {
-      // 忽略不存在的 schema 文件
+    } catch (error) {
+      throw new Error(`Failed to load schema: ${schemaPath}`, {
+        cause: error,
+      });
     }
   }
 }

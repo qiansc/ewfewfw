@@ -70,15 +70,16 @@
 | 2.18b | 表结构设计 | `architecture.md` | §3.6 表结构 | L751-762 | [x] | [x] |
 | 2.18c | 示例数据 | `architecture.md` | §3.7 示例数据 | L763-795 | [x] | [x] |
 | 2.18d | data 字段结构 | `architecture.md` | §3.8 data 字段结构 | L796-819 | [x] | [x] |
-| 2.18e | Local 模式技术栈 | `architecture.md` | §4 Local 模式技术栈 | L820-832 | [x] | [x] |
-| 2.18f | 数据流设计 | `architecture.md` | §5 数据流 | L833-873 | [x] | [x] |
-| 2.18g | CLI 架构 | `architecture.md` | §6 CLI 架构 | L874-964 | [x] | [x] |
-| 2.19 | feat 机制 | `architecture.md` | §7 feat 机制 | L965-1078 | [x] | [x] |
-| 2.20 | 合并策略 | `architecture.md` | §7.5 合并策略 | L1083-1091 | [x] | [x] |
-| 2.20a | MCP 工具与 feat | `architecture.md` | §7.4 MCP 工具与 feat | L1079-1082 | [x] | [x] |
-| 2.20b | 冲突解决与回滚 | `architecture.md` | §7.6 冲突解决与回滚 | L1092-1097 | [x] | [x] |
-| 2.21 | 跨项目 feat | `architecture.md` | §7.7 跨项目 feat | L1098-1107 | [x] | [x] |
-| 2.21a | 查询策略 | `architecture.md` | §7.8 查询策略 | L1108-1122 | [x] | [x] |
+| 2.18e | Local 模式技术栈 | `architecture.md` | §4 Local 模式技术栈 | L830-840 | [x] | [x] |
+| 2.18e+ | 包结构 | `architecture.md` | §4.1 包结构 | L841-855 | [x] | [x] |
+| 2.18f | 数据流设计 | `architecture.md` | §5 数据流 | L856-896 | [x] | [x] |
+| 2.18g | CLI 架构 | `architecture.md` | §6 CLI 架构 | L897-987 | [x] | [x] |
+| 2.19 | feat 机制 | `architecture.md` | §7 feat 机制 | L988-1101 | [x] | [x] |
+| 2.20 | 合并策略 | `architecture.md` | §7.5 合并策略 | L1106-1114 | [x] | [x] |
+| 2.20a | MCP 工具与 feat | `architecture.md` | §7.4 MCP 工具与 feat | L1102-1105 | [x] | [x] |
+| 2.20b | 冲突解决与回滚 | `architecture.md` | §7.6 冲突解决与回滚 | L1115-1120 | [x] | [x] |
+| 2.21 | 跨项目 feat | `architecture.md` | §7.7 跨项目 feat | L1121-1130 | [x] | [x] |
+| 2.21a | 查询策略 | `architecture.md` | §7.8 查询策略 | L1131-1145 | [x] | [x] |
 
 ---
 
@@ -89,12 +90,12 @@
 | 配置解析 | `packages/core/src/utils/config.ts` | .c4a.yaml 解析（mode: local/server/remote） | ✅ |
 | 目录结构 | `packages/core/src/utils/path.ts` | .context/ + business/technical/feat 路径计算 | ✅ |
 | ID 生成 | `packages/core/src/utils/id.ts` | ID 生成与验证 | ✅ |
-| 适配器配置 | `packages/core/src/store/get-adapter.ts` | 仅识别 .context/.c4a.yaml | ✅ |
+| 适配器配置 | `packages/storage/src/get-adapter.ts` | 仅识别 .context/.c4a.yaml | ✅ |
 | Schema 验证 | `packages/core/src/utils/schema.ts` | JSON Schema 验证（复用 validator 模块） | ✅ |
 | 验证器 | `packages/core/src/validator/index.ts` | DSL 验证器（validateDSL, validateDSLAuto） | ✅ |
 | 单元测试 | `packages/core/src/utils/__tests__/path.test.ts` | 路径计算测试（30 cases） | ✅ |
 | 单元测试 | `packages/core/src/utils/__tests__/config.test.ts` | 配置解析测试（8 cases） | ✅ |
-| 单元测试 | `packages/core/src/store/__tests__/get-adapter.test.ts` | 仅 .c4a.yaml 生效（忽略 .c4a.yml） | ✅ |
+| 单元测试 | `packages/storage/src/__tests__/get-adapter.test.ts` | 仅 .c4a.yaml 生效（忽略 .c4a.yml） | ✅ |
 | 本地视图 | `packages/cli/src/mcp/store/featChecklist.ts` | 渲染 checklist.md 只读视图 | ✅ |
 
 ---

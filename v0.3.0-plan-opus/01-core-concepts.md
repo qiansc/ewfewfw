@@ -66,7 +66,7 @@
 | 1.13 | 术语表 | `concepts.md` | 附录：术语表 | L854-884 | [x] | [x] |
 | 1.13a | 完整示例 | `concepts.md` | §9 直播电商项目 | L731-852 | [x] | [x] |
 | 1.14 | Feat 类型 | `concepts.md` | §8.4 feat | L680-705 | [x] | [x] |
-| 1.14 | Feat 生命周期 | `architecture.md` | §7 feat 机制 | L965-1078 | [x] | [x] |
+| 1.14 | Feat 生命周期 | `architecture.md` | §7 feat 机制 | L988-1101 | [x] | [x] |
 | 1.15 | Checklist 格式 | `skills/checklist-format.md` | 全文 | - | [x] | [x] |
 | 1.15 | Checklist 存储 | `architecture.md` | §2.5 文件命名规则 - checklist | L472-495 | [x] | [x] |
 | 1.16 | 关系类型 | `concepts.md` | §6 关系类型 | L443-461 | [x] | [x] |

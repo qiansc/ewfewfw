@@ -1,8 +1,8 @@
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { Database } from 'bun:sqlite';
-import { VectorStore } from '../packages/core/src/store/usearch-store.js';
-import { generateVectorKey, getEmbeddingDimension } from '../packages/core/src/store/vector-search.js';
+import { VectorStore } from '../packages/storage/src/usearch-store.js';
+import { generateVectorKey, getEmbeddingDimension } from '../packages/storage/src/vector-search.js';
 
 type VectorRow = {
   vector_key?: string;

@@ -14,6 +14,7 @@ import type {
   Owner,
   Perspective,
   Scope,
+  SoREntityType,
   StoredEntityMetadata,
 } from './base.js';
 
@@ -216,7 +217,7 @@ export type SoRSubType =
 /**
  * SoR 关联的实体类型
  */
-export type SoREntityType = 'product' | 'system' | 'container' | 'component';
+export type { SoREntityType };
 
 /**
  * SoR（需求项）

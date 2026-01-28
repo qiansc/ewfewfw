@@ -206,7 +206,7 @@
 ### 问题 7：c4a-sor.schema.json 缺少 acceptance_criteria 字段 ✅
 
 **问题描述**：
-- `architecture.md` L807 定义 SoR 应包含 `acceptance_criteria` 字段
+- `architecture.md` L820 定义 SoR 应包含 `acceptance_criteria` 字段
 - `c4a-sor.schema.json` 中缺少此字段
 - TypeScript 类型 `dsl.ts` 中已有定义
 

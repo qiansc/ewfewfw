@@ -4,7 +4,9 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { validateConfig, getDefaultConfig, type C4AConfig } from '../config.js';
+import { validateConfig, getDefaultConfig, loadConfig, type C4AConfig } from '../config.js';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 describe('getDefaultConfig', () => {
   test('returns default config with local mode', () => {
@@ -84,5 +86,27 @@ describe('validateConfig', () => {
     const config: C4AConfig = {};
     const result = validateConfig(config);
     expect(result.valid).toBe(true);
+  });
+});
+
+describe('loadConfig', () => {
+  const TMP_ROOT = join(process.cwd(), '.tmp', 'config-tests');
+
+  test('returns default config when file is missing', async () => {
+    const root = join(TMP_ROOT, `missing-${Date.now()}`);
+    const config = await loadConfig(root);
+    expect(config.mode).toBe('local');
+  });
+
+  test('throws on invalid YAML', async () => {
+    const root = join(TMP_ROOT, `invalid-${Date.now()}`);
+    const contextDir = join(root, '.context');
+    mkdirSync(contextDir, { recursive: true });
+    const configPath = join(contextDir, '.c4a.yaml');
+    writeFileSync(configPath, 'mode: [local', 'utf-8');
+
+    await expect(loadConfig(root)).rejects.toBeTruthy();
+
+    rmSync(root, { recursive: true, force: true });
   });
 });

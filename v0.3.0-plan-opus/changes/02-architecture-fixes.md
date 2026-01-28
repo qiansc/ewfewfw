@@ -112,7 +112,7 @@ if (!perspective && (type === 'process' || type === 'sor')) {
 **问题**：`lite-adapter/helpers.ts` 的 `parseContent` 和 `formatContent` 在 YAML 模式下直接抛错。
 
 **修复文件**：
-- `packages/core/src/store/lite-adapter/helpers.ts`
+- `packages/storage/src/lite-adapter/helpers.ts`
   - 导入 `yaml` 库
   - 实现 YAML 解析和格式化
 
@@ -124,7 +124,7 @@ if (!perspective && (type === 'process' || type === 'sor')) {
 
 **问题**：当前保存逻辑直接把 `data`/`content` 解析后的对象写入 `entities.data`，并且 `kind`/`scope`/`perspective` 仍从 `data.*` 取值。若传入的是 DSL（`type: software-system` + `system:{...}` 结构），这些字段都不会被提升/推导，导致数据库字段长期为空。
 
-**位置**：`packages/core/src/store/lite-adapter/crud-operations.ts` L93-171
+**位置**：`packages/storage/src/lite-adapter/crud-operations.ts` L93-171
 
 ```typescript
 // 当前逻辑：直接从 data 取值，未调用 converter
@@ -153,7 +153,7 @@ db.prepare(`...`).run(
 | Container | `relationships[].to` | ❌ 使用 `target` 字段 |
 | System/SoR | `system.corresponds_to` / `sor.corresponds_to` | ❌ 在嵌套字段里 |
 
-**位置**：`packages/core/src/store/lite-adapter/crud-operations.ts` L815-875
+**位置**：`packages/storage/src/lite-adapter/crud-operations.ts` L815-875
 
 **其他问题**：
 - 跨项目引用格式（`project:`/`repo:`/`scope:`）未解析

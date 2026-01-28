@@ -84,11 +84,11 @@
 
 | 文件 | 行数 | 说明 |
 |------|------|------|
-| `packages/core/src/store/write-queue.ts` | ~191 | 写队列实现 |
-| `packages/core/src/store/sqlite-store.ts` | ~527 | SQLite Store（新增单例 + 向量维护） |
-| `packages/core/src/store/in-memory-graph.ts` | ~328 | 内存图实现 |
-| `packages/core/src/store/graph-query-cache.ts` | ~158 | 图查询缓存实现 |
-| `packages/core/src/store/index.ts` | ~27 | Store 模块导出（更新） |
+| `packages/storage/src/write-queue.ts` | ~191 | 写队列实现 |
+| `packages/storage/src/sqlite-store.ts` | ~527 | SQLite Store（新增单例 + 向量维护） |
+| `packages/storage/src/in-memory-graph.ts` | ~328 | 内存图实现 |
+| `packages/storage/src/graph-query-cache.ts` | ~158 | 图查询缓存实现 |
+| `packages/storage/src/index.ts` | ~27 | Store 模块导出（更新） |
 | `packages/core/package.json` | +1 dep | 添加 @xenova/transformers 依赖 |
 
 ---

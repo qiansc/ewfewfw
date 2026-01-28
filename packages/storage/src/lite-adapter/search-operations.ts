@@ -2,6 +2,7 @@
  * LiteAdapter 搜索操作
  */
 
+import type { SQLQueryBindings } from 'bun:sqlite';
 import type { SQLiteStore } from '../sqlite-store.js';
 import { semanticSearch } from '../vector-search.js';
 import type {
@@ -178,7 +179,7 @@ function ftsSearch(
 ): SearchResultItem[] {
   const dbProposalId = proposalId ?? '';
   const conditions: string[] = [];
-  const values: unknown[] = [];
+  const values: SQLQueryBindings[] = [];
 
   conditions.push("(e.proposal_id = ? OR e.proposal_id IS NULL OR e.proposal_id = '')");
   values.push(dbProposalId);
@@ -282,7 +283,7 @@ function ftsSearchFallback(
 ): SearchResultItem[] {
   const dbProposalId = proposalId ?? '';
   const conditions: string[] = [];
-  const values: unknown[] = [];
+  const values: SQLQueryBindings[] = [];
 
   conditions.push("(e.proposal_id = ? OR e.proposal_id IS NULL OR e.proposal_id = '')");
   values.push(dbProposalId);
@@ -369,7 +370,7 @@ function likeSearch(
   limit: number
 ): SearchResultItem[] {
   const conditions: string[] = [];
-  const values: unknown[] = [];
+  const values: SQLQueryBindings[] = [];
 
   // 基于 LIKE 的简单搜索
   conditions.push("(e.data LIKE ? OR e.id LIKE ?)");

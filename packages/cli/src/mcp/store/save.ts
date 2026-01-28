@@ -5,7 +5,7 @@
  * 基于设计文档：v0.3.0/detailed-design/mcp/store-crud.md §3.1
  */
 import type { StoreSaveInput, StoreSaveResult } from "../storeSchemas.js";
-import { getAdapter } from "@c4a/core/store";
+import { getAdapter } from "@c4a/storage";
 
 /**
  * c4a_store_save 处理函数

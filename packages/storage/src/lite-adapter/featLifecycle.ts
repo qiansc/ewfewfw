@@ -2,7 +2,7 @@
  * LiteAdapter Feat 生命周期操作
  */
 
-import { isValidFeatStatusTransition } from '../../types/index.js';
+import { isValidFeatStatusTransition } from '@c4a/core/types';
 import type { SQLiteStore } from '../sqlite-store.js';
 import type {
   FeatLifecycleParams,

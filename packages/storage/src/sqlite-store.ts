@@ -520,7 +520,7 @@ export class SQLiteStore {
    */
   private static closeInstance(): void {
     if (this.instance) {
-      this.instance.vectorStore?.save();
+      this.instance.vectorStore?.flush();
       this.instance.db.close();
       this.instance = null;
     }
@@ -530,8 +530,11 @@ export class SQLiteStore {
    * 关闭数据库连接（实例方法）
    */
   close(): void {
-    this.vectorStore?.save();
+    this.vectorStore?.flush();
     this.db.close();
+    if (SQLiteStore.instance === this) {
+      SQLiteStore.instance = null;
+    }
   }
 
   /**
@@ -551,53 +554,60 @@ export class SQLiteStore {
       return { total: 0, indexed: 0, skipped: 0 };
     }
 
-    const rows = this.db.prepare(`
+    const stmt = this.db.prepare(`
       SELECT e.id, e.source_project, e.proposal_id, e.data, m.status
       FROM entities e
       JOIN metadata m ON e.source_project = m.source_project
         AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
       WHERE m.status NOT IN ('archived', 'deprecated')
-    `).all() as Array<{
-      id: string;
-      source_project: string;
-      proposal_id: string | null;
-      data: string;
-      status: string;
-    }>;
+    `);
 
-    const items: Array<{ key: string; embedding: Float32Array }> = [];
+    let total = 0;
     let skipped = 0;
+    let indexed = 0;
 
-    for (const row of rows) {
-      let data: Record<string, unknown>;
-      try {
-        data = JSON.parse(row.data) as Record<string, unknown>;
-      } catch {
-        skipped += 1;
-        continue;
-      }
+    this.vectorStore.beginBulkUpdate();
 
-      const text = buildSearchText(data);
-      if (!text) {
-        skipped += 1;
-        continue;
-      }
+    try {
+      for (const row of stmt.iterate() as Iterable<{
+        id: string;
+        source_project: string;
+        proposal_id: string | null;
+        data: string;
+        status: string;
+      }>) {
+        total += 1;
+        let data: Record<string, unknown>;
+        try {
+          data = JSON.parse(row.data) as Record<string, unknown>;
+        } catch {
+          skipped += 1;
+          continue;
+        }
 
-      try {
-        const embedding = await generateEmbedding(text);
-        const proposalId = row.proposal_id === '' ? null : row.proposal_id;
-        const key = generateVectorKey(row.source_project ?? '', row.id, proposalId);
-        items.push({ key, embedding });
-      } catch {
-        skipped += 1;
+        const text = buildSearchText(data);
+        if (!text) {
+          skipped += 1;
+          continue;
+        }
+
+        try {
+          const embedding = await generateEmbedding(text);
+          const proposalId = row.proposal_id === '' ? null : row.proposal_id;
+          const key = generateVectorKey(row.source_project ?? '', row.id, proposalId);
+          this.vectorStore.add(key, embedding);
+          indexed += 1;
+        } catch {
+          skipped += 1;
+        }
       }
+    } finally {
+      this.vectorStore.endBulkUpdate();
     }
 
-    this.vectorStore.rebuild(items);
-
     return {
-      total: rows.length,
-      indexed: items.length,
+      total,
+      indexed,
       skipped,
     };
   }

@@ -154,10 +154,15 @@ function getChecklist(
     };
   }
 
+  const parsedChecklist = parseChecklistPayload(feat.checklist, featId);
+  if (!parsedChecklist.success) {
+    return parsedChecklist.result;
+  }
+
   return {
     success: true,
     feat_id: featId,
-    checklist: JSON.parse(feat.checklist) as Checklist,
+    checklist: parsedChecklist.checklist,
   };
 }
 
@@ -176,8 +181,8 @@ function patchChecklist(
 
   // 获取当前 checklist
   const feat = db.prepare(`
-    SELECT id, checklist FROM feats WHERE id = ?
-  `).get(featId) as { id: string; checklist: string | null } | undefined;
+    SELECT id, checklist, updated_at FROM feats WHERE id = ?
+  `).get(featId) as { id: string; checklist: string | null; updated_at: string } | undefined;
 
   if (!feat) {
     return {
@@ -197,7 +202,12 @@ function patchChecklist(
     };
   }
 
-  const checklist = JSON.parse(feat.checklist) as Checklist;
+  const parsedChecklist = parseChecklistPayload(feat.checklist, featId);
+  if (!parsedChecklist.success) {
+    return parsedChecklist.result;
+  }
+
+  const checklist = parsedChecklist.checklist;
   const patchedTasks: Array<{ task_id: string; fields_updated: string[] }> = [];
   const missingTasks: string[] = [];
 
@@ -287,9 +297,18 @@ function patchChecklist(
     }
   }
 
-  db.prepare(`
-    UPDATE feats SET checklist = ?, updated_at = ? WHERE id = ?
-  `).run(JSON.stringify(checklist), now, featId);
+  const updateResult = db.prepare(`
+    UPDATE feats SET checklist = ?, updated_at = ? WHERE id = ? AND updated_at = ?
+  `).run(JSON.stringify(checklist), now, featId, feat.updated_at);
+
+  if (updateResult.changes === 0) {
+    return {
+      success: false,
+      feat_id: featId,
+      error: 'CHECKLIST_CONFLICT',
+      message: 'Checklist 已被其他会话更新，请先执行 get 获取最新内容',
+    };
+  }
 
   return {
     success: true,
@@ -298,6 +317,26 @@ function patchChecklist(
     patched_tasks: patchedTasks,
     updated_checklist: checklist,
   };
+}
+
+function parseChecklistPayload(
+  rawChecklist: string,
+  featId: string
+): { success: true; checklist: Checklist } | { success: false; result: ChecklistResult } {
+  try {
+    const checklist = JSON.parse(rawChecklist) as Checklist;
+    return { success: true, checklist };
+  } catch (error) {
+    return {
+      success: false,
+      result: {
+        success: false,
+        feat_id: featId,
+        error: 'CHECKLIST_PARSE_FAILED',
+        message: `Checklist 数据损坏，无法解析: ${(error as Error).message}`,
+      },
+    };
+  }
 }
 
 /**

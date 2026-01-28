@@ -2,7 +2,7 @@
  * Storage Adapter Layer - Feat 类型定义
  */
 
-import type { FeatStatus } from '../types/index.js';
+import type { FeatStatus } from '@c4a/core/types';
 
 // ============================================================
 // Feat 生命周期类型
