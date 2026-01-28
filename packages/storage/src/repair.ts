@@ -15,8 +15,7 @@ import { join } from 'node:path';
 import { SQLiteStore } from './sqlite-store.js';
 import { DataValidator, type ValidationIssue, type MigrateErrorCode } from './validate.js';
 import type { EntityType } from './adapter.js';
-import { parseYAML } from '../utils/yaml.js';
-import { CONFIG_FILENAME, CONTEXT_ROOT_DIR } from '../utils/path.js';
+import { parseYAML, CONFIG_FILENAME, CONTEXT_ROOT_DIR } from '@c4a/core';
 
 interface LocalProjectConfig {
   project_id?: string;

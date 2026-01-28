@@ -2,6 +2,7 @@
  * LiteAdapter ReadHistory 操作
  */
 
+import type { SQLQueryBindings } from 'bun:sqlite';
 import type { ReadHistoryParams, ReadHistoryResult, HistoryItem } from '../adapter.js';
 import type { AdapterContext } from './types.js';
 
@@ -22,7 +23,7 @@ export async function readHistory(
   const order = params.order ?? 'desc';
 
   const conditions: string[] = [];
-  const values: unknown[] = [];
+  const values: SQLQueryBindings[] = [];
 
   if (params.entity_id) {
     conditions.push('entity_id = ?');

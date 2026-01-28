@@ -13,6 +13,27 @@ export * as DSL from "./types/dsl.js";
 // 工具函数
 export * from "./utils/index.js";
 export * from "./utils/converter.js";
+export {
+  CONFIG_FILENAME,
+  CONTEXT_ROOT_DIR,
+  DSL_EXTENSION,
+  BUSINESS_TYPES,
+  TECHNICAL_TYPES,
+  TYPE_TO_DIR,
+  getPerspective,
+  getPerspectiveFromId,
+  getEntityPath,
+  getFeatPath,
+  getConfigPath,
+  getAssetsPath,
+  parseEntityPath,
+} from "./utils/path.js";
+export {
+  parseYAML,
+  parseYAMLSafe,
+  stringifyYAML,
+  validateYAMLSyntax,
+} from "./utils/yaml.js";
 
 // 验证器
 export * from "./validator/index.js";

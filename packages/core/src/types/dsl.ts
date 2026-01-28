@@ -5,6 +5,8 @@
  * 基于 v0.3.0/concepts.md 的双视角三构件模型。
  */
 
+import type { SoREntityType } from './base.js';
+
 // ============================================================================
 // 基础类型
 // ============================================================================
@@ -316,7 +318,7 @@ export type SoRSubType =
 /**
  * SoR 关联的实体类型
  */
-export type SoREntityType = 'product' | 'system' | 'container' | 'component';
+export type { SoREntityType };
 
 /**
  * SoR DSL - Statement of Requirements

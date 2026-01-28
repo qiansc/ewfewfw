@@ -2,6 +2,7 @@
  * LiteAdapter Read/List/Delete 操作
  */
 
+import type { SQLQueryBindings } from 'bun:sqlite';
 import type { SQLiteStore } from '../sqlite-store.js';
 import { getWriteQueue } from '../write-queue.js';
 import type {
@@ -90,7 +91,7 @@ export async function list(ctx: AdapterContext, params: ListParams): Promise<Lis
 
   // 构建查询条件（基于 Merge View 结果）
   const conditions: string[] = [];
-  const values: unknown[] = [];
+  const values: SQLQueryBindings[] = [];
 
   // type 过滤
   if (params.type && params.type !== 'all') {
@@ -121,7 +122,7 @@ export async function list(ctx: AdapterContext, params: ListParams): Promise<Lis
   }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-  const proposalParams = proposalId ? [dbProposalId, dbProposalId] : [];
+  const proposalParams: SQLQueryBindings[] = proposalId ? [dbProposalId, dbProposalId] : [];
   const baseCte = proposalId
     ? `
       WITH ranked AS (
@@ -521,7 +522,7 @@ function queryEntity(
   `;
 
   // 参数顺序：CASE 子句的 proposalIds + WHERE 的 id + IN 子句的 proposalIds
-  const params = [...proposalIds, id, ...proposalIds];
+  const params: SQLQueryBindings[] = [...proposalIds, id, ...proposalIds];
   const row = db.prepare(query).get(...params) as EntityRow | undefined;
   return row ? rowToEntity(row) : null;
 }
@@ -536,9 +537,9 @@ function queryRelations(
   filter?: Record<string, unknown>
 ): Relation[] {
   const conditions: string[] = ['(from_id = ? OR to_id = ?)'];
-  const values: unknown[] = [entityId, entityId];
+  const values: SQLQueryBindings[] = [entityId, entityId];
 
-  if (filter?.rel_type) {
+  if (typeof filter?.rel_type === 'string') {
     conditions.push('rel_type = ?');
     values.push(filter.rel_type);
   }

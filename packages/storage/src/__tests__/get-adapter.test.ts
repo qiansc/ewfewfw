@@ -5,11 +5,12 @@
 import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
-import { loadConfig } from "../get-adapter.js";
+import { getAdapter, loadConfig, resetAdapter } from "../get-adapter.js";
 
 function withTempDir(fn: (dir: string) => void): void {
-  const dir = mkdtempSync(join(tmpdir(), "c4a-config-"));
+  const root = join(process.cwd(), ".tmp");
+  mkdirSync(root, { recursive: true });
+  const dir = mkdtempSync(join(root, "c4a-config-"));
   try {
     fn(dir);
   } finally {
@@ -47,6 +48,35 @@ describe("loadConfig", () => {
       const config = loadConfig(dir);
       expect(config.mode).toBe("local");
       expect(config.server?.url).toBeUndefined();
+    });
+  });
+});
+
+describe("getAdapter", () => {
+  test("recreates adapter when local config changes", () => {
+    withTempDir((dir) => {
+      const dbPathA = join(dir, "a.db");
+      const dbPathB = join(dir, "b.db");
+      const adapterA = getAdapter({
+        basePath: dir,
+        config: {
+          dbPath: dbPathA,
+          defaultProject: "alpha",
+          enableVectorSearch: false,
+        },
+      }) as { config?: { dbPath?: string } };
+      const adapterB = getAdapter({
+        basePath: dir,
+        config: {
+          dbPath: dbPathB,
+          defaultProject: "alpha",
+          enableVectorSearch: false,
+        },
+      }) as { config?: { dbPath?: string } };
+
+      expect(adapterA).not.toBe(adapterB);
+      expect(adapterB.config?.dbPath).toBe(dbPathB);
+      resetAdapter();
     });
   });
 });

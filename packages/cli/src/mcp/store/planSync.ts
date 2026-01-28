@@ -9,8 +9,8 @@ import type {
   StorePlanSyncResult,
   StorePlanSyncExecutedResult,
 } from "../storeSchemas.js";
-import { getAdapter } from "@c4a/core/store";
-import type { LocalManifest, SyncSnapshot } from "@c4a/core/store";
+import { getAdapter } from "@c4a/storage";
+import type { LocalManifest, SyncSnapshot } from "@c4a/storage";
 
 /**
  * c4a_store_plan_sync 处理函数

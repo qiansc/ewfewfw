@@ -10,7 +10,7 @@ import type {
   StoreListCountResult,
   StoreListGroupResult,
 } from "../storeSchemas.js";
-import { getAdapter } from "@c4a/core/store";
+import { getAdapter } from "@c4a/storage";
 
 /**
  * c4a_store_list 处理函数

@@ -77,6 +77,32 @@ export function loadConfig(basePath: string = process.cwd()): C4AConfig {
 
 let adapterInstance: StorageAdapter | null = null;
 let currentMode: StorageMode | null = null;
+let currentConfigKey: string | null = null;
+
+function buildAdapterConfigKey(params: {
+  mode: StorageMode;
+  local?: {
+    dbPath?: string;
+    defaultProject?: string;
+    enableVectorSearch?: boolean;
+  };
+  server?: ServerConfig;
+}): string {
+  return JSON.stringify({
+    mode: params.mode,
+    local: {
+      dbPath: params.local?.dbPath ?? null,
+      defaultProject: params.local?.defaultProject ?? null,
+      enableVectorSearch: params.local?.enableVectorSearch ?? null,
+    },
+    server: params.server
+      ? {
+          url: params.server.url ?? null,
+          timeout: params.server.timeout ?? null,
+        }
+      : null,
+  });
+}
 
 /**
  * 获取 StorageAdapter 实例
@@ -95,21 +121,31 @@ export function getAdapter(options?: {
 }): StorageAdapter {
   const config = loadConfig(options?.basePath);
   const mode = options?.forceMode || config.mode || 'local';
+  const localConfig = {
+    dbPath: config.local?.dbPath || options?.config?.dbPath,
+    defaultProject: options?.config?.defaultProject,
+    enableVectorSearch: options?.config?.enableVectorSearch,
+  };
+  const configKey = buildAdapterConfigKey({
+    mode,
+    local: localConfig,
+    server: config.server,
+  });
 
-  // 如果模式改变，需要重新创建实例
-  if (adapterInstance && currentMode !== mode) {
+  // 如果配置改变，需要重新创建实例
+  if (adapterInstance && currentConfigKey !== configKey) {
+    adapterInstance.close().catch(() => {});
     adapterInstance = null;
+    currentMode = null;
+    currentConfigKey = null;
   }
 
   if (!adapterInstance) {
     currentMode = mode;
+    currentConfigKey = configKey;
 
     if (mode === 'local') {
-      adapterInstance = new LiteAdapter({
-        dbPath: config.local?.dbPath || options?.config?.dbPath,
-        defaultProject: options?.config?.defaultProject,
-        enableVectorSearch: options?.config?.enableVectorSearch,
-      });
+      adapterInstance = new LiteAdapter(localConfig);
     } else {
       const serverConfig = config.server;
       if (!serverConfig?.url) {
@@ -131,6 +167,7 @@ export function resetAdapter(): void {
   }
   adapterInstance = null;
   currentMode = null;
+  currentConfigKey = null;
 }
 
 /**

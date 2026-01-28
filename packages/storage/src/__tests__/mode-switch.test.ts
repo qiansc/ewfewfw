@@ -5,6 +5,7 @@
 import { describe, expect, test, beforeEach, afterEach } from 'bun:test';
 import { join } from 'node:path';
 import { existsSync, mkdirSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
+import { gzipSync } from 'node:zlib';
 import { LocalBackup, LocalRestore, formatConflictSummary } from '../mode-switch.js';
 import type { SQLiteStore } from '../sqlite-store.js';
 import type { ExportData } from '../modeSwitchTypes.js';
@@ -1144,5 +1145,63 @@ describe('LocalRestore', () => {
     expect(progress.some((item) => item.phase === 'entities')).toBe(true);
     expect(progress.some((item) => item.phase === 'relations')).toBe(true);
     expect(progress[progress.length - 1]?.phase).toBe('done');
+  });
+
+  test('restores from gzipped backup using streaming path', async () => {
+    const backupFile = createTempPath('restore-stream', 'json.gz');
+    tmpFiles.push(backupFile);
+
+    const exportData: ExportData = {
+      version: '0.3.0',
+      exported_at: '2026-02-04T10:00:00Z',
+      entities: [
+        {
+          id: 'stream-system',
+          type: 'system',
+          data: {
+            schema: 'c4a/v1',
+            type: 'software-system',
+            system: { id: 'stream-system', name: 'Stream System' },
+          },
+          metadata: {
+            source_project: 'stream-project',
+            status: 'published',
+            content_hash: 'hash-stream',
+            created_at: '2026-02-04T10:00:00Z',
+            updated_at: '2026-02-04T10:00:00Z',
+          },
+          proposal_id: null,
+        },
+      ],
+      relations: [
+        {
+          from_project: 'stream-project',
+          from_id: 'stream-system',
+          to_project: 'stream-project',
+          to_id: 'stream-dep',
+          rel_type: 'DEPENDS_ON',
+          status: 'active',
+        },
+      ],
+      feats: [
+        {
+          id: 'feat-stream',
+          status: 'draft',
+          created_at: '2026-02-04T10:00:00Z',
+          updated_at: '2026-02-04T10:00:00Z',
+        },
+      ],
+    };
+
+    const payload = JSON.stringify(exportData, null, 2);
+    writeFileSync(backupFile, gzipSync(payload));
+
+    const restore = new LocalRestore(store as unknown as SQLiteStore);
+    await restore.restore({ input: backupFile, conflictPolicy: 'skip', rebuildVectors: false });
+
+    expect(db.entities).toHaveLength(1);
+    expect(db.entities[0]?.id).toBe('stream-system');
+    expect(db.relations).toHaveLength(1);
+    expect(db.feats).toHaveLength(1);
   });
 });

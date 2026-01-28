@@ -8,6 +8,15 @@ import type { RestoreParams, RestoreResult, RestoreConflict } from '../adapter.j
 import type { AdapterContext } from './types.js';
 import { checkCompatibility, computeChecksum } from './utilsCommon.js';
 
+type BackupRelation = {
+  id?: string | null;
+  from_project?: string | null;
+  from_id: string;
+  to_project?: string | null;
+  to_id: string;
+  rel_type: string;
+};
+
 // ============================================================
 // Restore 操作
 // ============================================================
@@ -56,7 +65,7 @@ export async function restore(
           updated_at: string;
         };
       }>;
-      relations: Array<Record<string, unknown>>;
+      relations: BackupRelation[];
       checksums?: {
         entities: string;
         relations: string;
@@ -173,15 +182,18 @@ export async function restore(
 
     // 恢复关系（简化处理）
     for (const relation of backupData.relations) {
+      const relationId = relation.id ?? null;
+      const fromProject = relation.from_project ?? null;
+      const toProject = relation.to_project ?? null;
       try {
         db.prepare(`
           INSERT OR IGNORE INTO relations (id, proposal_id, from_project, from_id, to_project, to_id, rel_type, created_at, updated_at)
           VALUES (?, '', ?, ?, ?, ?, ?, ?, ?)
         `).run(
-          relation.id,
-          relation.from_project,
+          relationId,
+          fromProject,
           relation.from_id,
-          relation.to_project,
+          toProject,
           relation.to_id,
           relation.rel_type,
           now,

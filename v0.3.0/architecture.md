@@ -838,6 +838,19 @@ rel_type: CORRESPONDS
 
 > **详细设计**：向量存储选型、SQLite 表结构、图查询实现等请参考 [detailed-design/local-mode.md](./detailed-design/local-mode.md)
 
+### 4.1 包结构
+
+| 包名 | 路径 | 职责 | 依赖特点 |
+|------|------|------|---------|
+| `@c4a/core` | `packages/core/` | 类型定义、Schema、工具函数 | 纯 JS，无 Native 依赖 |
+| `@c4a/storage` | `packages/storage/` | 存储适配器、SQLite、向量搜索 | 含 Native 依赖 (bun:sqlite, usearch) |
+| `@c4a/cli` | `packages/cli/` | MCP Server、CLI 命令 | 依赖 @c4a/core + @c4a/storage |
+
+**设计理由**：
+- `@c4a/core` 保持轻量，可被任意包依赖而不引入 Native 模块
+- `@c4a/storage` 封装所有存储相关实现，包括 SQLite、USearch、Embedding 等
+- 分离后便于独立测试和按需引入
+
 ---
 
 ## 5. 数据流

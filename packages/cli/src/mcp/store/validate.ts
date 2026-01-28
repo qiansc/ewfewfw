@@ -4,7 +4,7 @@
  * 设计文档: store-utils.md §3.16
  */
 
-import { getAdapter } from '@c4a/core/store';
+import { getAdapter } from '@c4a/storage';
 import type {
   StoreValidateInput,
   StoreValidateResult,

@@ -5,7 +5,16 @@
  * 基于 v0.3.0 架构设计：.context/ + business/technical/feat 双视角结构
  */
 
-import type { EntityType, Perspective } from '../types/base.js';
+import {
+  BUSINESS_ENTITY_TYPES,
+  DIR_TO_ENTITY_TYPE,
+  ENTITY_TYPE_TO_DIR,
+  TECHNICAL_PERSPECTIVE_TYPES,
+  type BusinessEntityType,
+  type EntityType,
+  type Perspective,
+  type TechnicalPerspectiveType,
+} from '../types/base.js';
 
 // ============================================================================
 // 路径常量
@@ -24,25 +33,15 @@ export const DSL_EXTENSION = '.c4a.yaml';
 export type { Perspective };
 
 /** 业务视角实体类型 */
-export const BUSINESS_TYPES = ['product', 'process', 'sor'] as const;
-export type BusinessEntityType = (typeof BUSINESS_TYPES)[number];
+export const BUSINESS_TYPES = BUSINESS_ENTITY_TYPES;
+export type { BusinessEntityType };
 
 /** 技术视角实体类型 */
-export const TECHNICAL_TYPES = ['system', 'container', 'component', 'adr', 'contract', 'process', 'sor'] as const;
-export type TechnicalEntityType = (typeof TECHNICAL_TYPES)[number];
+export const TECHNICAL_TYPES = TECHNICAL_PERSPECTIVE_TYPES;
+export type TechnicalEntityType = TechnicalPerspectiveType;
 
 /** 实体类型到目录名映射 */
-export const TYPE_TO_DIR: Record<string, string> = {
-  product: 'products',
-  system: 'systems',
-  container: 'containers',
-  component: 'components',
-  adr: 'adrs',
-  contract: 'contracts',
-  process: 'processes',
-  sor: 'sors',
-  feat: 'feat',
-};
+export const TYPE_TO_DIR: Record<string, string> = ENTITY_TYPE_TO_DIR;
 
 // ============================================================================
 // 路径生成
@@ -152,16 +151,7 @@ export interface ParsedEntityPath {
 }
 
 /** 反向映射：目录名 → 类型 */
-const DIR_TO_TYPE: Record<string, EntityType> = {
-  products: 'product',
-  systems: 'system',
-  containers: 'container',
-  components: 'component',
-  adrs: 'adr',
-  contracts: 'contract',
-  processes: 'process',
-  sors: 'sor',
-};
+const DIR_TO_TYPE: Record<string, EntityType> = DIR_TO_ENTITY_TYPE;
 
 /**
  * 解析实体路径

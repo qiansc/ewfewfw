@@ -77,24 +77,38 @@ export type Perspective = 'business' | 'technical';
 // ============================================================================
 
 /**
+ * 实体类型定义（单一来源）
+ */
+export const ENTITY_TYPE_DEFS = {
+  product: { dir: 'products', perspective: 'business' as const },
+  system: { dir: 'systems', perspective: 'technical' as const },
+  container: { dir: 'containers', perspective: 'technical' as const },
+  component: { dir: 'components', perspective: 'technical' as const },
+  process: { dir: 'processes', perspective: null },
+  sor: { dir: 'sors', perspective: null },
+  adr: { dir: 'adrs', perspective: 'technical' as const },
+  contract: { dir: 'contracts', perspective: 'technical' as const },
+  feat: { dir: 'feat', perspective: null },
+} as const;
+
+/**
  * 所有实体类型
  */
-export type EntityType =
-  // 业务视角实体
-  | 'product'
-  // 技术视角实体 (C4 模型)
-  | 'system'
-  | 'container'
-  | 'component'
-  // 流程
-  | 'process'
-  // 需求项
-  | 'sor'
-  // 附属实体
-  | 'adr'
-  | 'contract'
-  // Feature 分支
-  | 'feat';
+export type EntityType = keyof typeof ENTITY_TYPE_DEFS;
+
+/**
+ * 实体类型到目录映射
+ */
+export const ENTITY_TYPE_TO_DIR = Object.fromEntries(
+  Object.entries(ENTITY_TYPE_DEFS).map(([type, def]) => [type, def.dir]),
+) as Record<EntityType, string>;
+
+/**
+ * 目录到实体类型映射
+ */
+export const DIR_TO_ENTITY_TYPE = Object.fromEntries(
+  Object.entries(ENTITY_TYPE_DEFS).map(([type, def]) => [def.dir, type]),
+) as Record<string, EntityType>;
 
 /**
  * Schema 验证类型
@@ -104,27 +118,61 @@ export type EntityType =
  * - DSL 文件使用 "software-system"（符合 C4 模型命名）
  * - Schema 验证使用 "system"（简化内部使用）
  */
-export type SchemaType =
-  | 'product'
-  | 'system'
-  | 'container'
-  | 'component'
-  | 'process'
-  | 'sor'
-  | 'adr'
-  | 'contract'
-  | 'feat'
-  | 'checklist';
+export const SCHEMA_TYPES = [
+  'product',
+  'system',
+  'container',
+  'component',
+  'process',
+  'sor',
+  'adr',
+  'contract',
+  'feat',
+  'checklist',
+] as const;
+
+export type SchemaType = (typeof SCHEMA_TYPES)[number];
 
 /**
  * 核心实体类型（三构件）
  */
-export type CoreEntityType = 'product' | 'system' | 'container' | 'component' | 'process' | 'sor';
+export const CORE_ENTITY_TYPES = [
+  'product',
+  'system',
+  'container',
+  'component',
+  'process',
+  'sor',
+] as const;
+
+export type CoreEntityType = (typeof CORE_ENTITY_TYPES)[number];
 
 /**
  * 技术视角实体类型
  */
-export type TechnicalEntityType = 'system' | 'container' | 'component';
+export const TECHNICAL_ENTITY_TYPES = ['system', 'container', 'component'] as const;
+
+export type TechnicalEntityType = (typeof TECHNICAL_ENTITY_TYPES)[number];
+
+export const BUSINESS_ENTITY_TYPES = ['product', 'process', 'sor'] as const;
+
+export type BusinessEntityType = (typeof BUSINESS_ENTITY_TYPES)[number];
+
+export const TECHNICAL_PERSPECTIVE_TYPES = [
+  'system',
+  'container',
+  'component',
+  'adr',
+  'contract',
+  'process',
+  'sor',
+] as const;
+
+export type TechnicalPerspectiveType = (typeof TECHNICAL_PERSPECTIVE_TYPES)[number];
+
+export const SOR_ENTITY_TYPES = ['product', 'system', 'container', 'component'] as const;
+
+export type SoREntityType = (typeof SOR_ENTITY_TYPES)[number];
 
 /**
  * 附属实体类型

@@ -10,9 +10,10 @@
  * - 检查层级字段
  */
 
+import type { SQLQueryBindings } from 'bun:sqlite';
 import { SQLiteStore } from './sqlite-store.js';
 import type { EntityType, EntityStatus } from './adapter.js';
-import { ERROR_MESSAGES, MIGRATE_ERROR_CODES as MIGRATE_ERROR_CODE_MAP } from '../types/errors.js';
+import { ERROR_MESSAGES, MIGRATE_ERROR_CODES as MIGRATE_ERROR_CODE_MAP } from '@c4a/core/types';
 
 // ============================================================
 // 错误码定义
@@ -178,7 +179,7 @@ export class DataValidator {
         AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
     `;
 
-    const params: unknown[] = [];
+    const params: SQLQueryBindings[] = [];
     const conditions: string[] = [];
 
     if (options.status) {

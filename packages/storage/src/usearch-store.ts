@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { Index } from 'usearch';
+import { Index, MetricKind, ScalarKind } from 'usearch';
 
 export type VectorStoreConfig = {
   dimensions: number;
@@ -8,6 +8,7 @@ export type VectorStoreConfig = {
   keyMapPath: string;
   metric?: 'cos' | 'l2' | 'ip';
   readonly?: boolean;
+  saveDelayMs?: number;
 };
 
 export type VectorSearchHit = {
@@ -21,6 +22,18 @@ type KeyMapFile = {
   entries: Array<[string, string]>;
 };
 
+function toMetricKind(metric: VectorStoreConfig['metric']): MetricKind {
+  switch (metric) {
+    case 'ip':
+      return MetricKind.IP;
+    case 'l2':
+      return MetricKind.L2sq;
+    case 'cos':
+    default:
+      return MetricKind.Cos;
+  }
+}
+
 export class VectorStore {
   private index: Index;
   private keyMap: Map<bigint, string> = new Map();
@@ -29,17 +42,30 @@ export class VectorStore {
   private readonly: boolean;
   private indexPath: string;
   private keyMapPath: string;
-  private config: { dimensions: number; metric: 'cos' | 'l2' | 'ip' };
+  private config: { dimensions: number; metric: MetricKind };
+  private saveDelayMs: number;
+  private pendingSave: ReturnType<typeof setTimeout> | null = null;
+  private dirty = false;
+  private suspendAutoSave = false;
 
   constructor(config: VectorStoreConfig) {
     this.config = {
       dimensions: config.dimensions,
-      metric: config.metric ?? 'cos',
+      metric: toMetricKind(config.metric),
     };
-    this.index = new Index(this.config);
+    this.index = new Index({
+      dimensions: this.config.dimensions,
+      metric: this.config.metric,
+      quantization: ScalarKind.F32,
+      connectivity: 0,
+      expansion_add: 0,
+      expansion_search: 0,
+      multi: false,
+    });
     this.indexPath = config.indexPath;
     this.keyMapPath = config.keyMapPath;
     this.readonly = config.readonly ?? false;
+    this.saveDelayMs = config.saveDelayMs ?? 1000;
 
     this.ensureDir(this.indexPath);
     this.ensureDir(this.keyMapPath);
@@ -48,6 +74,15 @@ export class VectorStore {
 
   size(): number {
     return this.keyMap.size;
+  }
+
+  beginBulkUpdate(): void {
+    this.suspendAutoSave = true;
+  }
+
+  endBulkUpdate(): void {
+    this.suspendAutoSave = false;
+    this.flush();
   }
 
   has(entityKey: string): boolean {
@@ -66,12 +101,13 @@ export class VectorStore {
       }
     }
 
-    this.index.add(key, embedding);
+    this.index.add(key, embedding, 0);
 
     if (!existing) {
       this.keyMap.set(key, entityKey);
       this.reverseMap.set(entityKey, key);
     }
+    this.markDirty();
   }
 
   remove(entityKey: string): void {
@@ -86,12 +122,13 @@ export class VectorStore {
 
     this.reverseMap.delete(entityKey);
     this.keyMap.delete(key);
+    this.markDirty();
   }
 
   search(queryVector: Float32Array, limit: number): VectorSearchHit[] {
     let raw: unknown;
     try {
-      raw = this.index.search(queryVector, limit) as unknown;
+      raw = this.index.search(queryVector, limit, 0) as unknown;
     } catch {
       return [];
     }
@@ -114,6 +151,17 @@ export class VectorStore {
     this.saveKeyMap();
   }
 
+  flush(): void {
+    if (this.readonly) return;
+    if (this.pendingSave) {
+      clearTimeout(this.pendingSave);
+      this.pendingSave = null;
+    }
+    if (!this.dirty) return;
+    this.save();
+    this.dirty = false;
+  }
+
   load(): void {
     if (existsSync(this.indexPath)) {
       this.index.load(this.indexPath);
@@ -124,16 +172,14 @@ export class VectorStore {
   }
 
   rebuild(entities: Array<{ key: string; embedding: Float32Array }>): void {
-    this.index = new Index(this.config);
-    this.keyMap.clear();
-    this.reverseMap.clear();
-    this.nextKey = 1n;
+    this.beginBulkUpdate();
+    this.reset();
 
     for (const entity of entities) {
       this.add(entity.key, entity.embedding);
     }
 
-    this.save();
+    this.endBulkUpdate();
   }
 
   private allocateKey(): bigint {
@@ -206,5 +252,32 @@ export class VectorStore {
     if (typeof value === 'number') return BigInt(Math.trunc(value));
     if (typeof value === 'string') return BigInt(value);
     return BigInt(0);
+  }
+
+  private reset(): void {
+    this.index = new Index({
+      dimensions: this.config.dimensions,
+      metric: this.config.metric,
+      quantization: ScalarKind.F32,
+      connectivity: 0,
+      expansion_add: 0,
+      expansion_search: 0,
+      multi: false,
+    });
+    this.keyMap.clear();
+    this.reverseMap.clear();
+    this.nextKey = 1n;
+    this.dirty = false;
+  }
+
+  private markDirty(): void {
+    if (this.readonly) return;
+    this.dirty = true;
+    if (this.suspendAutoSave) return;
+    if (this.pendingSave) return;
+    this.pendingSave = setTimeout(() => {
+      this.pendingSave = null;
+      this.flush();
+    }, this.saveDelayMs);
   }
 }
