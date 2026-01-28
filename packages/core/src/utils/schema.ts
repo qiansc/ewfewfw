@@ -5,8 +5,8 @@
  * 复用 validator/ 模块的底层实现
  */
 
-import { getAjv, getValidator, clearCache } from '../validator/ajvInstance';
-import type { EntityType } from '../types/base';
+import { getAjv, getValidator, clearCache } from '../validator/ajvInstance.js';
+import type { EntityType } from '../types/base.js';
 
 // ============================================================================
 // 验证结果类型
@@ -77,7 +77,7 @@ export function validateSchema(
     return { valid: true, errors: [] };
   }
 
-  const errors: ValidationError[] = (validate.errors || []).map((err) => ({
+  const errors: ValidationError[] = (validate.errors || []).map((err: any) => ({
     path: err.instancePath || '/',
     message: err.message || 'Unknown error',
     keyword: err.keyword,
@@ -102,7 +102,7 @@ export function validateEntity(
       if (valid) {
         return { valid: true, errors: [] };
       }
-      const errors: ValidationError[] = (validator.errors || []).map((err) => ({
+      const errors: ValidationError[] = (validator.errors || []).map((err: any) => ({
         path: err.instancePath || '/',
         message: err.message || 'Unknown error',
         keyword: err.keyword,

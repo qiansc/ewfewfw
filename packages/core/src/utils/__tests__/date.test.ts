@@ -14,7 +14,7 @@ import {
   formatDate,
   formatDateShort,
   formatRelative,
-} from '../date';
+} from '../date.js';
 
 describe('constants', () => {
   test('ISO_FORMAT is correct', () => {

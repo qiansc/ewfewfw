@@ -4,7 +4,7 @@
  * 用于生成和解析实体 ID
  */
 
-import type { EntityType } from '../types/base';
+import type { EntityType } from '../types/base.js';
 
 // ============================================================================
 // ID 格式常量
@@ -79,7 +79,13 @@ export function isValidEntityId(id: string, type?: EntityType): boolean {
   }
 
   // 通用验证：kebab-case 或带前缀的序号 ID
-  return isValidKebabCase(id) || /^(feat|adr|prc-[bt]|sor-[bt])-[a-z]\d{3}/.test(id);
+  // feat/adr 允许后缀：feat-a001-xxx, adr-a001-xxx
+  // prc/sor 不允许后缀：prc-b-a001, sor-t-a001
+  return (
+    isValidKebabCase(id) ||
+    /^(feat|adr)-[a-z]\d{3}(-[a-z0-9]+)*$/.test(id) ||
+    /^(prc|sor)-[bt]-[a-z]\d{3}$/.test(id)
+  );
 }
 
 // ============================================================================

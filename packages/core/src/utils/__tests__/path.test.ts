@@ -16,7 +16,7 @@ import {
   getConfigPath,
   getAssetsPath,
   parseEntityPath,
-} from '../path';
+} from '../path.js';
 
 describe('constants', () => {
   test('CONTEXT_ROOT_DIR is .context', () => {

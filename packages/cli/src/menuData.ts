@@ -67,6 +67,6 @@ export const helpDescriptions: Record<string, string> = {
   install: "安装项目依赖：TypeScript (bun install) + Python (uv sync)。",
   test: "运行项目测试：bun test (TypeScript) + pytest (Python)。",
   clean: "按 → 展开子菜单，选择清理范围：远程存储、本地文件或全部。",
-  "clean:storage": "清理远程存储（MongoDB/Neo4j/Milvus/Ollama volumes）。本地 .c4a/ 文件不受影响。",
-  "clean:local": "清理本地知识文件（.c4a/ 下的 drafts、approved、published、research、archive、cache）。远程存储和日志不受影响。",
+  "clean:storage": "清理远程存储（MongoDB/Neo4j/Milvus/Ollama volumes）。本地 .context/ 文件不受影响。",
+  "clean:local": "清理本地知识文件（.context/ 下的 business、technical、feat、assets、.schemas）。远程存储和日志不受影响。",
 };

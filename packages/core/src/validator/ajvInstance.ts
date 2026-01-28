@@ -1,29 +1,39 @@
 /**
  * AJV 实例单例，预编译 Schema
  */
-import Ajv, { type ValidateFunction } from "ajv";
+import AjvModule from "ajv";
+import addFormats from "ajv-formats";
+import type { ValidateFunction } from "ajv";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import type { SchemaType } from "../types/base.js";
+
+// ESM 兼容：ajv 的 default export 处理
+const Ajv = AjvModule.default ?? AjvModule;
+type AjvInstance = InstanceType<typeof Ajv>;
 
 // 获取当前文件路径（ESM 环境）
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const SCHEMA_DIR = join(__dirname, "../schemas");
 
-let ajvInstance: Ajv | null = null;
+let ajvInstance: AjvInstance | null = null;
 const validators = new Map<string, ValidateFunction>();
 
 /**
  * 获取 AJV 实例（单例）
  */
-export function getAjv(): Ajv {
+export function getAjv(): AjvInstance {
   if (!ajvInstance) {
     ajvInstance = new Ajv({
       allErrors: true,
       verbose: true,
       strict: false,
     });
+
+    // 添加格式验证支持（uri, date, email 等）
+    addFormats(ajvInstance);
 
     loadSchemas(ajvInstance);
   }
@@ -33,7 +43,7 @@ export function getAjv(): Ajv {
 /**
  * 加载所有 JSON Schema
  */
-function loadSchemas(ajv: Ajv): void {
+function loadSchemas(ajv: AjvInstance): void {
   const schemaFiles = [
     "c4a-common.schema.json",
     "c4a-product.schema.json",
@@ -46,9 +56,6 @@ function loadSchemas(ajv: Ajv): void {
     "c4a-contract.schema.json",
     "c4a-feat.schema.json",
     "c4a-checklist.schema.json",
-    "c4a-constraints.schema.json",
-    "c4a-risks.schema.json",
-    "c4a-history.schema.json",
   ];
 
   for (const file of schemaFiles) {
@@ -65,9 +72,7 @@ function loadSchemas(ajv: Ajv): void {
 /**
  * 获取特定类型的验证器
  */
-export function getValidator(
-  type: "product" | "system" | "container" | "component" | "process" | "sor" | "adr" | "contract"
-): ValidateFunction | null {
+export function getValidator(type: SchemaType): ValidateFunction | null {
   const cacheKey = type;
 
   if (validators.has(cacheKey)) {
@@ -75,15 +80,17 @@ export function getValidator(
   }
 
   const ajv = getAjv();
-  const schemaMap: Record<string, string> = {
-    product: "https://c4a.dev/schema/c4a-product.schema.json",
-    system: "https://c4a.dev/schema/c4a-system.schema.json",
-    container: "https://c4a.dev/schema/c4a-container.schema.json",
-    component: "https://c4a.dev/schema/c4a-component.schema.json",
-    process: "https://c4a.dev/schema/c4a-process.schema.json",
-    sor: "https://c4a.dev/schema/c4a-sor.schema.json",
-    adr: "https://c4a.dev/schema/c4a-adr.schema.json",
-    contract: "https://c4a.dev/schema/c4a-contract.schema.json",
+  const schemaMap: Record<SchemaType, string> = {
+    product: "https://context4ai.org/schemas/c4a-product.schema.json",
+    system: "https://context4ai.org/schemas/c4a-system.schema.json",
+    container: "https://context4ai.org/schemas/c4a-container.schema.json",
+    component: "https://context4ai.org/schemas/c4a-component.schema.json",
+    process: "https://context4ai.org/schemas/c4a-process.schema.json",
+    sor: "https://context4ai.org/schemas/c4a-sor.schema.json",
+    adr: "https://context4ai.org/schemas/c4a-adr.schema.json",
+    contract: "https://context4ai.org/schemas/c4a-contract.schema.json",
+    feat: "https://context4ai.org/schemas/c4a-feat.schema.json",
+    checklist: "https://context4ai.org/schemas/c4a-checklist.schema.json",
   };
 
   const schemaId = schemaMap[type];

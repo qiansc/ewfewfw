@@ -21,7 +21,7 @@
 
     "container": {
       "type": "object",
-      "required": ["id", "name", "description"],
+      "required": ["id", "name", "description", "scope", "system_id"],
       "additionalProperties": false,
       "properties": {
         "id": {
@@ -30,6 +30,11 @@
           "minLength": 1,
           "maxLength": 64,
           "description": "容器唯一标识"
+        },
+        "scope": {
+          "type": "string",
+          "enum": ["project"],
+          "description": "知识层级（Container 仅在 Project 层）"
         },
         "name": {
           "type": "string",
@@ -42,31 +47,44 @@
           "minLength": 1,
           "description": "容器描述"
         },
+        "system_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "所属 System ID"
+        },
         "external": {
           "type": "boolean",
           "default": false,
           "description": "是否为外部容器（仅有基本描述，无详细实现信息）"
         },
+        "external_info": {
+          "$ref": "c4a-common.schema.json#/$defs/externalInfo",
+          "description": "外部容器信息（仅 external=true 时）"
+        },
         "technology": {
-          "type": "object",
-          "required": ["language", "protocol"],
-          "additionalProperties": false,
-          "properties": {
-            "language": {
-              "type": "string",
-              "description": "编程语言及版本"
-            },
-            "framework": {
-              "type": "string",
-              "description": "使用的框架"
-            },
-            "runtime": {
-              "type": "string",
-              "description": "运行时环境"
-            },
-            "protocol": {
-              "type": "string",
-              "description": "对外通信协议类型"
+          "type": "array",
+          "description": "技术栈列表（支持多语言/多框架场景）",
+          "items": {
+            "type": "object",
+            "required": ["language"],
+            "additionalProperties": false,
+            "properties": {
+              "language": {
+                "type": "string",
+                "description": "编程语言及版本"
+              },
+              "framework": {
+                "type": "string",
+                "description": "使用的框架"
+              },
+              "runtime": {
+                "type": "string",
+                "description": "运行时环境"
+              },
+              "protocol": {
+                "type": "string",
+                "description": "技术栈通信协议（如 REST、gRPC、GraphQL）"
+              }
             }
           }
         },
@@ -111,6 +129,10 @@
           },
           "additionalProperties": false,
           "description": "代码仓库信息"
+        },
+        "code_path": {
+          "type": "string",
+          "description": "代码路径（关联代码目录）"
         },
         "apis": {
           "type": "array",
@@ -195,15 +217,14 @@
             "type": "boolean",
             "default": false,
             "description": "是否为外部容器（如 Redis、Kafka 等）"
+          },
+          "external_info": {
+            "$ref": "c4a-common.schema.json#/$defs/externalInfo",
+            "description": "外部容器信息（仅 external=true 时）"
           }
         }
       },
       "description": "容器间依赖关系"
-    },
-
-    "knowledge": {
-      "$ref": "c4a-common.schema.json#/$defs/knowledge",
-      "description": "容器级知识附加"
     }
   }
 }

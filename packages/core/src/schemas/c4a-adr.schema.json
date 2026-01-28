@@ -131,6 +131,10 @@
             "items": { "type": "string" },
             "description": "缺点"
           },
+          "reason": {
+            "type": "string",
+            "description": "未选择该方案的原因"
+          },
           "evaluation": {
             "type": "integer",
             "minimum": 1,
@@ -142,29 +146,12 @@
       "description": "考虑的备选方案"
     },
 
-    "affects": {
+    "related_entities": {
       "type": "array",
       "items": {
-        "type": "object",
-        "required": ["element_id", "element_type"],
-        "additionalProperties": false,
-        "properties": {
-          "element_type": {
-            "type": "string",
-            "enum": ["system", "container", "component"],
-            "description": "元素类型"
-          },
-          "element_id": {
-            "type": "string",
-            "description": "元素 ID"
-          },
-          "scope": {
-            "type": "string",
-            "description": "影响范围说明"
-          }
-        }
+        "type": "string"
       },
-      "description": "影响的架构元素"
+      "description": "影响的实体 ID 列表"
     },
 
     "related": {
@@ -188,19 +175,9 @@
             "pattern": "^adr-[a-z]\\d{3}(-[a-z0-9]+)*$"
           },
           "description": "相关 ADR 列表"
-        },
-        "related_contracts": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "相关契约 ID 列表"
         }
       },
       "description": "关联信息"
-    },
-
-    "content": {
-      "type": "string",
-      "description": "完整 Markdown 内容（可选，用于富文本）"
     }
   }
 }

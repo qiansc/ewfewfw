@@ -5,7 +5,7 @@
  * 支持 Copy-on-Write 机制
  */
 
-import type { LifecycleStatus, Owner } from './base';
+import type { LifecycleStatus, Owner } from './base.js';
 
 // ============================================================================
 // Feat 状态
@@ -14,32 +14,39 @@ import type { LifecycleStatus, Owner } from './base';
 /**
  * Feat 生命周期状态
  *
- * 状态流转：
- * draft → in_progress → reviewing → approved → publishing → published
- *                 ↓                                    ↓
- *              rejected ────────────────────────► archived
+ * 状态流转（与通用实体生命周期一致）：
+ * draft ──批准──► approved ──发布──► published ──废弃──► deprecated ──归档──► archived
+ *
+ * 参考：v0.3.0/architecture.md §7.1
  */
 export type FeatStatus =
   | 'draft' // 草稿：刚创建，尚未开始
-  | 'in_progress' // 进行中：正在开发
-  | 'reviewing' // 审核中：等待审核
   | 'approved' // 已批准：审核通过，等待发布
-  | 'publishing' // 发布中：正在执行发布流程
   | 'published' // 已发布：合并到主分支
-  | 'rejected' // 已拒绝：审核未通过
+  | 'deprecated' // 已废弃：不推荐使用
   | 'archived'; // 已归档：终态
 
 /**
  * Feat 状态流转有效性映射
+ *
+ * 根据 v0.3.0/architecture.md 定义的生命周期：
+ * draft ──批准──► approved ──发布──► published ──废弃──► deprecated ──归档──► archived
+ *   │                                    │
+ *   └──────────────拒绝──────────────────►│
+ *                                        ▼
+ *                                    archived
+ *
+ * 规则：
+ * - 状态流转必须按顺序进行，不可跳过
+ * - draft 可直接到 archived（拒绝场景）
+ * - approved 必须先发布，不能直接归档
+ * - published 可直接到 archived（快速归档场景），或先废弃再归档
  */
 export const VALID_FEAT_STATUS_TRANSITIONS: Record<FeatStatus, FeatStatus[]> = {
-  draft: ['in_progress', 'archived'],
-  in_progress: ['reviewing', 'archived'],
-  reviewing: ['approved', 'rejected'],
-  approved: ['publishing', 'archived'],
-  publishing: ['published', 'approved'], // 发布失败可回退到 approved
-  published: ['archived'],
-  rejected: ['in_progress', 'archived'], // rejected 可重新开始
+  draft: ['approved', 'archived'], // archived 用于拒绝场景
+  approved: ['published'], // 必须先发布
+  published: ['deprecated', 'archived'], // 可直接归档或先废弃
+  deprecated: ['archived'],
   archived: [], // 终态
 };
 
@@ -227,18 +234,37 @@ export interface CreateFeatParams {
 }
 
 /**
+ * Feat 状态流转的目标状态
+ *
+ * 注意：不包含 'draft'，因为 feat 创建时自动为 draft 状态，
+ * 不需要通过 transition 操作流转到 draft。
+ *
+ * 参考：v0.3.0/detailed-design/mcp/store-feat-lifecycle.md
+ */
+export type FeatTransitionTarget = 'approved' | 'published' | 'deprecated' | 'archived';
+
+/**
  * Feat 状态流转参数
  */
 export interface TransitionFeatStatusParams {
   /** Feat ID */
   feat_id: string;
-  /** 目标状态 */
-  to_status: FeatStatus;
+
+  /**
+   * 目标状态
+   *
+   * 可选值：approved | published | deprecated | archived
+   * 不包含 draft（feat 创建时自动为 draft）
+   */
+  to_status: FeatTransitionTarget;
+
   /** 操作者 */
   operator?: string;
-  /** 备注（如拒绝原因） */
+
+  /** 备注（如归档原因） */
   note?: string;
-  /** 审核人列表（流转到 reviewing 时） */
+
+  /** 审核人列表（流转到 approved 时可选） */
   reviewers?: string[];
 }
 
@@ -327,12 +353,9 @@ export function isFeat(entity: unknown): entity is Feat {
 export function isFeatStatus(status: string): status is FeatStatus {
   return [
     'draft',
-    'in_progress',
-    'reviewing',
     'approved',
-    'publishing',
     'published',
-    'rejected',
+    'deprecated',
     'archived',
   ].includes(status);
 }

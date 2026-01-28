@@ -4,7 +4,7 @@
  * ADR（架构决策记录）和 Contract（接口规格）
  */
 
-import type { BaseEntityMetadata, Criticality, LifecycleStatus } from './base';
+import type { BaseEntityMetadata, Criticality, LifecycleStatus } from './base.js';
 
 // ============================================================================
 // ADR (Architecture Decision Record)
@@ -12,15 +12,16 @@ import type { BaseEntityMetadata, Criticality, LifecycleStatus } from './base';
 
 /**
  * ADR 状态
- * 注意：ADR 有自己的状态机，与通用生命周期略有不同
+ *
+ * 使用通用生命周期状态 + superseded（被替代）
+ * 参考：v0.3.0/concepts.md §8.2, c4a-adr.schema.json
  */
 export type ADRStatus =
   | 'draft' // 草稿
-  | 'proposed' // 已提出，等待审核
   | 'approved' // 已批准
-  | 'implemented' // 已实施
   | 'published' // 已发布
   | 'deprecated' // 已废弃
+  | 'archived' // 已归档
   | 'superseded'; // 已被替代
 
 /**
@@ -71,12 +72,23 @@ export interface ADRRelated {
  *
  * 记录架构决策的背景、选项和结论
  * 只在 Project Knowledge 层存在
+ *
+ * 注意：ADR 使用 title 而非 name（参考 v0.3.0/concepts.md §8.2, architecture.md §2.6）
+ * 因此不继承 BaseEntityMetadata，而是使用独立的类型定义
  */
-export interface ADR extends BaseEntityMetadata {
+export interface ADR {
+  /** 实体唯一标识 */
+  id: string;
   type: 'adr';
+  /** ADR 标题（不是 name，参考设计文档） */
+  title: string;
+  /** 描述 */
+  description?: string;
+  /** 标签 */
+  tags?: string[];
   data: {
-    /** ADR 状态 */
-    adr_status: ADRStatus;
+    /** ADR 状态（含 superseded，与 DSL/Schema 一致） */
+    status: ADRStatus;
     /** 关联的 System ID */
     system_id?: string;
     /** 日期 */
@@ -171,14 +183,10 @@ export interface Contract extends BaseEntityMetadata {
   data: {
     /** Contract 类型 */
     contract_type: ContractType;
-    /** Contract 状态 */
-    contract_status: ContractStatus;
+    /** Contract 状态（含 implemented，与 DSL/Schema 一致） */
+    status: ContractStatus;
     /** 版本号 */
     version?: string;
-    /** 关联的 Container ID */
-    container_id?: string;
-    /** 实现此 Contract 的 Component ID */
-    component_id?: string;
     /** 实现了哪些 SoR（IMPLEMENTS 关系的数据字段冗余） */
     implements_sor?: string[];
 

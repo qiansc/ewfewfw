@@ -36,8 +36,8 @@ export type LifecycleStatus = 'draft' | 'approved' | 'published' | 'deprecated' 
  */
 export const VALID_STATUS_TRANSITIONS: Record<LifecycleStatus, LifecycleStatus[]> = {
   draft: ['approved', 'archived'], // archived 用于拒绝场景
-  approved: ['published', 'archived'], // archived 用于废弃场景
-  published: ['deprecated'],
+  approved: ['published'], // 只有 approved 才能发布
+  published: ['deprecated'], // 普通实体不支持 published -> archived 快速归档
   deprecated: ['archived'],
   archived: [], // 终态，不可流转
 };
@@ -95,6 +95,26 @@ export type EntityType =
   | 'contract'
   // Feature 分支
   | 'feat';
+
+/**
+ * Schema 验证类型
+ *
+ * 用于 JSON Schema 验证器，包含所有可验证的 DSL 类型。
+ * 注意：这与 DSL 文件中的 type 字段值不同
+ * - DSL 文件使用 "software-system"（符合 C4 模型命名）
+ * - Schema 验证使用 "system"（简化内部使用）
+ */
+export type SchemaType =
+  | 'product'
+  | 'system'
+  | 'container'
+  | 'component'
+  | 'process'
+  | 'sor'
+  | 'adr'
+  | 'contract'
+  | 'feat'
+  | 'checklist';
 
 /**
  * 核心实体类型（三构件）
@@ -159,6 +179,12 @@ export interface BaseEntityMetadata {
   /** 知识层级 */
   scope: Scope;
 
+  /** 知识点类型 */
+  kind?: EntityKind;
+
+  /** 视角（业务/技术） */
+  perspective?: Perspective;
+
   /** 显示名称 */
   name: string;
 
@@ -206,6 +232,9 @@ export interface StoredEntityMetadata extends BaseEntityMetadata {
 
   /** 实体归属的代码仓库 URL */
   source_repo?: string | null;
+
+  /** 外部系统/组件 URL */
+  external_url?: string | null;
 
   /** 内容哈希，用于变更检测 */
   content_hash?: string;

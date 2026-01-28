@@ -17,7 +17,7 @@
     },
     "process": {
       "type": "object",
-      "required": ["id", "name", "process_type"],
+      "required": ["id", "name", "description", "process_type", "scope"],
       "additionalProperties": false,
       "properties": {
         "id": {
@@ -31,14 +31,19 @@
           "maxLength": 128,
           "description": "流程名称"
         },
+        "description": {
+          "type": "string",
+          "description": "流程描述"
+        },
         "process_type": {
           "type": "string",
           "enum": ["business", "technical"],
           "description": "流程类型"
         },
-        "description": {
+        "scope": {
           "type": "string",
-          "description": "流程描述"
+          "enum": ["domain", "enterprise", "project"],
+          "description": "知识层级"
         },
         "owner": {
           "$ref": "c4a-common.schema.json#/$defs/owner"
@@ -76,8 +81,32 @@
         }
       }
     },
-    "knowledge": {
-      "$ref": "c4a-common.schema.json#/$defs/knowledge"
+    "steps": {
+      "type": "array",
+      "description": "流程步骤",
+      "items": {
+        "type": "object",
+        "required": ["id", "name"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "步骤 ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "步骤名称"
+          },
+          "description": {
+            "type": "string",
+            "description": "步骤描述"
+          },
+          "actor": {
+            "type": "string",
+            "description": "执行者"
+          }
+        }
+      }
     }
   }
 }

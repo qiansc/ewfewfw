@@ -15,7 +15,7 @@ import type {
   Perspective,
   Scope,
   StoredEntityMetadata,
-} from './base';
+} from './base.js';
 
 // ============================================================================
 // Entity 构件
@@ -73,13 +73,13 @@ export interface Container extends BaseEntityMetadata {
   data: {
     /** 所属 System ID */
     system_id: string;
-    /** 技术栈 */
-    technology?: {
-      language?: string;
+    /** 技术栈列表（支持多语言/多框架场景） */
+    technology?: Array<{
+      language: string;
       framework?: string;
       runtime?: string;
       protocol?: string;
-    };
+    }>;
     /** 端口配置 */
     ports?: Array<{
       port: number;
@@ -122,12 +122,10 @@ export interface Component extends BaseEntityMetadata {
     container_id: string;
     /** 技术 */
     technology?: string;
-    /** 职责描述 */
-    responsibility?: string;
     /** 代码路径（关联代码文件） */
     code_path?: string;
-    /** 实现的 Contract ID */
-    implements_contract?: string;
+    /** 实现的 Contract ID 列表 */
+    implements_contracts?: string[];
     /** 扩展数据 */
     [key: string]: unknown;
   };

@@ -41,13 +41,9 @@
           "type": "string",
           "description": "契约描述"
         },
-        "container_id": {
-          "type": "string",
-          "description": "所属容器 ID"
-        },
         "contract_type": {
           "type": "string",
-          "enum": ["openapi", "asyncapi", "protobuf", "graphql"],
+          "enum": ["openapi", "asyncapi", "proto", "graphql"],
           "description": "契约类型"
         },
         "status": {
@@ -59,120 +55,25 @@
           "type": "string",
           "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$",
           "description": "契约版本，如 v1.2.0"
+        },
+
+        "implements_sor": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "此 Contract 实现的 SoR ID 列表"
         }
       }
     },
 
-    "content": {
+    "spec": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "内联存储规格内容（小型契约，便于版本管理）"
+    },
+
+    "spec_uri": {
       "type": "string",
-      "description": "契约内容（OpenAPI YAML/JSON、Proto、GraphQL SDL 等）"
-    },
-
-    "metadata": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "created_at": {
-          "type": "string",
-          "format": "date-time",
-          "description": "创建时间"
-        },
-        "updated_at": {
-          "type": "string",
-          "format": "date-time",
-          "description": "更新时间"
-        },
-        "created_by": {
-          "type": "string",
-          "description": "创建人"
-        },
-        "approved_by": {
-          "type": "string",
-          "description": "批准人"
-        },
-        "approved_at": {
-          "type": "string",
-          "format": "date-time",
-          "description": "批准时间"
-        }
-      }
-    },
-
-    "validation": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "last_validated_at": {
-          "type": "string",
-          "format": "date-time",
-          "description": "最后验证时间"
-        },
-        "success": {
-          "type": "boolean",
-          "description": "验证是否成功"
-        },
-        "errors": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "验证错误"
-        },
-        "warnings": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "验证警告"
-        }
-      },
-      "description": "验证信息"
-    },
-
-    "related": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "adr_id": {
-          "type": "string",
-          "pattern": "^ADR-[0-9]{3,4}$",
-          "description": "关联的 ADR ID"
-        },
-        "consumers": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "消费者容器 ID 列表"
-        },
-        "supersedes": {
-          "type": "string",
-          "description": "替代的契约 ID"
-        },
-        "superseded_by": {
-          "type": "string",
-          "description": "被哪个契约替代"
-        }
-      },
-      "description": "关联信息"
-    },
-
-    "breaking_changes": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["version", "description"],
-        "additionalProperties": false,
-        "properties": {
-          "version": {
-            "type": "string",
-            "description": "引入破坏性变更的版本"
-          },
-          "description": {
-            "type": "string",
-            "description": "变更描述"
-          },
-          "migration_guide": {
-            "type": "string",
-            "description": "迁移指南"
-          }
-        }
-      },
-      "description": "破坏性变更记录"
+      "description": "外部引用 URI（大型契约，URI 作为唯一标识，不在 C4A 同步范围内）"
     }
   }
 }

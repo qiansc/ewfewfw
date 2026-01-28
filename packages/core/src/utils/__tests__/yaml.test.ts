@@ -8,7 +8,7 @@ import {
   parseYAMLSafe,
   stringifyYAML,
   validateYAMLSyntax,
-} from '../yaml';
+} from '../yaml.js';
 
 describe('parseYAML', () => {
   test('parses simple YAML', () => {

@@ -5,8 +5,8 @@
  * 由现有实体组合而成，不是独立的实体类型
  */
 
-import type { Product, System, Container, Component, Process, SoR } from './entities';
-import type { Contract } from './attached';
+import type { Product, System, Container, Component, Process, SoR } from './entities.js';
+import type { Contract } from './attached.js';
 
 // ============================================================================
 // Functional Spec（PRD 的 DSL 版本）

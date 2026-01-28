@@ -13,7 +13,7 @@ import {
   generateEntityId,
   generateProposalId,
   parseEntityId,
-} from '../id';
+} from '../id.js';
 
 describe('isValidKebabCase', () => {
   test('valid kebab-case', () => {
