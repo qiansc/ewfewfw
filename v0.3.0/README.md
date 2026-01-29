@@ -22,7 +22,7 @@
 | 文件 | 说明 |
 |------|------|
 | [mcp/overview.md](./detailed-design/mcp/overview.md) | MCP 工具概述与分类 |
-| [mcp/code.md](./detailed-design/mcp/code.md) | 代码分析工具（c4a_code_*） |
+| [mcp/code.md](./detailed-design/mcp/code.md) | 知识采集工具（c4a_extract_*） |
 | [mcp/query.md](./detailed-design/mcp/query.md) | 查询工具（c4a_query_*） |
 | [mcp/store.md](./detailed-design/mcp/store.md) | 存储工具总览（c4a_store_*） |
 | [mcp/store-crud.md](./detailed-design/mcp/store-crud.md) | 存储 CRUD 操作详解 |

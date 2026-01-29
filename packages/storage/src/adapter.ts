@@ -16,7 +16,7 @@
  *     ┌────────┴────────┐
  *     ▼                 ▼
  * LiteAdapter      ServerAdapter
- *   (TS)            (Python)
+ *   (TS)            (HTTP)
  *     │                │
  *     ▼                ▼
  *   SQLite         MongoDB/Neo4j/Milvus
@@ -48,7 +48,7 @@ export type * from './adapterUtilsTypes.js';
  *
  * 实现:
  * - LiteAdapter: Local 模式，调用 SQLiteStore
- * - ServerAdapter: Server 模式，调用 mcp-data HTTP API
+ * - ServerAdapter: Server 模式，调用 Server API
  */
 export interface StorageAdapter {
   // ============================================================

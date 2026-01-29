@@ -379,7 +379,7 @@ function checkContracts(
           code: 'MISSING_CONTRACT',
           entity_id: component.id,
           message: `Component '${component.id}' 有 API 但缺少契约`,
-          suggestion: '使用 c4a_code_contract 生成契约',
+          suggestion: '使用 c4a_extract_contract 生成契约',
         });
       }
     }

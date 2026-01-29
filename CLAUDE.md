@@ -12,12 +12,14 @@ c4a/
 │   ├── cli/                   # 交互式 CLI (TypeScript + Ink)
 │   ├── config-generator/      # 配置生成器 (TypeScript)
 │   ├── core/                  # 共享核心库 (TypeScript)
-│   ├── mcp-code/              # 代码分析提取 (TypeScript)
-│   └── mcp-data/              # 统一数据服务 (Python)
+│   ├── storage/               # 存储适配层 (TypeScript)
+│   ├── mcp-extract/           # 知识采集 MCP (c4a_extract_*)
+│   ├── mcp-store/             # 知识存储 MCP (c4a_store_*)
+│   └── mcp-query/             # 知识查询 MCP (c4a_query_*)
 ├── prompts/                   # Agent Prompts
 ├── docker/                    # Docker 配置
 ├── docs/                      # 项目文档
-├── .c4a/                      # 架构知识本地存储
+├── .context/                  # 架构知识本地存储
 └── start.sh                   # CLI 入口 (查看所有命令: ./start.sh)
 ```
 
@@ -103,6 +105,32 @@ server.tool("my_tool", ..., MyInputSchema.shape, ...);  // ✅ 正常工作
 
 **原因**：Zod 的 `.refine()` / `.superRefine()` / `.transform()` 返回 `ZodEffects` 类型而非 `ZodObject`，TypeScript 尝试推断深度嵌套的泛型类型时会消耗大量内存导致 OOM。
 
+### MCP 错误响应规范 (必须遵守)
+
+MCP 工具执行失败时，返回 `content[].text` 内的错误结构必须遵循：
+
+```typescript
+interface ErrorResponse {
+  code: string;           // 错误码，如 "C4A-DATA-001"
+  message: string;        // 错误消息（用户友好）
+  details?: {             // 详细信息（可选）
+    field?: string;       // 出错字段
+    expected?: string;    // 期望值
+    actual?: string;      // 实际值
+    suggestion?: string;  // 修复建议
+  };
+  timestamp: string;      // 错误发生时间（ISO 8601）
+  request_id?: string;    // 请求 ID（用于追踪）
+  recoverable_actions?: RecoverableAction[];
+}
+
+interface RecoverableAction {
+  action: string;         // 操作标识，如 "retry", "force", "skip"
+  label: string;          // 操作描述
+  params?: object;        // 重试时需要的参数
+}
+```
+
 ### 代码风格
 
 **TypeScript:**
@@ -121,9 +149,9 @@ server.tool("my_tool", ..., MyInputSchema.shape, ...);  // ✅ 正常工作
 - 调试阶段生成的临时测试文件必须写到 `.tmp/` 目录
 - `.tmp/` 目录已在 `.gitignore` 中忽略
 
-## .c4a/ 目录结构
+## .context/ 目录结构
 
-架构知识的本地存储，数据库（MongoDB + Neo4j + Milvus）是权威源。
+架构知识的本地存储，数据库是权威源（Local 模式使用 SQLite，Server 模式使用 MongoDB + Neo4j + Milvus）。
 
 | 目录 | 用途 | 可修改性 |
 |------|------|----------|
@@ -149,7 +177,7 @@ drafts/adr-002-introduce-mq/
 ├── adr-002.c4a.yaml              # ADR 本身
 ├── containers/
 │   ├── c4a-mq.c4a.yaml           # 新增容器
-│   └── c4a-data-mcp.c4a.yaml     # 修改的容器
+│   └── c4a-store-mcp.c4a.yaml    # 修改的容器
 └── README.md                     # 提案说明（可选）
 ```
 
@@ -165,11 +193,12 @@ cp .env.example .env    # 复制环境变量模板
 
 ```bash
 ./start.sh              # 交互式菜单 (推荐)
-./start.sh dev          # 开发模式: 启动存储 + mcp-data + ttyd，提供 Web 终端访问
+./start.sh dev          # 开发模式: 启动存储 + MCP 服务，提供 Web 终端访问
 ./start.sh docker       # Docker 模式: 全部服务容器化，暴露 HTTP 端口
 ./start.sh prod         # 生产模式: 启用健康检查和自动重启
-./start.sh debug:code   # 调试 mcp-code (前台运行)
-./start.sh debug:data   # 调试 mcp-data (前台运行)
+./start.sh debug:extract # 调试 mcp-extract (前台运行)
+./start.sh debug:store  # 调试 mcp-store (前台运行)
+./start.sh debug:query  # 调试 mcp-query (前台运行)
 ./start.sh status       # 查看服务状态
 ./start.sh stop         # 停止所有服务
 ./start.sh logs         # 查看服务日志
@@ -192,7 +221,7 @@ cp .env.example .env    # 复制环境变量模板
 | **docker** | `./start.sh docker` | 团队共享、演示、CI/CD |
 | **prod** | `./start.sh prod` | 正式环境部署 |
 
-- **dev 模式**: 存储服务 Docker 运行，mcp-data 本地运行，ttyd 提供 Web 终端（局域网可访问 OpenCode）
+- **dev 模式**: 存储服务 Docker 运行，MCP 服务本地运行，ttyd 提供 Web 终端（局域网可访问）
 - **docker 模式**: 所有服务 Docker 运行，MCP 暴露 HTTP 端口供远程调用
 - **prod 模式**: 基于 docker 模式，增加健康检查和自动重启
 
@@ -200,13 +229,15 @@ cp .env.example .env    # 复制环境变量模板
 
 | 端口 | 服务 |
 |------|------|
-| 27017 | MongoDB |
-| 7474 | Neo4j Browser |
-| 7687 | Neo4j Bolt |
-| 19530 | Milvus |
+| 27017 | MongoDB (Server 模式) |
+| 7474 | Neo4j Browser (Server 模式) |
+| 7687 | Neo4j Bolt (Server 模式) |
+| 19530 | Milvus (Server 模式) |
 | 7681 | ttyd (Web 终端，仅 dev 模式) |
-| 8050 | mcp-data (数据服务) |
-| 8052 | mcp-code (代码分析，仅 docker/prod 模式) |
+| 8051 | mcp-store (知识存储) |
+| 8052 | mcp-extract (知识采集，仅 docker/prod 模式) |
+| 8053 | mcp-visual (可视化服务) |
+| 8054 | mcp-query (知识查询) |
 
 ## 核心概念
 

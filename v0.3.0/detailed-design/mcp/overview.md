@@ -12,7 +12,7 @@
 
 | 分组 | 前缀 | 能力 |
 |------|------|------|
-| **Code** | `c4a_code_*` | 代码分析/提取/AST/契约 |
+| **Extract** | `c4a_extract_*` | 代码分析/提取/AST/契约 |
 | **Store** | `c4a_store_*` | 写入/读取/列表/同步/feat 管理 |
 | **Query** | `c4a_query_*` | 语义搜索、依赖/影响分析 |
 | **Visual** | `c4a_visual_*` | AI 图片生成、C4 架构图渲染 |
@@ -27,9 +27,9 @@ Agent 完成知识管理任务的必需工具：
 
 | 工具 | 用途 |
 |------|------|
-| `c4a_code_extract` | 从代码提取接口/类型 |
-| `c4a_code_analyze` | 分析代码结构与依赖 |
-| `c4a_code_contract` | 生成 API 契约 |
+| `c4a_extract_interfaces` | 从代码提取接口/类型 |
+| `c4a_extract_analyze` | 分析代码结构与依赖 |
+| `c4a_extract_contract` | 生成 API 契约 |
 | `c4a_store_save` | 保存/更新实体 |
 | `c4a_store_read` | 读取实体 |
 | `c4a_store_list` | 列出实体概要 |
@@ -51,7 +51,7 @@ Agent 完成知识管理任务的必需工具：
 
 | 工具 | 用途 | 典型场景 |
 |------|------|---------|
-| `c4a_code_ast` | 获取 AST | 深度代码分析 |
+| `c4a_extract_ast` | 获取 AST | 深度代码分析 |
 | `c4a_store_validate` | 架构一致性检查 | 发布前检查 |
 | `c4a_store_read_history` | 查询变更历史 | 追溯实体演进 |
 | `c4a_store_update_workflow_step` | 原子更新 workflow 步骤 | Skills 错误恢复 |

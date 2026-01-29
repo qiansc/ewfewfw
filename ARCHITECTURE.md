@@ -24,8 +24,8 @@ C4A v0.2 采用 **MCP (Model Context Protocol) + Agent** 架构，完全围绕 A
           ┌───────────────────┼───────────────────┐
           ▼                   ▼                   ▼
    ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-   │   mcp-dsl   │     │  mcp-code   │     │  mcp-data   │
-   │  (TS/Bun)   │     │  (TS/Bun)   │     │  (Python)   │
+   │  mcp-store  │     │ mcp-extract │     │  mcp-query  │
+   │  (TS/Bun)   │     │  (TS/Bun)   │     │  (TS/Bun)   │
    └─────────────┘     └─────────────┘     └─────────────┘
                                                   │
                               ┌───────────────────┼───────────────────┐
@@ -37,46 +37,39 @@ C4A v0.2 采用 **MCP (Model Context Protocol) + Agent** 架构，完全围绕 A
 
 ## MCP 服务架构
 
-### mcp-dsl (TypeScript)
+### mcp-store (TypeScript)
 
-DSL 解析与验证服务。
+知识存储服务。
 
 | 工具 | 功能 |
 |------|------|
-| `c4a_dsl_parse` | 解析 C4A DSL 文件 (YAML → Object) |
-| `c4a_dsl_validate` | 验证 DSL 正确性 |
-| `c4a_dsl_generate` | 生成 DSL 模板 |
-| `c4a_dsl_schema` | 获取 JSON Schema |
-| `c4a_local_init_repo` | 初始化 .c4a/ 目录结构 |
-| `c4a_local_list_files` | 列出本地架构知识文件 |
-| `c4a_local_read_file` | 读取本地 DSL 文件 |
-| `c4a_local_write_file` | 写入本地 DSL 文件 |
-| `c4a_local_transition_status` | 流转 DSL 状态 |
+| `c4a_store_save` | 保存/更新 C4A 文档 |
+| `c4a_store_read` | 读取 C4A 文档 |
+| `c4a_store_list` | 列表查询与统计 |
+| `c4a_store_delete` | 删除 C4A 文档 |
+| `c4a_store_sync` | 同步本地 DSL 与存储 |
+| `c4a_store_plan_sync` | 生成同步计划 |
 
-### mcp-code (TypeScript)
+### mcp-extract (TypeScript)
 
 代码分析与提取服务，基于 Tree-sitter。
 
 | 工具 | 功能 |
 |------|------|
-| `c4a_code_extract` | 从代码提取接口、类型、类定义 |
-| `c4a_code_analyze` | 分析代码结构和依赖关系 |
-| `c4a_code_ast` | 获取代码的 AST 结构 |
-| `c4a_code_contract` | 从代码生成 API 契约 (OpenAPI/AsyncAPI/Proto) |
+| `c4a_extract_interfaces` | 从代码提取接口、类型、类定义 |
+| `c4a_extract_analyze` | 分析代码结构和依赖关系 |
+| `c4a_extract_ast` | 获取代码的 AST 结构 |
+| `c4a_extract_contract` | 从代码生成 API 契约 (OpenAPI/AsyncAPI/Proto) |
 
-### mcp-data (Python)
+### mcp-query (TypeScript)
 
-统一数据服务，整合三种存储。
+知识查询服务。
 
 | 工具 | 功能 |
 |------|------|
-| `c4a_store_save` | 保存/更新 C4A 文档，自动同步三库 |
-| `c4a_store_read` | 从 MongoDB 查询 C4A 文档 |
-| `c4a_store_delete` | 删除 C4A 文档，级联清理三库 |
 | `c4a_query_search` | 语义搜索 C4A 知识库 (Milvus) |
 | `c4a_query_deps` | 查询实体的依赖关系 (Neo4j) |
 | `c4a_query_impact` | 分析实体变更的影响范围 |
-| `c4a_store_sync` | 同步 DSL 文件与三库（支持单文件/批量） |
 
 ### MCP 传输协议
 
@@ -125,9 +118,9 @@ packages/cli/
 ```
 ┌─────────────────────┬─────────────────────┐
 │ ▸ 开发              │ ▸ 启动开发环境      │
-│   运维              │   调试 DSL MCP      │
-│   调试              │   调试 Code MCP     │
-│   工具              │   调试 Data MCP     │
+│   运维              │   调试 Store MCP    │
+│   调试              │   调试 Extract MCP  │
+│   工具              │   调试 Query MCP    │
 └─────────────────────┴─────────────────────┘
 ```
 
@@ -141,8 +134,8 @@ packages/cli/
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                       mcp-data                               │
-│                    (统一数据服务)                             │
+│                      mcp-store                              │
+│                    (知识存储服务)                             │
 └─────────────────────────────────────────────────────────────┘
                               │
           ┌───────────────────┼───────────────────┐
@@ -159,14 +152,14 @@ packages/cli/
 | Neo4j | 关系索引 | System/Container/Component 关系图 |
 | Milvus | 语义索引 | Knowledge 向量嵌入 |
 
-数据写入 MongoDB 后，由 mcp-data 负责同步到 Neo4j 和 Milvus。
+数据写入 MongoDB 后，由 mcp-store 负责同步到 Neo4j 和 Milvus。
 
 ## 部署模式
 
 ### 开发模式 (dev)
 
 - 存储服务：Docker 容器
-- MCP 服务：本地进程（mcp-data 以 HTTP 模式运行）
+- MCP 服务：本地进程（mcp-store/mcp-query 以 HTTP 模式运行）
 - Web 终端：ttyd 提供局域网访问
 - Agent：项目内置 OpenCode (opencode-ai)
 
@@ -189,11 +182,9 @@ packages/cli/
 | 层级 | 技术 | 说明 |
 |------|------|------|
 | 运行时 | Bun 1.3+ | TypeScript 执行 |
-| Python | 3.11+ | mcp-data 服务 |
 | Agent 框架 | OpenCode (opencode-ai) | 项目内置 AI Agent |
 | Web 终端 | ttyd | 局域网共享 OpenCode |
 | MCP SDK | @modelcontextprotocol/sdk | TypeScript MCP |
-| MCP SDK | mcp (Python) | Python MCP |
 | CLI 框架 | Ink | React for CLI |
 | DSL 解析 | YAML + Zod | 结构化配置 |
 | 代码提取 | Tree-sitter | 多语言 AST 解析 |

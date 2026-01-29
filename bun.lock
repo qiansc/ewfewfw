@@ -62,8 +62,8 @@
         "typescript": "^5.4.0",
       },
     },
-    "packages/mcp-code": {
-      "name": "@c4a/mcp-code",
+    "packages/mcp-extract": {
+      "name": "@c4a/mcp-extract",
       "version": "0.1.0",
       "dependencies": {
         "@c4a/core": "workspace:*",
@@ -73,6 +73,32 @@
         "tree-sitter-python": "^0.23.0",
         "tree-sitter-typescript": "^0.23.0",
         "web-tree-sitter": "^0.24.0",
+        "zod": "^3.23.0",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "typescript": "^5.4.0",
+      },
+    },
+    "packages/mcp-query": {
+      "name": "@c4a/mcp-query",
+      "version": "0.1.0",
+      "dependencies": {
+        "@c4a/storage": "workspace:*",
+        "@modelcontextprotocol/sdk": "^1.0.0",
+        "zod": "^3.23.0",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "typescript": "^5.4.0",
+      },
+    },
+    "packages/mcp-store": {
+      "name": "@c4a/mcp-store",
+      "version": "0.1.0",
+      "dependencies": {
+        "@c4a/storage": "workspace:*",
+        "@modelcontextprotocol/sdk": "^1.0.0",
         "zod": "^3.23.0",
       },
       "devDependencies": {
@@ -120,7 +146,11 @@
 
     "@c4a/core": ["@c4a/core@workspace:packages/core"],
 
-    "@c4a/mcp-code": ["@c4a/mcp-code@workspace:packages/mcp-code"],
+    "@c4a/mcp-extract": ["@c4a/mcp-extract@workspace:packages/mcp-extract"],
+
+    "@c4a/mcp-query": ["@c4a/mcp-query@workspace:packages/mcp-query"],
+
+    "@c4a/mcp-store": ["@c4a/mcp-store@workspace:packages/mcp-store"],
 
     "@c4a/mcp-visual": ["@c4a/mcp-visual@workspace:packages/mcp-visual"],
 
@@ -640,7 +670,11 @@
 
     "@c4a/core/@types/bun": ["@types/bun@1.3.7", "", { "dependencies": { "bun-types": "1.3.7" } }, "sha512-lmNuMda+Z9b7tmhA0tohwy8ZWFSnmQm1UDWXtH5r9F7wZCfkeO3Jx7wKQ1EOiKq43yHts7ky6r8SDJQWRNupkA=="],
 
-    "@c4a/mcp-code/@types/bun": ["@types/bun@1.3.7", "", { "dependencies": { "bun-types": "1.3.7" } }, "sha512-lmNuMda+Z9b7tmhA0tohwy8ZWFSnmQm1UDWXtH5r9F7wZCfkeO3Jx7wKQ1EOiKq43yHts7ky6r8SDJQWRNupkA=="],
+    "@c4a/mcp-extract/@types/bun": ["@types/bun@1.3.7", "", { "dependencies": { "bun-types": "1.3.7" } }, "sha512-lmNuMda+Z9b7tmhA0tohwy8ZWFSnmQm1UDWXtH5r9F7wZCfkeO3Jx7wKQ1EOiKq43yHts7ky6r8SDJQWRNupkA=="],
+
+    "@c4a/mcp-query/@types/bun": ["@types/bun@1.3.7", "", { "dependencies": { "bun-types": "1.3.7" } }, "sha512-lmNuMda+Z9b7tmhA0tohwy8ZWFSnmQm1UDWXtH5r9F7wZCfkeO3Jx7wKQ1EOiKq43yHts7ky6r8SDJQWRNupkA=="],
+
+    "@c4a/mcp-store/@types/bun": ["@types/bun@1.3.7", "", { "dependencies": { "bun-types": "1.3.7" } }, "sha512-lmNuMda+Z9b7tmhA0tohwy8ZWFSnmQm1UDWXtH5r9F7wZCfkeO3Jx7wKQ1EOiKq43yHts7ky6r8SDJQWRNupkA=="],
 
     "@c4a/storage/@types/bun": ["@types/bun@1.3.7", "", { "dependencies": { "bun-types": "1.3.7" } }, "sha512-lmNuMda+Z9b7tmhA0tohwy8ZWFSnmQm1UDWXtH5r9F7wZCfkeO3Jx7wKQ1EOiKq43yHts7ky6r8SDJQWRNupkA=="],
 
@@ -656,7 +690,11 @@
 
     "@c4a/core/@types/bun/bun-types": ["bun-types@1.3.7", "", { "dependencies": { "@types/node": "*" } }, "sha512-qyschsA03Qz+gou+apt6HNl6HnI+sJJLL4wLDke4iugsE6584CMupOtTY1n+2YC9nGVrEKUlTs99jjRLKgWnjQ=="],
 
-    "@c4a/mcp-code/@types/bun/bun-types": ["bun-types@1.3.7", "", { "dependencies": { "@types/node": "*" } }, "sha512-qyschsA03Qz+gou+apt6HNl6HnI+sJJLL4wLDke4iugsE6584CMupOtTY1n+2YC9nGVrEKUlTs99jjRLKgWnjQ=="],
+    "@c4a/mcp-extract/@types/bun/bun-types": ["bun-types@1.3.7", "", { "dependencies": { "@types/node": "*" } }, "sha512-qyschsA03Qz+gou+apt6HNl6HnI+sJJLL4wLDke4iugsE6584CMupOtTY1n+2YC9nGVrEKUlTs99jjRLKgWnjQ=="],
+
+    "@c4a/mcp-query/@types/bun/bun-types": ["bun-types@1.3.7", "", { "dependencies": { "@types/node": "*" } }, "sha512-qyschsA03Qz+gou+apt6HNl6HnI+sJJLL4wLDke4iugsE6584CMupOtTY1n+2YC9nGVrEKUlTs99jjRLKgWnjQ=="],
+
+    "@c4a/mcp-store/@types/bun/bun-types": ["bun-types@1.3.7", "", { "dependencies": { "@types/node": "*" } }, "sha512-qyschsA03Qz+gou+apt6HNl6HnI+sJJLL4wLDke4iugsE6584CMupOtTY1n+2YC9nGVrEKUlTs99jjRLKgWnjQ=="],
 
     "@c4a/storage/@types/bun/bun-types": ["bun-types@1.3.7", "", { "dependencies": { "@types/node": "*" } }, "sha512-qyschsA03Qz+gou+apt6HNl6HnI+sJJLL4wLDke4iugsE6584CMupOtTY1n+2YC9nGVrEKUlTs99jjRLKgWnjQ=="],
 

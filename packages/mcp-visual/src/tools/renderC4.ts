@@ -234,16 +234,20 @@ function getMockData(
   if (level === "container") {
     return {
       entities: [
-        { id: "mcp-dsl", name: "MCP DSL", description: "DSL 解析验证服务", type: "container" },
-        { id: "mcp-code", name: "MCP Code", description: "代码分析服务", type: "container" },
-        { id: "mcp-data", name: "MCP Data", description: "数据服务", type: "container" },
+        { id: "mcp-store", name: "MCP Store", description: "知识存储服务", type: "container" },
+        { id: "mcp-extract", name: "MCP Extract", description: "代码分析服务", type: "container" },
+        { id: "mcp-query", name: "MCP Query", description: "知识查询服务", type: "container" },
         { id: "mcp-visual", name: "MCP Visual", description: "可视化服务", type: "container" },
         { id: "mongodb", name: "MongoDB", description: "文档存储", type: "container_ext" },
         { id: "neo4j", name: "Neo4j", description: "图数据库", type: "container_ext" },
+        { id: "milvus", name: "Milvus", description: "向量数据库", type: "container_ext" },
       ],
       relationships: [
-        { from: "mcp-data", to: "mongodb", label: "stores data" },
-        { from: "mcp-data", to: "neo4j", label: "stores graph" },
+        { from: "mcp-store", to: "mongodb", label: "stores data" },
+        { from: "mcp-store", to: "neo4j", label: "stores graph" },
+        { from: "mcp-store", to: "milvus", label: "stores vector" },
+        { from: "mcp-query", to: "neo4j", label: "queries graph" },
+        { from: "mcp-query", to: "milvus", label: "searches vector" },
         { from: "mcp-visual", to: "neo4j", label: "queries" },
       ],
     };

@@ -34,6 +34,7 @@ function normalizeProject(project: string | null): string | null {
 interface GraphNode {
   project: string | null;
   id: string;
+  type: string | null;
   outgoing: Map<string, Set<NodeKey>>; // rel_type -> target_node_keys
   incoming: Map<string, Set<NodeKey>>; // rel_type -> source_node_keys
 }
@@ -45,6 +46,8 @@ export interface DependencyResult {
   project: string | null;
   id: string;
   distance: number;
+  type?: string | null;
+  relation_type?: string;
 }
 
 /**
@@ -184,6 +187,8 @@ export class InMemoryGraph {
         rel.rel_type
       );
     }
+
+    this.attachNodeTypes(db, proposalId);
   }
 
   /**
@@ -196,7 +201,9 @@ export class InMemoryGraph {
     fromId: string,
     toProject: string | null,
     toId: string,
-    relType: string
+    relType: string,
+    fromType?: string | null,
+    toType?: string | null
   ): void {
     const normalizedFrom = normalizeProject(fromProject);
     const normalizedTo = normalizeProject(toProject);
@@ -208,6 +215,7 @@ export class InMemoryGraph {
       this.nodes.set(fromKey, {
         project: normalizedFrom,
         id: fromId,
+        type: fromType ?? null,
         outgoing: new Map(),
         incoming: new Map(),
       });
@@ -216,9 +224,19 @@ export class InMemoryGraph {
       this.nodes.set(toKey, {
         project: normalizedTo,
         id: toId,
+        type: toType ?? null,
         outgoing: new Map(),
         incoming: new Map(),
       });
+    }
+
+    const fromNodeType = this.nodes.get(fromKey);
+    if (fromType && fromNodeType && !fromNodeType.type) {
+      fromNodeType.type = fromType;
+    }
+    const toNodeType = this.nodes.get(toKey);
+    if (toType && toNodeType && !toNodeType.type) {
+      toNodeType.type = toType;
     }
 
     // 添加出边
@@ -324,7 +342,7 @@ export class InMemoryGraph {
     const visited = new Set<NodeKey>();
     const result: DependencyResult[] = [];
 
-    const traverse = (nodeKey: NodeKey, currentDepth: number) => {
+    const traverse = (nodeKey: NodeKey, currentDepth: number, relType?: string) => {
       if (currentDepth > depth || visited.has(nodeKey)) return;
 
       visited.add(nodeKey);
@@ -335,6 +353,8 @@ export class InMemoryGraph {
             project: node.project,
             id: node.id,
             distance: currentDepth,
+            type: node.type,
+            relation_type: relType,
           });
         }
       }
@@ -350,7 +370,7 @@ export class InMemoryGraph {
             continue;
           }
           for (const targetKey of Array.from(targets)) {
-            traverse(targetKey, currentDepth + 1);
+            traverse(targetKey, currentDepth + 1, relType);
           }
         }
       }
@@ -363,7 +383,7 @@ export class InMemoryGraph {
             continue;
           }
           for (const sourceKey of Array.from(sources)) {
-            traverse(sourceKey, currentDepth + 1);
+            traverse(sourceKey, currentDepth + 1, relType);
           }
         }
       }
@@ -381,10 +401,73 @@ export class InMemoryGraph {
   }
 
   /**
+   * 更新节点类型
+   */
+  setNodeType(project: string | null, id: string, type: string | null): void {
+    const key = makeNodeKey(project, id);
+    const node = this.nodes.get(key);
+    if (node) {
+      node.type = type;
+    }
+  }
+
+  /**
    * 获取节点数量（用于监控）
    */
   getNodeCount(): number {
     return this.nodes.size;
+  }
+
+  private attachNodeTypes(db: Database, proposalId: string | null): void {
+    if (this.nodes.size === 0) return;
+
+    const dbProposalId = proposalId ?? '';
+    const rows = proposalId
+      ? db
+          .prepare(
+            `
+          SELECT source_project, id, proposal_id, type
+          FROM entities
+          WHERE proposal_id = ? OR proposal_id IS NULL OR proposal_id = ''
+        `
+          )
+          .all(dbProposalId)
+      : db
+          .prepare(
+            `
+          SELECT source_project, id, proposal_id, type
+          FROM entities
+          WHERE proposal_id IS NULL OR proposal_id = ''
+        `
+          )
+          .all();
+
+    const preferred = new Set<NodeKey>();
+
+    for (const row of rows as Array<{
+      source_project: string | null;
+      id: string;
+      proposal_id: string | null;
+      type: string | null;
+    }>) {
+      const normalizedProject = normalizeProject(row.source_project ?? null);
+      const key = makeNodeKey(normalizedProject, row.id);
+      if (!this.nodes.has(key)) continue;
+
+      const isProposal = proposalId && row.proposal_id === dbProposalId;
+      if (isProposal) {
+        preferred.add(key);
+      }
+
+      const node = this.nodes.get(key);
+      if (!node) continue;
+
+      if (isProposal || !node.type) {
+        node.type = row.type ?? null;
+      } else if (!preferred.has(key) && node.type === null) {
+        node.type = row.type ?? null;
+      }
+    }
   }
 
   /**

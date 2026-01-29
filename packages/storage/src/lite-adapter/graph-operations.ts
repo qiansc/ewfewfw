@@ -50,9 +50,9 @@ export async function queryDeps(ctx: AdapterContext, params: DepsParams): Promis
   const depsNodes = results.map((r) => ({
     id: r.id,
     source_project: r.project,
-    type: 'component' as EntityType,
+    type: (r.type ?? 'component') as EntityType,
     distance: r.distance,
-    relation_type: 'depends_on',
+    relation_type: r.relation_type ?? 'DEPENDS_ON',
   }));
 
   // 写缓存（包含相关实体用于失效）
@@ -96,12 +96,20 @@ export async function queryImpact(ctx: AdapterContext, params: ImpactParams): Pr
   // 影响分析：查询下游依赖
   const results = ctx.graph.queryDeps(normalizedProject, params.id, 'downstream', depth);
 
+  const reason =
+    params.change_type === 'remove'
+      ? 'breaking'
+      : params.change_type
+        ? 'potential'
+        : undefined;
+
   const impactNodes = results.map((r) => ({
     id: r.id,
     source_project: r.project,
-    type: 'component' as EntityType,
+    type: (r.type ?? 'component') as EntityType,
     distance: r.distance,
     impact_level: (r.distance === 1 ? 'direct' : 'indirect') as 'direct' | 'indirect',
+    reason,
   }));
 
   // 写缓存

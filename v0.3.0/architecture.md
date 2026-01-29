@@ -19,7 +19,7 @@
 
 | 特性 | Local 模式 | Server 模式 | Remote 模式 |
 |------|----------|-------------|-------------|
-| 运行时 | Bun (TypeScript)¹ | Python | - |
+| 运行时 | Bun (TypeScript)¹ | TS + Python² | - |
 | 存储 | SQLite | MongoDB + Neo4j + Milvus | 远程服务 |
 | 访问方式 | MCP stdio（由 IDE 管理生命周期） | HTTP Server | HTTP API |
 | 安装 | `npm install -g @c4a/cli` | `docker-compose up` | 无需安装存储 |
@@ -28,6 +28,8 @@
 | 启动时间 | <1s | 30-60s | <1s |
 
 > ¹ Local 模式使用 Bun 运行时，SQLite 通过 `bun:sqlite` 内置模块访问，向量搜索使用 USearch (WASM)。详见 [mode-switch.md §7.1](./detailed-design/local-mode/mode-switch.md#71-依赖库)。
+>
+> ² Server 模式：MCP Server 层为 TypeScript，ServerAdapter 通过 HTTP/gRPC 调用 Python 后端（storage-backend）。Python 封装 MongoDB/Neo4j/Milvus 访问，因为这些数据库的 Python 驱动更成熟稳定。
 
 **Remote 模式说明**：
 - 不安装本地存储，使用项目配置的远程 MCP 服务
@@ -35,9 +37,9 @@
 - 适合使用团队共享的 C4A 服务实例
 - 需要在项目配置中指定 `remote.url` 和认证信息
 
-**Code MCP 必须本地运行**：
+**Extract MCP 必须本地运行**：
 
-`c4a_code_*` 工具（代码分析、AST 解析、契约提取）需要访问本地文件系统，因此在任何模式下都必须以 stdio 方式本地运行。Remote 模式仅影响 Data MCP（`c4a_store_*`、`c4a_query_*`）的连接方式。
+`c4a_extract_*` 工具（代码分析、AST 解析、契约提取）需要访问本地文件系统，因此在任何模式下都必须以 stdio 方式本地运行。Remote 模式仅影响 Data MCP（`c4a_store_*`、`c4a_query_*`）的连接方式。
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -45,7 +47,7 @@
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │   ┌─────────┐      stdio      ┌──────────────┐             │
-│   │  Agent  │◄───────────────►│  Code MCP    │             │
+│   │  Agent  │◄───────────────►│ Extract MCP  │             │
 │   │         │                 │  (本地运行)   │             │
 │   │         │                 └──────┬───────┘             │
 │   │         │                        │                     │
@@ -69,7 +71,7 @@
 
 | MCP 服务 | 工具前缀 | 连接方式 | 说明 |
 |---------|---------|---------|------|
-| Code MCP | `c4a_code_*` | stdio（始终本地） | 需要访问本地源代码 |
+| Extract MCP | `c4a_extract_*` | stdio（始终本地） | 需要访问本地源代码 |
 | Data MCP | `c4a_store_*`、`c4a_query_*` | 按模式切换 | Local: stdio，Server/Remote: HTTP |
 
 ### 1.2 核心洞察：存储层可插拔
@@ -106,7 +108,7 @@
 
 | 阶段 | 职责 | 能力 | MCP 工具 |
 |------|------|------|---------|
-| **Extract** | 从代码/文档提取知识碎片 | 代码分析、AST 解析、契约提取 | 见 [mcp-tools.md](./detailed-design/mcp-tools.md) 的 `c4a_code_*` |
+| **Extract** | 从代码/文档提取知识碎片 | 代码分析、AST 解析、契约提取 | 见 [mcp-tools.md](./detailed-design/mcp-tools.md) 的 `c4a_extract_*` |
 | **Model** | 将碎片/对话结果建模为结构化 DSL（实体 + 关系） | DSL 生成、关系推断、规范化 | 由 Skills 完成（调用 `c4a_store_*` 工具） |
 | **Store** | 持久化 + 索引 + 版本管理 | 保存/读取/同步/feat 管理/模板生成/Schema | 见 [mcp-tools.md](./detailed-design/mcp-tools.md) 的 `c4a_store_*` |
 | **Query** | 查询/推理/可视化 | 语义搜索、依赖分析、影响分析 | 见 [mcp-tools.md](./detailed-design/mcp-tools.md) 的 `c4a_query_*` |
@@ -166,13 +168,13 @@
      ┌────▼────┐    ┌────▼────┐              │
      │  Lite   │    │ Server  │              │
      │ Adapter │    │ Adapter │              │
-     │  (TS)   │    │ (Python)│              │
+     │  (TS)   │    │  (TS)   │              │
      └────┬────┘    └────┬────┘              │
-          │              │                   │
+          │              │ HTTP/gRPC         │
    ┌──────▼──┐    ┌──────▼──────┐            │
-   │ SQLite  │    │  MongoDB    │            │
-   │ 单文件   │    │  Neo4j      │            │
-   │{缓存目录}│    │  Milvus     │            │
+   │ SQLite  │    │storage-backend           │
+   │ USearch │    │  (Python)   │            │
+   │{缓存目录}│    │MongoDB+Neo4j+Milvus      │
    └─────────┘    └─────────────┘            │
 ```
 

@@ -41,7 +41,7 @@ import {
   batchSync,
   resumeSync,
   cancelSync,
-} from "../mcp/store/index.js";
+} from "../../../mcp-store/src/tools/index.js";
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = resolve(TEST_DIR, "../../../../");

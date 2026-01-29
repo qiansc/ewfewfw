@@ -143,7 +143,7 @@ pending → in_progress → completed
 **Server 模式（Python + MongoDB）**：
 
 ```python
-# mcp-data 内部实现
+# storage-backend 内部实现
 from datetime import datetime
 from motor.motor_asyncio import AsyncIOMotorDatabase
 

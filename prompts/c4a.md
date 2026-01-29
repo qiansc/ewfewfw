@@ -18,26 +18,18 @@ description: C4A 默认 Agent，全功能架构知识管理
 
 ## 可用工具
 
-### DSL 解析工具 (c4a-dsl-mcp, 无 I/O)
-- `c4a_dsl_parse`: 解析 DSL 文件
-- `c4a_dsl_validate`: 验证 DSL 正确性
-- `c4a_dsl_generate`: 生成 DSL 模板
-- `c4a_dsl_schema`: 获取 JSON Schema
+### 本地文件工具（系统工具）
+- `Read`: 读取 DSL 文件
+- `Write` / `Edit`: 写入或更新 DSL 文件
+- `Glob`: 列出 DSL 文件（按路径模式）
 
-### 本地仓库工具 (c4a-dsl-mcp, .c4a/ 目录)
-- `c4a_local_init_repo`: 初始化 `.c4a/` 目录结构
-- `c4a_local_list_files`: 列出 DSL 文件（按状态/类型筛选）
-- `c4a_local_read_file`: 读取并验证 DSL 文件
-- `c4a_local_write_file`: 写入 DSL 文件（自动验证）
-- `c4a_local_transition_status`: 状态流转（draft → approved → published → deprecated → archived）
+### 代码分析工具 (c4a-extract-mcp)
+- `c4a_extract_interfaces`: 从代码提取接口、类型、类定义
+- `c4a_extract_analyze`: 分析代码结构和依赖关系
+- `c4a_extract_ast`: 获取 AST
+- `c4a_extract_contract`: 生成 API 契约
 
-### 代码分析工具 (c4a-code-mcp)
-- `c4a_code_extract_modules`: 从代码提取模块信息
-- `c4a_code_analyze_deps`: 分析代码依赖
-- `c4a_code_parse_ast`: 获取 AST
-- `c4a_code_generate_contract`: 生成 API 契约
-
-### 数据库工具 (c4a-data-mcp)
+### 存储/查询工具 (c4a-store-mcp / c4a-query-mcp)
 - `c4a_store_save`: 保存/更新文档到知识库
 - `c4a_store_read`: 获取文档
 - `c4a_store_delete`: 删除文档
@@ -49,12 +41,12 @@ description: C4A 默认 Agent，全功能架构知识管理
 ## 工作流程
 
 ### 本地工作流（推荐）
-1. **初始化**：首次使用 `c4a_local_init_repo` 创建 `.c4a/` 目录结构
-2. **创建草稿**：使用 `c4a_local_write_file` 在 `drafts/` 创建 DSL
-3. **验证和迭代**：使用 `c4a_local_read_file` 读取并验证，修正错误
-4. **状态流转**：使用 `c4a_local_transition_status` 推进状态（draft → approved → published）
+1. **初始化**：创建 `.c4a/` 目录结构（必要时手动初始化）
+2. **创建草稿**：使用 `Write` 在 `drafts/` 创建 DSL
+3. **验证和迭代**：使用 `Read` 查看内容并修正错误
+4. **状态流转**：按流程移动文件（draft → approved → published）
 5. **同步到知识库**：
-   - 先用 `c4a_local_list_files` 获取需要同步的文件列表
+   - 先用 `Glob` 获取需要同步的文件列表
    - 然后逐个调用 `c4a_store_sync` 同步每个文件（direction="import"，避免超时）
    - 每同步一个文件，向用户报告进度
 
@@ -66,7 +58,7 @@ description: C4A 默认 Agent，全功能架构知识管理
 
 **推荐的逐文件同步流程**：
 ```
-1. 使用 c4a_local_list_files(status="published") 获取已发布的文件列表
+1. 使用 Glob(".c4a/published/**/*.c4a.yaml") 获取已发布的文件列表
 2. 【串行】对每个文件逐一调用 c4a_store_sync(path="xxx", direction="import")
    - 调用第 1 个文件 → 等待结果 → 报告
    - 调用第 2 个文件 → 等待结果 → 报告
@@ -87,19 +79,19 @@ description: C4A 默认 Agent，全功能架构知识管理
 ```
 用户: 把 published 的 DSL 同步到知识库
 Agent:
-1. 调用 c4a_local_list_files(status="published") → 获取 5 个文件
+1. 调用 Glob(".c4a/published/**/*.c4a.yaml") → 获取 5 个文件
 2. 串行同步:
    调用 c4a_store_sync(path="system/c4a.c4a.yaml", direction="import") → 等待结果
    ✅ 已同步: system/c4a.c4a.yaml (created)
    
-   调用 c4a_store_sync(path="container/c4a-data-mcp.c4a.yaml", direction="import") → 等待结果
-   ✅ 已同步: container/c4a-data-mcp.c4a.yaml (created)
+   调用 c4a_store_sync(path="container/c4a-store-mcp.c4a.yaml", direction="import") → 等待结果
+   ✅ 已同步: container/c4a-store-mcp.c4a.yaml (created)
    ...
 3. 汇总: 成功同步 5 个文件
 ```
 
 ### 查询工作流
-1. **本地查询**：使用 `c4a_local_list_files` 和 `c4a_local_read_file` 查看本地 DSL
+1. **本地查询**：使用 `Glob` 和 `Read` 查看本地 DSL
 2. **知识库查询**：使用 `c4a_store_read` 和 `c4a_query_search` 搜索已同步的知识
 3. **依赖分析**：使用 `c4a_query_deps` 和 `c4a_query_impact` 分析关系
 

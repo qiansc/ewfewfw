@@ -533,6 +533,45 @@ export function persistRelations(
 export function updateGraph(ctx: AdapterContext, changeset: RelationsChangeSet): void {
   const toGraphProject = (value: string | null | undefined): string | null =>
     value === '' || value === null || value === undefined ? null : value;
+  const toDbProject = (value: string | null | undefined): string => value ?? '';
+  const db = ctx.store.getDatabase();
+  const proposalId = ctx.graph.getProposalId();
+
+  const fetchEntityType = (project: string | null | undefined, id: string): string | null => {
+    const dbProject = toDbProject(project);
+    if (proposalId) {
+      const row = db
+        .prepare(
+          `
+          SELECT type
+          FROM entities
+          WHERE source_project = ? AND id = ?
+            AND (proposal_id = ? OR proposal_id IS NULL OR proposal_id = '')
+          ORDER BY CASE
+            WHEN proposal_id = ? THEN 1
+            WHEN proposal_id IS NULL OR proposal_id = '' THEN 2
+            ELSE 3
+          END
+          LIMIT 1
+        `
+        )
+        .get(dbProject, id, proposalId, proposalId) as { type?: string } | undefined;
+      return row?.type ?? null;
+    }
+
+    const row = db
+      .prepare(
+        `
+        SELECT type
+        FROM entities
+        WHERE source_project = ? AND id = ?
+          AND (proposal_id IS NULL OR proposal_id = '')
+        LIMIT 1
+      `
+      )
+      .get(dbProject, id) as { type?: string } | undefined;
+    return row?.type ?? null;
+  };
 
   for (const rel of changeset.removed) {
     ctx.graph.removeRelation(
@@ -545,12 +584,16 @@ export function updateGraph(ctx: AdapterContext, changeset: RelationsChangeSet):
   }
 
   for (const rel of changeset.added) {
+    const fromType = fetchEntityType(rel.fromProject, rel.fromId);
+    const toType = fetchEntityType(rel.toProject, rel.toId);
     ctx.graph.addRelation(
       toGraphProject(rel.fromProject),
       rel.fromId,
       toGraphProject(rel.toProject),
       rel.toId,
-      rel.relType
+      rel.relType,
+      fromType,
+      toType
     );
   }
 

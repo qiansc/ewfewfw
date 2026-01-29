@@ -142,11 +142,11 @@ ADR 评审的交互式流程，支持以下操作：
 
 ## 架构影响分析（如数据库可用）
 🔍 相关现有容器：
-  - c4a-data-mcp: 当前使用同步 HTTP，可能需要适配
-  - c4a-code-mcp: 有数据依赖关系
+  - c4a-store-mcp: 当前使用同步 HTTP，可能需要适配
+  - c4a-extract-mcp: 有数据依赖关系
 
 🔗 依赖链：
-  c4a-dsl-mcp → c4a-data-mcp → MongoDB
+  c4a-store-mcp → MongoDB/Neo4j/Milvus
 
 ⚠️ ADR 范围建议（如有问题）
 检测到以下内容可能过于具体：
@@ -302,7 +302,7 @@ ADR 评审的交互式流程，支持以下操作：
 🔍 配置一致性检查
 
 涉及的 MCP 容器：
-  ✅ c4a-data-mcp - 已在 c4a.config.yaml 中配置
+  ✅ c4a-store-mcp - 已在 c4a.config.yaml 中配置
   ❌ c4a-visual-mcp - 缺少配置！
 
 ⚠️ 发现配置缺失，请先更新 c4a.config.yaml：
