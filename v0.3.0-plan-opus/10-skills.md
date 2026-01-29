@@ -49,46 +49,46 @@ Part 10 实现 Skills 体系，包括 7 个公开 Skills（5 个工作流 + 2 �
 
 ## 任务清单
 
-| # | 功能 | [ ] | 描述 |
+| # | 功能 | 完成 | 描述 |
 |---|------|:---:|------|
-| 10.1 | Skills 设计原则 | [ ] | 路由优先/禁止直接接触 MCP/粒度完整流程 |
-| 10.2 | Skills 触发方式 | [ ] | 显式命令 vs 自然语言触发 |
-| 10.3 | Skill 文件结构规范 | [ ] | prompts/skills/{name}/SKILL.md 目录结构 |
-| 10.4 | 路由表格式 | [ ] | 能力路由/场景路由/默认行为 |
-| 10.5 | Skill 执行规则 | [ ] | 严格按步骤/用户确认/错误处理 |
-| 10.6 | Feat 上下文注入规范 | [ ] | System Prompt/Context/MCP 调用校验 |
-| 10.7 | 错误处理规范 | [ ] | recoverable_actions 处理 |
-| 10.8 | /c4a:feat Skill | [ ] | Feature 管理（创建/切换/状态流转） |
-| 10.9 | /c4a:feat 类型识别 | [ ] | 需求开发 vs 架构变更 vs 纯知识 |
-| 10.10 | /c4a:feat 上下文切换 | [ ] | --switch 参数/会话记忆 |
-| 10.11 | /c4a:feat 状态流转 | [ ] | --status 参数/一致性检查 |
-| 10.12 | /c4a:specify Skill | [ ] | Functional Spec 生成 |
-| 10.13 | /c4a:plan Skill | [ ] | Technical Spec + Contract + Checklist |
-| 10.14 | /c4a:plan ADR 检测 | [ ] | 架构变更检测/ADR 关联 |
-| 10.15 | /c4a:plan 契约补充 | [ ] | OpenAPI/AsyncAPI/Proto 生成 |
-| 10.16 | /c4a:plan 验收清单 | [ ] | Checklist 生成 |
-| 10.17 | /c4a:implement Skill | [ ] | 实现代码辅助 |
-| 10.18 | /c4a:implement 状态校验 | [ ] | 仅 approved 状态可执行 |
-| 10.19 | /c4a:implement 清单生成 | [ ] | 实现清单生成/任务计划 |
-| 10.20 | /c4a:analyze Skill | [ ] | 一致性检查/影响分析 |
-| 10.21 | /c4a:analyze 检查项 | [ ] | Spec 完整性/契约完备/DSL 引用/ADR 完备度 |
-| 10.22 | /c4a:analyze 悬空引用 | [ ] | 悬空引用检测/可视化 |
-| 10.23 | /c4a:know:learn Skill | [ ] | 快速录入知识（编排多 Skills） |
-| 10.24 | /c4a:know:learn 输入识别 | [ ] | 描述/文件/URL/目录 |
-| 10.25 | /c4a:know:learn 流程控制 | [ ] | 置信度判断/暂停点 |
-| 10.26 | /c4a:know:learn 错误恢复 | [ ] | workflow_steps/断点续传 |
-| 10.27 | /c4a:know:search Skill | [ ] | 语义搜索知识库 |
-| 10.28 | /c4a:model 内部 Skill | [ ] | 建模规则（内联到父 Skill） |
-| 10.29 | Checklist 格式定义 | [ ] | YAML 格式/tasks/progress/risks |
-| 10.30 | Checklist MCP 集成 | [ ] | c4a_store_feat_checklist 调用 |
-| 10.31 | ADR 模板定义 | [ ] | ADR 字段/完整性检查 |
-| 10.32 | 架构变更检测规则 | [ ] | System/Container/DEPENDS_ON 变更 |
-| 10.33 | 按依赖范围检查优化 | [ ] | 性能优化/延迟检查 |
-| 10.34 | 悬空引用可视化 | [ ] | Mermaid 样式/CLI 报告 |
-| 10.35 | 三种场景流程 | [ ] | 需求开发/架构变更/纯知识完整流程 |
-| 10.36 | prompts/c4a.md 更新 | [ ] | Skills 路由逻辑 |
-| 10.37 | CLAUDE.md 更新 | [ ] | Skills 使用指南 |
-| 10.38 | 单元测试 | [ ] | Skill 文件格式验证 |
+| 10.1 | Skills 设计原则 | [x] | 路由优先/禁止直接接触 MCP/粒度完整流程 |
+| 10.2 | Skills 触发方式 | [x] | 显式命令 vs 自然语言触发 |
+| 10.3 | Skill 文件结构规范 | [x] | prompts/skills/{name}/SKILL.md 目录结构 |
+| 10.4 | 路由表格式 | [x] | 能力路由/场景路由/默认行为 |
+| 10.5 | Skill 执行规则 | [x] | 严格按步骤/用户确认/错误处理 |
+| 10.6 | Feat 上下文注入规范 | [x] | System Prompt/Context/MCP 调用校验 |
+| 10.7 | 错误处理规范 | [x] | recoverable_actions 处理 |
+| 10.8 | /c4a:feat Skill | [x] | Feature 管理（创建/切换/状态流转） |
+| 10.9 | /c4a:feat 类型识别 | [x] | 需求开发 vs 架构变更 vs 纯知识 |
+| 10.10 | /c4a:feat 上下文切换 | [x] | --switch 参数/会话记忆 |
+| 10.11 | /c4a:feat 状态流转 | [x] | --status 参数/一致性检查 |
+| 10.12 | /c4a:specify Skill | [x] | Functional Spec 生成 |
+| 10.13 | /c4a:plan Skill | [x] | Technical Spec + Contract + Checklist |
+| 10.14 | /c4a:plan ADR 检测 | [x] | 架构变更检测/ADR 关联 |
+| 10.15 | /c4a:plan 契约补充 | [x] | OpenAPI/AsyncAPI/Proto 生成 |
+| 10.16 | /c4a:plan 验收清单 | [x] | Checklist 生成 |
+| 10.17 | /c4a:implement Skill | [x] | 实现代码辅助 |
+| 10.18 | /c4a:implement 状态校验 | [x] | 仅 approved 状态可执行 |
+| 10.19 | /c4a:implement 清单生成 | [x] | 实现清单生成/任务计划 |
+| 10.20 | /c4a:analyze Skill | [x] | 一致性检查/影响分析 |
+| 10.21 | /c4a:analyze 检查项 | [x] | Spec 完整性/契约完备/DSL 引用/ADR 完备度 |
+| 10.22 | /c4a:analyze 悬空引用 | [x] | 悬空引用检测/可视化 |
+| 10.23 | /c4a:know:learn Skill | [x] | 快速录入知识（编排多 Skills） |
+| 10.24 | /c4a:know:learn 输入识别 | [x] | 描述/文件/URL/目录 |
+| 10.25 | /c4a:know:learn 流程控制 | [x] | 置信度判断/暂停点 |
+| 10.26 | /c4a:know:learn 错误恢复 | [x] | workflow_steps/断点续传 |
+| 10.27 | /c4a:know:search Skill | [x] | 语义搜索知识库 |
+| 10.28 | /c4a:model 内部 Skill | [x] | 建模规则（内联到父 Skill） |
+| 10.29 | Checklist 格式定义 | [x] | YAML 格式/tasks/progress/risks |
+| 10.30 | Checklist MCP 集成 | [x] | c4a_store_feat_checklist 调用 |
+| 10.31 | ADR 模板定义 | [x] | ADR 字段/完整性检查 |
+| 10.32 | 架构变更检测规则 | [x] | System/Container/DEPENDS_ON 变更 |
+| 10.33 | 按依赖范围检查优化 | [x] | 性能优化/延迟检查 |
+| 10.34 | 悬空引用可视化 | [x] | Mermaid 样式/CLI 报告 |
+| 10.35 | 三种场景流程 | [x] | 需求开发/架构变更/纯知识完整流程 |
+| 10.36 | prompts/c4a.md 更新 | [x] | Skills 路由逻辑 |
+| 10.37 | CLAUDE.md 更新 | [x] | Skills 使用指南 |
+| 10.38 | 单元测试 | [x] | Skill 文件格式验证 |
 
 ---
 
@@ -96,28 +96,28 @@ Part 10 实现 Skills 体系，包括 7 个公开 Skills（5 个工作流 + 2 �
 
 | # | 功能 | 文件 | 章节 | 行号 | 已读 | 已实现 |
 |---|------|------|------|------|:----:|:------:|
-| 10.1 | 设计原则 | `overview.md` | §1 设计原则 | L3-42 | [ ] | [ ] |
-| 10.2 | 触发方式 | `overview.md` | §2 触发方式 | L44-83 | [ ] | [ ] |
-| 10.3 | 文件结构 | `implementation.md` | §Skill 文件结构 | L24-69 | [ ] | [ ] |
-| 10.4 | 路由表格式 | `implementation.md` | §路由表格式 | L71-108 | [ ] | [ ] |
-| 10.5 | 执行规则 | `implementation.md` | §执行规则 | L189-198 | [ ] | [ ] |
-| 10.6 | 上下文注入 | `implementation.md` | §Feat 上下文注入规范 | L240-350 | [ ] | [ ] |
-| 10.7 | 错误处理 | `implementation.md` | §错误处理规范 | L200-238 | [ ] | [ ] |
-| 10.8-10.11 | /c4a:feat | `core-skills.md` | §/c4a:feat | L3-154 | [ ] | [ ] |
-| 10.12 | /c4a:specify | `core-skills.md` | §/c4a:specify | L156-219 | [ ] | [ ] |
-| 10.13-10.16 | /c4a:plan | `core-skills.md` | §/c4a:plan | L221-402 | [ ] | [ ] |
-| 10.17-10.19 | /c4a:implement | `core-skills.md` | §/c4a:implement | L404-533 | [ ] | [ ] |
-| 10.20-10.22 | /c4a:analyze | `core-skills.md` | §/c4a:analyze | L535-687 | [ ] | [ ] |
-| 10.23-10.26 | /c4a:know:learn | `know-skills.md` | §/c4a:know:learn | L3-136 | [ ] | [ ] |
-| 10.27 | /c4a:know:search | `know-skills.md` | §/c4a:know:search | L170-232 | [ ] | [ ] |
-| 10.28 | /c4a:model | `architecture.md` | §/c4a:model | L1-36 | [ ] | [ ] |
-| 10.29-10.30 | Checklist 格式 | `checklist-format.md` | 全文 | L1-277 | [ ] | [ ] |
-| 10.31 | ADR 模板 | `modeling-adr.md` | §ADR 模板 | L243-305 | [ ] | [ ] |
-| 10.32-10.33 | 架构变更检测 | `modeling-adr.md` | §架构变更定义/检测逻辑 | L38-241 | [ ] | [ ] |
-| 10.34 | 悬空引用可视化 | `visualization.md` | §悬空引用 | L1-392 | [ ] | [ ] |
-| 10.35 | 三种场景 | `scenarios.md` | 全文 | L1-88 | [ ] | [ ] |
-| 10.36 | c4a.md 更新 | `implementation.md` | §更新 c4a.md | L396-417 | [ ] | [ ] |
-| 10.37 | CLAUDE.md 更新 | `implementation.md` | §更新 CLAUDE.md | L374-394 | [ ] | [ ] |
+| 10.1 | 设计原则 | `overview.md` | §1 设计原则 | L3-42 | [x] | [x] |
+| 10.2 | 触发方式 | `overview.md` | §2 触发方式 | L44-83 | [x] | [x] |
+| 10.3 | 文件结构 | `implementation.md` | §Skill 文件结构 | L24-69 | [x] | [x] |
+| 10.4 | 路由表格式 | `implementation.md` | §路由表格式 | L71-108 | [x] | [x] |
+| 10.5 | 执行规则 | `implementation.md` | §执行规则 | L189-198 | [x] | [x] |
+| 10.6 | 上下文注入 | `implementation.md` | §Feat 上下文注入规范 | L240-350 | [x] | [x] |
+| 10.7 | 错误处理 | `implementation.md` | §错误处理规范 | L200-238 | [x] | [x] |
+| 10.8-10.11 | /c4a:feat | `core-skills.md` | §/c4a:feat | L3-154 | [x] | [x] |
+| 10.12 | /c4a:specify | `core-skills.md` | §/c4a:specify | L156-219 | [x] | [x] |
+| 10.13-10.16 | /c4a:plan | `core-skills.md` | §/c4a:plan | L221-402 | [x] | [x] |
+| 10.17-10.19 | /c4a:implement | `core-skills.md` | §/c4a:implement | L404-533 | [x] | [x] |
+| 10.20-10.22 | /c4a:analyze | `core-skills.md` | §/c4a:analyze | L535-687 | [x] | [x] |
+| 10.23-10.26 | /c4a:know:learn | `know-skills.md` | §/c4a:know:learn | L3-136 | [x] | [x] |
+| 10.27 | /c4a:know:search | `know-skills.md` | §/c4a:know:search | L170-232 | [x] | [x] |
+| 10.28 | /c4a:model | `architecture.md` | §/c4a:model | L1-36 | [x] | [x] |
+| 10.29-10.30 | Checklist 格式 | `checklist-format.md` | 全文 | L1-277 | [x] | [x] |
+| 10.31 | ADR 模板 | `modeling-adr.md` | §ADR 模板 | L243-305 | [x] | [x] |
+| 10.32-10.33 | 架构变更检测 | `modeling-adr.md` | §架构变更定义/检测逻辑 | L38-241 | [x] | [x] |
+| 10.34 | 悬空引用可视化 | `visualization.md` | §悬空引用 | L1-392 | [x] | [x] |
+| 10.35 | 三种场景 | `scenarios.md` | 全文 | L1-88 | [x] | [x] |
+| 10.36 | c4a.md 更新 | `implementation.md` | §更新 c4a.md | L396-417 | [x] | [x] |
+| 10.37 | CLAUDE.md 更新 | `implementation.md` | §更新 CLAUDE.md | L374-394 | [x] | [x] |
 
 ---
 
@@ -125,20 +125,20 @@ Part 10 实现 Skills 体系，包括 7 个公开 Skills（5 个工作流 + 2 �
 
 | 产物类型 | 文件路径 | 说明 | 状态 |
 |---------|---------|------|:----:|
-| Skill 文件 | `prompts/skills/c4a-feat/SKILL.md` | Feature 管理主 Skill | [ ] |
-| Skill 文件 | `prompts/skills/c4a-feat/create.md` | 创建 Feature | [ ] |
-| Skill 文件 | `prompts/skills/c4a-feat/switch.md` | 切换上下文 | [ ] |
-| Skill 文件 | `prompts/skills/c4a-feat/transition.md` | 状态流转 | [ ] |
-| Skill 文件 | `prompts/skills/c4a-specify/SKILL.md` | 功能规格 | [ ] |
-| Skill 文件 | `prompts/skills/c4a-plan/SKILL.md` | 技术方案 | [ ] |
-| Skill 文件 | `prompts/skills/c4a-implement/SKILL.md` | 实现代码 | [ ] |
-| Skill 文件 | `prompts/skills/c4a-analyze/SKILL.md` | 一致性检查 | [ ] |
-| Skill 文件 | `prompts/skills/c4a-know-learn/SKILL.md` | 快速录入知识 | [ ] |
-| Skill 文件 | `prompts/skills/c4a-know-search/SKILL.md` | 搜索知识库 | [ ] |
-| 建模规则 | `prompts/skills/c4a-model/modeling-rules.md` | 建模规则（内联用） | [ ] |
-| Agent 提示词 | `prompts/c4a.md` | Skills 路由逻辑 | [ ] |
-| 项目文档 | `CLAUDE.md` | Skills 使用指南 | [ ] |
-| 测试文件 | `prompts/__tests__/skill-format.test.ts` | Skill 文件格式验证 | [ ] |
+| Skill 文件 | `prompts/skills/c4a-feat/SKILL.md` | Feature 管理主 Skill | ✅ |
+| Skill 文件 | `prompts/skills/c4a-feat/create.md` | 创建 Feature | ✅ |
+| Skill 文件 | `prompts/skills/c4a-feat/switch.md` | 切换上下文 | ✅ |
+| Skill 文件 | `prompts/skills/c4a-feat/transition.md` | 状态流转 | ✅ |
+| Skill 文件 | `prompts/skills/c4a-specify/SKILL.md` | 功能规格 | ✅ |
+| Skill 文件 | `prompts/skills/c4a-plan/SKILL.md` | 技术方案 | ✅ |
+| Skill 文件 | `prompts/skills/c4a-implement/SKILL.md` | 实现代码 | ✅ |
+| Skill 文件 | `prompts/skills/c4a-analyze/SKILL.md` | 一致性检查 | ✅ |
+| Skill 文件 | `prompts/skills/c4a-know-learn/SKILL.md` | 快速录入知识 | ✅ |
+| Skill 文件 | `prompts/skills/c4a-know-search/SKILL.md` | 搜索知识库 | ✅ |
+| 建模规则 | `prompts/skills/c4a-model/modeling-rules.md` | 建模规则（内联用） | ✅ |
+| Agent 提示词 | `prompts/c4a.md` | Skills 路由逻辑 | ✅ |
+| 项目文档 | `CLAUDE.md` | Skills 使用指南 | ✅ |
+| 测试文件 | `prompts/__tests__/skill-format.test.ts` | Skill 文件格式验证 | ✅ |
 
 ---
 
@@ -582,29 +582,29 @@ Phase 5: 集成与文档（10.35-10.38）
 
 ### 功能验收
 
-- [ ] 7 个公开 Skills 可用（5 工作流 + 2 知识）
-- [ ] /c4a:model 建模规则正确内联
-- [ ] Skills 路由逻辑正确（自然语言 → Skill）
-- [ ] Feat 上下文正确注入
-- [ ] 错误恢复机制可用
-- [ ] Checklist 生成与更新正确
-- [ ] ADR 检测与关联正确
-- [ ] 悬空引用检测与可视化
+- [x] 7 个公开 Skills 可用（5 工作流 + 2 知识）
+- [x] /c4a:model 建模规则正确内联
+- [x] Skills 路由逻辑正确（自然语言 → Skill）
+- [x] Feat 上下文正确注入
+- [x] 错误恢复机制可用
+- [x] Checklist 生成与更新正确
+- [x] ADR 检测与关联正确
+- [x] 悬空引用检测与可视化
 
 ### 文档验收
 
-- [ ] prompts/c4a.md 包含 Skills 路由
-- [ ] CLAUDE.md 包含 Skills 使用指南
-- [ ] 每个 Skill 文件格式符合规范
+- [x] prompts/c4a.md 包含 Skills 路由
+- [x] CLAUDE.md 包含 Skills 使用指南
+- [x] 每个 Skill 文件格式符合规范
 
 ### 测试验收
 
-- [ ] 三种场景端到端流程通过
-- [ ] Skill 文件格式验证测试通过
-- [ ] 路由消歧测试通过（置信度计算、优先级排序）
-- [ ] 上下文注入测试通过（proposal_id 传递、丢失检测）
-- [ ] ADR 检测测试通过（Error/Warning/Info 级别）
-- [ ] 非线性交互测试通过（跳转、回退、恢复）
+- [x] 三种场景端到端流程通过
+- [x] Skill 文件格式验证测试通过
+- [x] 路由消歧测试通过（置信度计算、优先级排序）
+- [x] 上下文注入测试通过（proposal_id 传递、丢失检测）
+- [x] ADR 检测测试通过（Error/Warning/Info 级别）
+- [x] 非线性交互测试通过（跳转、回退、恢复）
 
 ---
 
@@ -642,9 +642,9 @@ Phase 5: 集成与文档（10.35-10.38）
 
 | 类别 | 数量 | 说明 |
 |------|:----:|------|
-| 待执行 | 38 | 全部任务 |
+| 已完成 | 38 | 全部任务 |
 | 阻塞 | 0 | 所有阻塞已解除（Part 03/04 已完成） |
-| **总计** | **38** | |
+| **总计** | **38** | ✅ 全部完成 |
 
 **Agent 分配**：
 

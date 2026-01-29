@@ -408,40 +408,38 @@ packages/
 
 ## Part 07: 数据操作
 
+> 详细计划见: [07-data-ops.md](07-data-ops.md)
+
 | # | 功能 | 完成 | 描述 |
 |---|------|:----:|------|
-| 7.1 | 实体唯一性设计 | [ ] | 逻辑/物理唯一键 |
-| 7.2 | 引用格式规范 | [ ] | 简单ID/跨项目/跨仓库/scope |
-| 7.3 | 引用解析优先级 | [ ] | 本项目→基建→其他→Enterprise→Domain |
-| 7.4 | 悬空引用处理 | [ ] | 状态感知 + 自动解析 |
-| 7.5 | CoW 机制实现 | [ ] | 数据库设计 + 工作流 |
-| 7.6 | Checklist 处理 | [ ] | DB-only + 渲染 |
-| 7.7 | 实体变更历史 | [ ] | entity_history 表 |
-| 7.8 | 冲突检测算法 | [ ] | content_hash + 两阶段 |
-| 7.9 | conflict_policy | [ ] | skip/warn/override/prompt |
-| 7.10 | Feat 合并策略 | [ ] | 自动合并 + 模型决策 |
+| 7.1 | 引用格式规范 | [ ] | 简单ID/project:/repo:/scope: 四种格式 |
+| 7.2 | 引用解析优先级 | [ ] | 本项目→基建→其他→Enterprise→Domain |
+| 7.3 | 悬空引用处理 | [ ] | 状态感知 + 修复建议 |
+| 7.4 | CoW 机制实现 | [ ] | 复制实体到 feat 分支 |
+| 7.5 | 同步引擎 | [ ] | 双向同步 DB ↔ .context/ |
+| 7.6 | 增量同步算法 | [ ] | content_hash + updated_at |
+| 7.7 | 冲突检测 | [ ] | 内容/删除/类型冲突 |
+| 7.8 | 导出引擎 | [ ] | yaml/json 格式导出 |
+| 7.9 | Feat 冲突检测 | [ ] | 并发修改/删除冲突 |
+| 7.10 | 冲突解决策略 | [ ] | ours/theirs/manual/abort |
 | 7.11 | 回滚机制 | [ ] | 创建回滚 Feat |
-| 7.12 | 跨项目 Feat | [ ] | 中心化数据库架构 |
-| 7.13 | 跨库事务补偿 | [ ] | MongoDB→Neo4j→Milvus |
-| 7.14 | Feat 发布事务 | [ ] | MongoDB 多文档事务 |
-| 7.15 | workflow_steps 字段 | [ ] | 断点续传支持 |
-| 7.16 | 恢复流程实现 | [ ] | 检测 + 选项 + 执行 |
-| 7.17 | 步骤幂等性 | [ ] | checkStepCompletion |
-| 7.18 | 实体清理机制 | [ ] | cleanup Feat |
+| 7.12 | Feat 事务 | [ ] | begin/commit/rollback |
+| 7.13 | 补偿机制 | [ ] | 补偿日志 + 执行 |
+| 7.14 | 跨项目 Feat | [ ] | 多项目实体原子发布 |
+| 7.15 | Workflow 状态管理 | [ ] | pending/running/paused/completed/failed |
+| 7.16 | 断点续传 | [ ] | checkpoint 保存/恢复 |
+| 7.17 | 步骤幂等性 | [ ] | step_id + input_hash |
+| 7.18 | 实体清理机制 | [ ] | orphaned 实体清理 |
 
 **相关设计文档：**
 
 | 功能 | 文件 | 章节 | 行号 | 已读 | 已实现 |
 |------|------|------|------|:----:|:------:|
-| 7.1-7.4 | `data-ops/cross-reference.md` | §1.1-1.11 | L1-340 | [ ] | [ ] |
-| 7.5 | `data-ops/cross-reference.md` | §1.12 CoW | L340-700 | [ ] | [ ] |
-| 7.6 | `data-ops/cross-reference.md` | §1.12.7 Checklist | L700-820 | [ ] | [ ] |
-| 7.7 | `data-ops/cross-reference.md` | §1.13 历史 | L820-END | [ ] | [ ] |
-| 7.8-7.9 | `data-ops/sync-export.md` | §2.3-2.4 | L30-190 | [ ] | [ ] |
-| 7.10-7.11 | `data-ops/conflict-rollback.md` | §3-4 | L1-240 | [ ] | [ ] |
-| 7.12 | `data-ops/cross-project-transaction.md` | §5 跨项目 | L1-70 | [ ] | [ ] |
-| 7.13-7.14 | `data-ops/cross-project-transaction.md` | §6 事务 | L70-360 | [ ] | [ ] |
-| 7.15-7.18 | `data-ops/workflow-recovery.md` | 全文 | L1-END | [ ] | [ ] |
+| 7.1-7.4 | `data-ops/cross-reference.md` | 引用解析 + CoW | L1-450 | [ ] | [ ] |
+| 7.5-7.8 | `data-ops/sync-export.md` | 同步导出 | L1-300 | [ ] | [ ] |
+| 7.9-7.11 | `data-ops/conflict-rollback.md` | 冲突回滚 | L1-190 | [ ] | [ ] |
+| 7.12-7.14 | `data-ops/cross-project-transaction.md` | 跨项目事务 | L1-338 | [ ] | [ ] |
+| 7.15-7.18 | `data-ops/workflow-recovery.md` | Workflow 恢复 | L1-574 | [ ] | [ ] |
 
 ---
 
@@ -507,20 +505,20 @@ packages/
 
 | # | 功能 | 完成 | 描述 |
 |---|------|:----:|------|
-| 10.1-10.7 | 基础设施 | [ ] | 设计原则/触发方式/文件结构/路由表/执行规则/上下文注入/错误处理 |
-| 10.8-10.11 | /c4a:feat Skill | [ ] | Feature 管理（类型识别/上下文切换/状态流转） |
-| 10.12 | /c4a:specify Skill | [ ] | Functional Spec 生成 |
-| 10.13-10.16 | /c4a:plan Skill | [ ] | Technical Spec + ADR 检测 + 契约补充 + 验收清单 |
-| 10.17-10.19 | /c4a:implement Skill | [ ] | 实现代码（状态校验/清单生成） |
-| 10.20-10.22 | /c4a:analyze Skill | [ ] | 一致性检查（检查项/悬空引用） |
-| 10.23-10.26 | /c4a:know:learn Skill | [ ] | 快速录入知识（输入识别/流程控制/错误恢复） |
-| 10.27 | /c4a:know:search Skill | [ ] | 语义搜索知识库 |
-| 10.28 | /c4a:model 内部 Skill | [ ] | 建模规则（内联到父 Skill） |
-| 10.29-10.30 | Checklist 集成 | [ ] | 格式定义 + MCP 集成 |
-| 10.31-10.33 | ADR 检测 | [ ] | 模板定义 + 架构变更规则 + 性能优化 |
-| 10.34 | 悬空引用可视化 | [ ] | Mermaid 样式 + CLI 报告 |
-| 10.35 | 三种场景流程 | [ ] | 需求开发/架构变更/纯知识 |
-| 10.36-10.38 | 集成与文档 | [ ] | c4a.md 更新 + CLAUDE.md 更新 + 单元测试 |
+| 10.1-10.7 | 基础设施 | [x] | 设计原则/触发方式/文件结构/路由表/执行规则/上下文注入/错误处理 |
+| 10.8-10.11 | /c4a:feat Skill | [x] | Feature 管理（类型识别/上下文切换/状态流转） |
+| 10.12 | /c4a:specify Skill | [x] | Functional Spec 生成 |
+| 10.13-10.16 | /c4a:plan Skill | [x] | Technical Spec + ADR 检测 + 契约补充 + 验收清单 |
+| 10.17-10.19 | /c4a:implement Skill | [x] | 实现代码（状态校验/清单生成） |
+| 10.20-10.22 | /c4a:analyze Skill | [x] | 一致性检查（检查项/悬空引用） |
+| 10.23-10.26 | /c4a:know:learn Skill | [x] | 快速录入知识（输入识别/流程控制/错误恢复） |
+| 10.27 | /c4a:know:search Skill | [x] | 语义搜索知识库 |
+| 10.28 | /c4a:model 内部 Skill | [x] | 建模规则（内联到父 Skill） |
+| 10.29-10.30 | Checklist 集成 | [x] | 格式定义 + MCP 集成 |
+| 10.31-10.33 | ADR 检测 | [x] | 模板定义 + 架构变更规则 + 性能优化 |
+| 10.34 | 悬空引用可视化 | [x] | Mermaid 样式 + CLI 报告 |
+| 10.35 | 三种场景流程 | [x] | 需求开发/架构变更/纯知识 |
+| 10.36-10.38 | 集成与文档 | [x] | c4a.md 更新 + CLAUDE.md 更新 + 单元测试 |
 
 **Skills 体系概览**：
 
@@ -530,8 +528,21 @@ packages/
 | 知识 | `/c4a:know:learn`, `/c4a:know:search` | 2 个知识 Skills |
 | 内部 | `/c4a:model` | 1 个内部 Skill（建模规则，内联到父 Skill） |
 
-**阻塞清单**：
-- 10.14 ADR 检测、10.22 悬空引用、10.30 Checklist MCP 集成依赖 Part 03/04 完成
+**实现产物**：
+
+| 产物 | 路径 | 状态 |
+|------|------|:----:|
+| /c4a:feat Skill | prompts/skills/c4a-feat/ | ✅ |
+| /c4a:specify Skill | prompts/skills/c4a-specify/SKILL.md | ✅ |
+| /c4a:plan Skill | prompts/skills/c4a-plan/SKILL.md | ✅ |
+| /c4a:implement Skill | prompts/skills/c4a-implement/SKILL.md | ✅ |
+| /c4a:analyze Skill | prompts/skills/c4a-analyze/SKILL.md | ✅ |
+| /c4a:know:learn Skill | prompts/skills/c4a-know-learn/SKILL.md | ✅ |
+| /c4a:know:search Skill | prompts/skills/c4a-know-search/SKILL.md | ✅ |
+| 建模规则 | prompts/skills/c4a-model/modeling-rules.md | ✅ |
+| Skills 路由逻辑 | prompts/c4a.md | ✅ |
+| Skills 使用指南 | CLAUDE.md | ✅ |
+| Skill 格式验证测试 | prompts/__tests__/skill-format.test.ts | ✅ |
 
 ---
 

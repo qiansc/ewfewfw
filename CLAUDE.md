@@ -320,3 +320,48 @@ cp .env.example .env    # 复制环境变量模板
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) - 工程架构详情
 - [CONTRIBUTING.md](CONTRIBUTING.md) - 文档编写规范
+
+## Skills 使用指南
+
+C4A 提供以下 Skills 来完成架构知识管理任务：
+
+### 核心 Skills
+
+| Skill | 用途 | 触发示例 |
+|-------|------|----------|
+| `/c4a:feat` | Feature 生命周期管理 | "开发功能"、"创建 ADR"、"批准方案"、"发布" |
+| `/c4a:specify` | 功能规格定义 | "定义需求"、"写功能规格" |
+| `/c4a:plan` | 技术方案设计 | "设计方案"、"技术设计" |
+| `/c4a:implement` | 代码实现辅助 | "开始实现"、"写代码" |
+| `/c4a:analyze` | 一致性检查 | "检查一致性"、"验证方案" |
+
+### 知识管理 Skills
+
+| Skill | 用途 | 触发示例 |
+|-------|------|----------|
+| `/c4a:know:learn` | 快速录入知识 | "整理规范"、"记录知识" |
+| `/c4a:know:search` | 搜索知识库 | "搜索 xxx"、"查找 xxx" |
+
+### 典型工作流
+
+**需求开发**：
+```
+/c4a:feat "用户登录功能"
+→ /c4a:specify
+→ /c4a:plan
+→ /c4a:feat --status=approved
+→ /c4a:implement
+→ /c4a:feat --status=published
+```
+
+**快速录入知识**：
+```
+/c4a:know:learn ./docs/redis-guide.md
+→ 自动完成全流程
+```
+
+### CLI Commands
+
+- `c4a sync` - 同步到知识库
+- `c4a status` - 查看状态
+- `./start.sh` - 查看所有可用命令
