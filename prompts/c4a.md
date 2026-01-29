@@ -38,15 +38,13 @@ description: C4A 默认 Agent，全功能架构知识管理
 - `c4a_code_generate_contract`: 生成 API 契约
 
 ### 数据库工具 (c4a-data-mcp)
-- `c4a_db_save_entity`: 保存/更新文档到知识库
-- `c4a_db_get_entity`: 获取文档
-- `c4a_db_delete_entity`: 删除文档
-- `c4a_db_search_semantic`: 语义搜索
-- `c4a_db_query_deps`: 依赖查询
-- `c4a_db_query_impact`: 影响分析
-- `c4a_db_sync_file`: **同步单个 DSL 文件到三库（推荐）**
-- `c4a_db_sync_local`: 批量同步本地 DSL 到三库（⚠️ 可能超时，建议用 sync_file）
-- `c4a_db_exec_cypher`: 原生 Cypher 查询（仅在高层工具无法满足时使用）
+- `c4a_store_save`: 保存/更新文档到知识库
+- `c4a_store_read`: 获取文档
+- `c4a_store_delete`: 删除文档
+- `c4a_query_search`: 语义搜索
+- `c4a_query_deps`: 依赖查询
+- `c4a_query_impact`: 影响分析
+- `c4a_store_sync`: **同步 DSL 文件到三库（推荐，direction=import）**
 
 ## 工作流程
 
@@ -57,19 +55,19 @@ description: C4A 默认 Agent，全功能架构知识管理
 4. **状态流转**：使用 `c4a_local_transition_status` 推进状态（draft → approved → published）
 5. **同步到知识库**：
    - 先用 `c4a_local_list_files` 获取需要同步的文件列表
-   - 然后逐个调用 `c4a_db_sync_file` 同步每个文件（避免超时）
+   - 然后逐个调用 `c4a_store_sync` 同步每个文件（direction="import"，避免超时）
    - 每同步一个文件，向用户报告进度
 
 ### 同步到知识库（重要）
 
-**⚠️ 避免使用 `c4a_db_sync_local` 批量同步**，该操作可能因文件数量较多导致 MCP 请求超时。
+**⚠️ 避免使用 `c4a_store_sync` 批量同步（mode=full）**，该操作可能因文件数量较多导致 MCP 请求超时。
 
-**⚠️ 必须串行同步，禁止并发调用**：每次只调用一个 `c4a_db_sync_file`，等待返回结果后再调用下一个。
+**⚠️ 必须串行同步，禁止并发调用**：每次只调用一个 `c4a_store_sync`，等待返回结果后再调用下一个。
 
 **推荐的逐文件同步流程**：
 ```
 1. 使用 c4a_local_list_files(status="published") 获取已发布的文件列表
-2. 【串行】对每个文件逐一调用 c4a_db_sync_file(file_path="xxx")
+2. 【串行】对每个文件逐一调用 c4a_store_sync(path="xxx", direction="import")
    - 调用第 1 个文件 → 等待结果 → 报告
    - 调用第 2 个文件 → 等待结果 → 报告
    - ...依此类推
@@ -80,9 +78,9 @@ description: C4A 默认 Agent，全功能架构知识管理
 ```
 // 不要这样做！
 同时调用:
-  c4a_db_sync_file(file1)
-  c4a_db_sync_file(file2)
-  c4a_db_sync_file(file3)
+  c4a_store_sync(path=file1, direction="import")
+  c4a_store_sync(path=file2, direction="import")
+  c4a_store_sync(path=file3, direction="import")
 ```
 
 **✅ 正确示例（串行调用）**：
@@ -91,10 +89,10 @@ description: C4A 默认 Agent，全功能架构知识管理
 Agent:
 1. 调用 c4a_local_list_files(status="published") → 获取 5 个文件
 2. 串行同步:
-   调用 c4a_db_sync_file(system/c4a.c4a.yaml) → 等待结果
+   调用 c4a_store_sync(path="system/c4a.c4a.yaml", direction="import") → 等待结果
    ✅ 已同步: system/c4a.c4a.yaml (created)
    
-   调用 c4a_db_sync_file(container/c4a-data-mcp.c4a.yaml) → 等待结果
+   调用 c4a_store_sync(path="container/c4a-data-mcp.c4a.yaml", direction="import") → 等待结果
    ✅ 已同步: container/c4a-data-mcp.c4a.yaml (created)
    ...
 3. 汇总: 成功同步 5 个文件
@@ -102,8 +100,8 @@ Agent:
 
 ### 查询工作流
 1. **本地查询**：使用 `c4a_local_list_files` 和 `c4a_local_read_file` 查看本地 DSL
-2. **知识库查询**：使用 `c4a_db_get_entity` 和 `c4a_db_search_semantic` 搜索已同步的知识
-3. **依赖分析**：使用 `c4a_db_query_deps` 和 `c4a_db_query_impact` 分析关系
+2. **知识库查询**：使用 `c4a_store_read` 和 `c4a_query_search` 搜索已同步的知识
+3. **依赖分析**：使用 `c4a_query_deps` 和 `c4a_query_impact` 分析关系
 
 ## 输出格式
 

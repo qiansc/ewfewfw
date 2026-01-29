@@ -87,6 +87,11 @@ beforeAll(() => {
       dbPath: DB_PATH,
       defaultProject: 'default',
       enableVectorSearch: true,
+      repoId: null,
+      feat: {
+        concurrent_warning: true,
+        auto_notify: false,
+      },
     },
   };
 

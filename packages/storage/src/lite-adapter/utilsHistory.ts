@@ -56,7 +56,7 @@ export async function readHistory(
   const items: HistoryItem[] = rows.map(row => ({
     entity_id: row.entity_id,
     feat_id: row.feat_id,
-    action: row.action as 'create' | 'update' | 'delete',
+    action: normalizeAction(row.action),
     changed_fields: row.changed_fields ? JSON.parse(row.changed_fields) : undefined,
     changed_by: row.changed_by ?? undefined,
     changed_at: row.changed_at,
@@ -72,4 +72,11 @@ export async function readHistory(
     items,
     total: countResult.total,
   };
+}
+
+function normalizeAction(action: string): HistoryItem['action'] {
+  if (action === 'create' || action === 'update' || action === 'delete' || action === 'archive') {
+    return action;
+  }
+  return 'update';
 }

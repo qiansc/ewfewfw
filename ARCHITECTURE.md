@@ -70,15 +70,13 @@ DSL 解析与验证服务。
 
 | 工具 | 功能 |
 |------|------|
-| `c4a_db_save_entity` | 保存/更新 C4A 文档，自动同步三库 |
-| `c4a_db_get_entity` | 从 MongoDB 查询 C4A 文档 |
-| `c4a_db_delete_entity` | 删除 C4A 文档，级联清理三库 |
-| `c4a_db_search_semantic` | 语义搜索 C4A 知识库 (Milvus) |
-| `c4a_db_query_deps` | 查询实体的依赖关系 (Neo4j) |
-| `c4a_db_query_impact` | 分析实体变更的影响范围 |
-| `c4a_db_exec_cypher` | 执行原生 Cypher 查询 |
-| `c4a_db_sync_file` | 同步单个 DSL 文件到三库 |
-| `c4a_db_sync_local` | 批量同步本地 .c4a/ 目录到三库 |
+| `c4a_store_save` | 保存/更新 C4A 文档，自动同步三库 |
+| `c4a_store_read` | 从 MongoDB 查询 C4A 文档 |
+| `c4a_store_delete` | 删除 C4A 文档，级联清理三库 |
+| `c4a_query_search` | 语义搜索 C4A 知识库 (Milvus) |
+| `c4a_query_deps` | 查询实体的依赖关系 (Neo4j) |
+| `c4a_query_impact` | 分析实体变更的影响范围 |
+| `c4a_store_sync` | 同步 DSL 文件与三库（支持单文件/批量） |
 
 ### MCP 传输协议
 

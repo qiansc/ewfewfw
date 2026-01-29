@@ -83,6 +83,11 @@ function pickString(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
+function isEntityStatus(value: string | null): value is EntityStatus {
+  if (!value) return false;
+  return ['draft', 'approved', 'published', 'deprecated', 'archived'].includes(value);
+}
+
 // ============================================================
 // Save 操作
 // ============================================================
@@ -103,6 +108,7 @@ async function doSave(ctx: AdapterContext, params: SaveParams): Promise<SaveResu
   const db = ctx.store.getDatabase();
   const now = new Date().toISOString();
   const warnings: Warning[] = [];
+  const warningEnabled = !params.force_save;
 
   // 解析数据
   let rawData: Record<string, unknown>;
@@ -117,6 +123,12 @@ async function doSave(ctx: AdapterContext, params: SaveParams): Promise<SaveResu
   // 转换 DSL -> Internal Entity（用于提取 kind/scope/perspective）
   const converted = toInternalEntity(rawData);
   const storedData = rawData;
+
+  const requestedStatus = isEntityStatus(pickString(storedData.status))
+    ? (storedData.status as EntityStatus)
+    : isEntityStatus(pickString((storedData.metadata as Record<string, unknown> | undefined)?.status))
+      ? ((storedData.metadata as Record<string, unknown>).status as EntityStatus)
+      : null;
 
   // 提取 ID
   const id = params.id || converted?.id || (rawData.id as string);
@@ -155,11 +167,23 @@ async function doSave(ctx: AdapterContext, params: SaveParams): Promise<SaveResu
 
   const previousData = existing?.data ? (JSON.parse(existing.data) as Record<string, unknown>) : null;
 
+  const mainExists = !!db.prepare(`
+    SELECT 1 FROM entities
+    WHERE source_project = ? AND id = ? AND (proposal_id IS NULL OR proposal_id = '')
+  `).get(dbSourceProject, id);
+
   // 3.18 并发修改预警：检查是否有其他活跃 feat 也在修改同一实体
   // 设计文档: store-feat-checklist.md §3.10
-  if (existing && proposalId && !params.ignore_concurrent_warning) {
+  const concurrentWarningEnabled = ctx.config.feat.concurrent_warning !== false;
+  if (
+    warningEnabled &&
+    concurrentWarningEnabled &&
+    proposalId &&
+    !params.ignore_concurrent_warning &&
+    (existing || mainExists)
+  ) {
     const concurrentFeats = db.prepare(`
-      SELECT e.proposal_id, m.updated_at, m.updated_by, f.status as feat_status, f.title
+      SELECT e.proposal_id, m.updated_at, m.updated_by, m.status as entity_status, f.status as feat_status, f.title, f.description
       FROM entities e
       JOIN metadata m ON e.source_project = m.source_project
         AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
@@ -169,13 +193,15 @@ async function doSave(ctx: AdapterContext, params: SaveParams): Promise<SaveResu
         AND e.proposal_id IS NOT NULL
         AND e.proposal_id != ''
         AND e.proposal_id != ?
-        AND (f.status IS NULL OR f.status IN ('draft', 'approved'))
+        AND m.status IN ('draft', 'approved')
     `).all(id, dbSourceProject, dbProposalId) as Array<{
       proposal_id: string;
       updated_at: string;
       updated_by: string | null;
+      entity_status: string | null;
       feat_status: string | null;
       title: string | null;
+      description: string | null;
     }>;
 
     if (concurrentFeats.length > 0) {
@@ -186,10 +212,10 @@ async function doSave(ctx: AdapterContext, params: SaveParams): Promise<SaveResu
         details: {
           concurrent_feats: concurrentFeats.map(f => ({
             feat_id: f.proposal_id,
-            status: f.feat_status || 'unknown',
+            status: f.feat_status || f.entity_status || 'unknown',
             updated_by: f.updated_by,
             updated_at: f.updated_at,
-            title: f.title,
+            changes_summary: pickString(f.description) ?? pickString(f.title) ?? undefined,
           })),
         },
       });
@@ -197,7 +223,7 @@ async function doSave(ctx: AdapterContext, params: SaveParams): Promise<SaveResu
   }
 
   // 确定状态
-  const status: EntityStatus = proposalId ? 'draft' : 'published';
+  const status: EntityStatus = requestedStatus ?? (proposalId ? 'draft' : 'published');
 
   const changeActor =
     (storedData.updated_by as string | undefined) ||
@@ -214,6 +240,48 @@ async function doSave(ctx: AdapterContext, params: SaveParams): Promise<SaveResu
   const updatedBy = changeActor ?? existing?.updated_by ?? createdBy ?? null;
 
   const changedFields = previousData ? diffFields(previousData, storedData) : Object.keys(storedData);
+
+  // 3.19 引用完整性预警：废弃/归档实体时检查依赖
+  // 设计文档: store-feat-checklist.md §3.11
+  if (
+    warningEnabled &&
+    (status === 'deprecated' || status === 'archived') &&
+    (existing || mainExists)
+  ) {
+    const dependents = db.prepare(`
+      SELECT DISTINCT r.from_id, r.from_project, e.type, r.proposal_id, r.rel_type
+      FROM relations r
+      JOIN entities e ON r.from_project = e.source_project
+        AND r.from_id = e.id AND r.proposal_id IS e.proposal_id
+      LEFT JOIN feats f ON r.proposal_id = f.id
+      WHERE r.to_id = ?
+        AND (r.status IS NULL OR r.status != 'deleted')
+        AND r.rel_type IN ('DEPENDS_ON', 'USES', 'CALLS')
+        AND (r.proposal_id IS NULL OR r.proposal_id = '' OR f.status IS NULL OR f.status IN ('draft', 'approved'))
+    `).all(id) as Array<{
+      from_id: string;
+      from_project: string;
+      type: string;
+      proposal_id: string | null;
+      rel_type: string;
+    }>;
+
+    if (dependents.length > 0) {
+      warnings.push({
+        code: 'DANGLING_REFERENCE',
+        message: `废弃此实体将导致 ${dependents.length} 个依赖方出现悬空引用`,
+        severity: 'warning',
+        details: {
+          dependents: dependents.map(d => ({
+            id: d.from_id,
+            type: d.type,
+            feat_id: d.proposal_id,
+            rel_type: d.rel_type,
+          })),
+        },
+      });
+    }
+  }
 
   // P1-2.1: ADR 检查逻辑
   // 设计文档: store-crud.md §3.1

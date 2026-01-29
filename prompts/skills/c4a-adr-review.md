@@ -79,8 +79,8 @@ ADR 评审的交互式流程，支持以下操作：
 
 **步骤**：
 1. 从 ADR 内容中提取关键词（技术选型、涉及的容器）
-2. 调用 `c4a_db_search_semantic(query: <关键词>)` 查询相关实体
-3. 如果 ADR 涉及修改现有容器，调用 `c4a_db_query_impact(entity_id: <容器id>)` 分析影响
+2. 调用 `c4a_query_search(query: <关键词>)` 查询相关实体
+3. 如果 ADR 涉及修改现有容器，调用 `c4a_query_impact(entity_id: <容器id>)` 分析影响
 
 **降级处理**：如果数据库不可用，跳过此步骤，只展示本地文件信息。
 
@@ -326,15 +326,15 @@ mcpServers:
 
 **重要**：发布后需要将 **所有 published 目录下的文件**（包括 System、Container、ADR）同步到知识库。
 
-**⚠️ 避免使用 `c4a_db_sync_local` 批量同步**，该操作可能因文件数量较多导致 MCP 请求超时。
+**⚠️ 避免使用 `c4a_store_sync` 批量同步（mode=full）**，该操作可能因文件数量较多导致 MCP 请求超时。
 
-**⚠️ 必须串行同步，禁止并发调用**：每次只调用一个 `c4a_db_sync_file`，等待返回结果后再调用下一个。并发调用会导致服务过载超时！
+**⚠️ 必须串行同步，禁止并发调用**：每次只调用一个 `c4a_store_sync`（direction="import"），等待返回结果后再调用下一个。并发调用会导致服务过载超时！
 
 **推荐的逐文件同步流程**：
 
 ```
 1. 调用 c4a_local_list_files(status="published") 获取所有已发布文件
-2. 【串行】对每个文件逐一调用 c4a_db_sync_file(file_path="xxx")
+2. 【串行】对每个文件逐一调用 c4a_store_sync(path="xxx", direction="import")
    - 调用第 1 个文件 → 等待结果返回 → 报告进度
    - 调用第 2 个文件 → 等待结果返回 → 报告进度
    - ...依此类推，一次只能调用一个！
@@ -345,9 +345,9 @@ mcpServers:
 ```
 // 不要这样做！一次调用多个会超时！
 同时调用:
-  c4a_db_sync_file(file1)
-  c4a_db_sync_file(file2)
-  c4a_db_sync_file(file3)
+  c4a_store_sync(path=file1, direction="import")
+  c4a_store_sync(path=file2, direction="import")
+  c4a_store_sync(path=file3, direction="import")
 ```
 
 **✅ 正确示例（串行调用）**：
@@ -356,10 +356,10 @@ mcpServers:
 
 正在同步 10 个文件（串行执行）:
 
-[1/10] 调用 c4a_db_sync_file(.c4a/published/system/c4a.c4a.yaml)
+[1/10] 调用 c4a_store_sync(path=".c4a/published/system/c4a.c4a.yaml", direction="import")
   ✅ system/c4a.c4a.yaml (created)
 
-[2/10] 调用 c4a_db_sync_file(.c4a/published/container/c4a-cli.c4a.yaml)
+[2/10] 调用 c4a_store_sync(path=".c4a/published/container/c4a-cli.c4a.yaml", direction="import")
   ✅ container/c4a-cli.c4a.yaml (created)
 
 ... 依次同步每个文件 ...

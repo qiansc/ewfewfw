@@ -12,7 +12,7 @@
 export interface HistoryItem {
   entity_id?: string;
   feat_id: string | null;
-  action: 'create' | 'update' | 'delete';
+  action: 'create' | 'update' | 'delete' | 'archive';
   changed_fields?: string[];
   changed_by?: string;
   changed_at: string;

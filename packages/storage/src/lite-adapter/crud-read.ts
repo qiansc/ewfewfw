@@ -237,6 +237,10 @@ async function doDelete(ctx: AdapterContext, params: DeleteParams): Promise<Dele
   const proposalId = params.proposal_id ?? null;
   const dbProposalId = proposalId ?? '';
   const proposalClause = dbProposalId === '' ? '(proposal_id = ? OR proposal_id IS NULL)' : 'proposal_id = ?';
+  const entityClause = dbProposalId === ''
+    ? "(e.proposal_id IS NULL OR e.proposal_id = '')"
+    : 'e.proposal_id = ?';
+  const entityParams = dbProposalId === '' ? [params.id] : [params.id, dbProposalId];
   const warnings: Warning[] = [];
 
   // 3.19 引用完整性预警：检查是否有其他实体依赖当前实体
@@ -251,6 +255,7 @@ async function doDelete(ctx: AdapterContext, params: DeleteParams): Promise<Dele
       LEFT JOIN feats f ON r.proposal_id = f.id
       WHERE r.to_id = ?
         AND (r.status IS NULL OR r.status != 'deleted')
+        AND r.rel_type IN ('DEPENDS_ON', 'USES', 'CALLS')
         AND (r.proposal_id IS NULL OR r.proposal_id = '' OR f.status IS NULL OR f.status IN ('draft', 'approved'))
     `).all(params.id) as Array<{
       from_id: string;
@@ -375,8 +380,8 @@ async function doDelete(ctx: AdapterContext, params: DeleteParams): Promise<Dele
       FROM entities e
       JOIN metadata m ON e.source_project = m.source_project
         AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
-      WHERE e.id = ? AND ${proposalClause}
-    `).run(params.id, dbProposalId);
+      WHERE e.id = ? AND ${entityClause}
+    `).run(...entityParams);
 
     // 删除 metadata
     db.prepare(`

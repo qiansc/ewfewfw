@@ -362,12 +362,19 @@ export class SQLiteStore {
         description TEXT,
         created_by TEXT,
         checklist TEXT,
+        workflow_steps TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
 
       CREATE INDEX IF NOT EXISTS idx_feats_status ON feats(status);
     `);
+
+    try {
+      this.db.exec(`ALTER TABLE feats ADD COLUMN workflow_steps TEXT;`);
+    } catch {
+      // column already exists
+    }
 
     // Feat 发布历史表 (用于回滚)
     // 设计文档: L219-231

@@ -86,6 +86,11 @@ export class LiteAdapter implements StorageAdapter {
       dbPath: config.dbPath || defaultDbPath,
       defaultProject: config.defaultProject || 'default',
       enableVectorSearch: config.enableVectorSearch ?? true,
+      repoId: config.repoId ?? null,
+      feat: {
+        concurrent_warning: config.feat?.concurrent_warning ?? true,
+        auto_notify: config.feat?.auto_notify ?? false,
+      },
     };
 
     this.store = SQLiteStore.getInstance({ dbPath: this.config.dbPath });

@@ -160,11 +160,11 @@ drafts/adr-002-introduce-mq/
 
 ### 同步规则
 
-**⚠️ 必须串行同步，禁止并发调用 `c4a_db_sync_file`**
+**⚠️ 必须串行同步，禁止并发调用 `c4a_store_sync`**
 
 推荐流程：
 1. 使用 `c4a_local_list_files(status="published")` 获取文件列表
-2. 逐个调用 `c4a_db_sync_file`，等待每个返回后再调用下一个
+2. 逐个调用 `c4a_store_sync`（direction="import"），等待每个返回后再调用下一个
 3. 每同步一个文件，向用户报告进度
 
 ### 输出格式

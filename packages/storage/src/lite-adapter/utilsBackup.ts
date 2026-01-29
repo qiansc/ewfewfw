@@ -17,6 +17,44 @@ import { computeChecksum } from './utilsCommon.js';
  */
 const BACKUP_FORMAT_VERSION = '1.0';
 
+const TAR_BLOCK_SIZE = 512;
+
+function writeOctal(value: number, length: number): string {
+  const str = value.toString(8);
+  return str.padStart(length - 1, '0') + '\0';
+}
+
+function buildTarHeader(filename: string, size: number, mtime: number): Buffer {
+  const header = Buffer.alloc(TAR_BLOCK_SIZE, 0);
+  header.write(filename, 0, 100, 'utf-8');
+  header.write(writeOctal(0o644, 8), 100, 8, 'utf-8');
+  header.write(writeOctal(0, 8), 108, 8, 'utf-8');
+  header.write(writeOctal(0, 8), 116, 8, 'utf-8');
+  header.write(writeOctal(size, 12), 124, 12, 'utf-8');
+  header.write(writeOctal(mtime, 12), 136, 12, 'utf-8');
+  header.write('        ', 148, 8, 'utf-8');
+  header.write('0', 156, 1, 'utf-8');
+  header.write('ustar\0', 257, 6, 'utf-8');
+  header.write('00', 263, 2, 'utf-8');
+
+  let sum = 0;
+  for (const byte of header) {
+    sum += byte;
+  }
+  const checksum = writeOctal(sum, 8);
+  header.write(checksum, 148, 8, 'utf-8');
+  return header;
+}
+
+function createTarArchive(filename: string, content: string): Buffer {
+  const payload = Buffer.from(content, 'utf-8');
+  const header = buildTarHeader(filename, payload.length, Math.floor(Date.now() / 1000));
+  const padSize = (TAR_BLOCK_SIZE - (payload.length % TAR_BLOCK_SIZE)) % TAR_BLOCK_SIZE;
+  const padding = Buffer.alloc(padSize, 0);
+  const end = Buffer.alloc(TAR_BLOCK_SIZE * 2, 0);
+  return Buffer.concat([header, payload, padding, end]);
+}
+
 /**
  * 备份数据
  * 设计文档: store-utils.md §3.13
@@ -70,30 +108,41 @@ export async function backup(
     const vectorCount = ctx.store.getVectorStore()?.size() ?? 0;
 
     // 构建备份数据
+    const source: Record<string, string> = {
+      mode: 'local',
+      project_id: ctx.config.defaultProject,
+    };
+    if (ctx.config.repoId) {
+      source.repo_id = ctx.config.repoId;
+    }
+
+    const backupEntities = entities.map(e => ({
+      id: e.id,
+      type: e.type,
+      source_project: e.source_project,
+      status: e.status,
+      data: JSON.parse(e.data),
+      metadata: params.include_metadata !== false ? {
+        content_hash: e.content_hash,
+        created_at: e.created_at,
+        updated_at: e.updated_at,
+      } : undefined,
+    }));
+
+    const entitiesChecksum = computeChecksum(JSON.stringify(backupEntities));
+    const relationsChecksum = computeChecksum(JSON.stringify(relations));
+
     const backupData = {
       version: '0.3.0',
       format_version: BACKUP_FORMAT_VERSION,
       exported_at: new Date().toISOString(),
-      source: {
-        mode: 'local',
-        project_id: ctx.config.defaultProject,
-      },
-      entities: entities.map(e => ({
-        id: e.id,
-        type: e.type,
-        source_project: e.source_project,
-        status: e.status,
-        data: JSON.parse(e.data),
-        metadata: params.include_metadata !== false ? {
-          content_hash: e.content_hash,
-          created_at: e.created_at,
-          updated_at: e.updated_at,
-        } : undefined,
-      })),
+      exported_by: 'unknown',
+      source,
+      entities: backupEntities,
       relations,
       checksums: {
-        entities: computeChecksum(JSON.stringify(entities)),
-        relations: computeChecksum(JSON.stringify(relations)),
+        entities: entitiesChecksum,
+        relations: relationsChecksum,
       },
     };
 
@@ -102,10 +151,9 @@ export async function backup(
 
     // 根据格式写入文件
     if (format === 'tar.gz') {
-      // P2-3.1: 使用 gzip 压缩
-      // 注意：这是简化的实现，实际 tar.gz 需要 tar 归档 + gzip 压缩
-      // 这里我们直接对 JSON 进行 gzip 压缩，文件扩展名为 .json.gz
-      const compressed = gzipSync(Buffer.from(jsonContent, 'utf-8'));
+      // P2-3.1: tar + gzip 压缩
+      const tarContent = createTarArchive('backup.json', jsonContent);
+      const compressed = gzipSync(tarContent);
       writeFileSync(params.output, compressed);
     } else {
       // json 格式：直接写入
