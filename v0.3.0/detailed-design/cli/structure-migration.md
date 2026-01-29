@@ -20,7 +20,7 @@ packages/cli/
 │   │   └── ...
 │   ├── core/
 │   │   ├── store/           # SQLite (Local 模式)
-│   │   ├── code/            # 内嵌 mcp-code 逻辑
+│   │   ├── extract/          # 内嵌 mcp-extract 逻辑
 │   │   └── config.ts
 │   └── utils/
 │       ├── docker.ts        # 新增：Docker 管理

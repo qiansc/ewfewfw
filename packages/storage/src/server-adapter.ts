@@ -1,7 +1,7 @@
 /**
  * ServerAdapter 占位实现
  *
- * 说明：Server 模式依赖 Part 13 (mcp-data) 的 API，
+ * 说明：Server 模式依赖 Part 13 的 Server API，
  * 当前仅提供明确错误提示，避免误用。
  */
 
@@ -58,7 +58,7 @@ export class ServerAdapter implements StorageAdapter {
     const url = this.config.url || 'unknown';
     throw new Error(
       `Server mode not implemented (${method}). Server URL: ${url}. ` +
-        `This requires Part 13 (mcp-data HTTP API).`
+        `This requires Part 13 (Server API).`
     );
   }
 

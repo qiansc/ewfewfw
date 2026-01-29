@@ -20,13 +20,13 @@ $ ./start.sh
   ║                                      ║
   ╚══════════════════════════════════════╝
 
-  本地开发: 存储服务 Docker 运行，mcp-data 本地运行，支持热重载
+  本地开发: 存储服务 Docker 运行，MCP Server 本地运行，支持热重载
 
   ↑/↓ 选择  → 展开  Enter 确认  q 退出
 ```
 
 **菜单说明**（根据光标位置动态显示）：
-- **dev**：存储服务 Docker 运行，mcp-data 本地运行，支持热重载，适合日常开发
+- **dev**：存储服务 Docker 运行，MCP Server 本地运行，支持热重载，适合日常开发
 - **docker**：所有服务容器化运行，暴露 HTTP 端口，适合 CI/CD 和团队共享
 - **debug**：前台运行 MCP 服务，可直接查看日志，适合调试
 - **server**：管理服务状态（status/restart/stop/logs）
@@ -41,8 +41,8 @@ $ ./start.sh
 ./start.sh                  # 交互式菜单
 ./start.sh dev              # 启动开发环境
 ./start.sh docker           # Docker 模式
-./start.sh debug:code       # 调试 mcp-code
-./start.sh debug:data       # 调试 mcp-data
+./start.sh debug:code       # 调试 mcp-extract
+./start.sh debug:store      # 调试 mcp-store
 ./start.sh status           # 服务状态
 ./start.sh restart          # 重启所有服务
 ./start.sh stop             # 停止服务
@@ -91,7 +91,7 @@ $ ./start.sh build
    ✅ prompts/skills/ → packages/cli/dist/skills/
 
 3. 内嵌 MCP 工具 (Local 模式)
-   ✅ mcp-code 核心逻辑 → packages/cli/dist/core/code/
+   ✅ mcp-extract 核心逻辑 → packages/cli/dist/core/extract/
    ✅ store 核心逻辑 → packages/cli/dist/core/store/
 
 4. 复制资源文件

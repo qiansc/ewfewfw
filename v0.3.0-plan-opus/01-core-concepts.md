@@ -66,16 +66,16 @@
 | 1.13 | 术语表 | `concepts.md` | 附录：术语表 | L854-884 | [x] | [x] |
 | 1.13a | 完整示例 | `concepts.md` | §9 直播电商项目 | L731-852 | [x] | [x] |
 | 1.14 | Feat 类型 | `concepts.md` | §8.4 feat | L680-705 | [x] | [x] |
-| 1.14 | Feat 生命周期 | `architecture.md` | §7 feat 机制 | L988-1101 | [x] | [x] |
+| 1.14 | Feat 生命周期 | `architecture.md` | §7 feat 机制 | L990-1103 | [x] | [x] |
 | 1.15 | Checklist 格式 | `skills/checklist-format.md` | 全文 | - | [x] | [x] |
-| 1.15 | Checklist 存储 | `architecture.md` | §2.5 文件命名规则 - checklist | L472-495 | [x] | [x] |
+| 1.15 | Checklist 存储 | `architecture.md` | §2.5 文件命名规则 - checklist | L484-507 | [x] | [x] |
 | 1.16 | 关系类型 | `concepts.md` | §6 关系类型 | L443-461 | [x] | [x] |
-| 1.16 | 跨层级引用 | `architecture.md` | §3.4.1 跨层级和跨项目引用 | L700-731 | [x] | [x] |
-| 1.17-1.20 | Schema 校验 | `architecture.md` | §2.7 Schema 校验 | L543-615 | [x] | [x] |
+| 1.16 | 跨层级引用 | `architecture.md` | §3.4.1 跨层级和跨项目引用 | L712-743 | [x] | [x] |
+| 1.17-1.20 | Schema 校验 | `architecture.md` | §2.7 Schema 校验 | L555-627 | [x] | [x] |
 | 1.21 | 错误码格式 | `permissions/error-codes.md` | §3.1 错误码格式 | L1-70 | [x] | [x] |
 | 1.22 | 完整错误码表 | `permissions/error-codes.md` | §3.2 完整错误码映射表 | L72-122 | [x] | [x] |
 | 1.23-1.24 | 错误响应格式 | `permissions/error-codes.md` | §3.3 错误响应格式 | L123-155 | [x] | [x] |
-| 1.25-1.29 | ID/路径规范 | `architecture.md` | §2.4-2.5 | L354-495 | [x] | [x] |
+| 1.25-1.29 | ID/路径规范 | `architecture.md` | §2.4-2.5 | L358-507 | [x] | [x] |
 | 1.25 | content_hash | `mcp/store-crud.md` | §3.1 save - 内部行为 | L105-111 | [x] | [x] |
 | 1.30 | 全局配置 | `cli/user-cli.md` | §2.4 全局配置 | L1467-1500 | [x] | [x] |
 | 1.30 | 项目配置 | `cli/user-cli.md` | §2.5 项目配置 | L1502-1596 | [x] | [x] |

@@ -8,28 +8,29 @@
 
 | # | 功能 | [ ] | 描述 |
 |---|------|:---:|------|
-| 4.1 | c4a_query_search 输入参数 | [ ] | query/scope/proposal_id/limit 参数定义（复用 SearchParams） |
-| 4.2 | c4a_query_search 返回结果 | [ ] | items/degraded/degraded_reason/search_mode 返回结构 |
-| 4.3 | SearchHit 类型 | [ ] | id/type/score/summary/highlights 搜索结果项 |
-| 4.4 | c4a_query_deps 输入参数 | [ ] | id/source_project/direction/depth/proposal_id 参数定义（复用 DepsParams） |
-| 4.5 | c4a_query_deps 返回结果 | [ ] | items/degraded/degraded_reason/degraded_message 返回结构 |
-| 4.6 | DepsNode 类型 | [ ] | id/type/distance/relation_type/path 依赖节点 |
-| 4.7 | c4a_query_impact 输入参数 | [ ] | id/source_project/change_type(upgrade\|deprecate\|remove)/depth/proposal_id 参数定义（复用 ImpactParams） |
-| 4.8 | c4a_query_impact 返回结果 | [ ] | items/degraded/degraded_reason/suggestion 返回结构 |
-| 4.9 | ImpactNode 类型 | [ ] | id/type/distance/impact_level/reason 影响节点 |
-| 4.10 | 查询一致性检测 | [ ] | checkSyncStatus 检查 pendingSync 状态（Server 模式，Local 跳过） |
-| 4.11 | QueryContext 类型 | [ ] | degraded/degraded_reason/degraded_message/affected_entities |
-| 4.12 | 降级行为 - deps | [ ] | Neo4j 不可用时降级到 MongoDB $graphLookup |
-| 4.13 | 降级行为 - impact | [ ] | 降级模式下返回 degraded: true + suggestion |
-| 4.14 | 降级行为 - search | [ ] | Milvus 不可用时降级到全文搜索，search_mode: 'fulltext' |
-| 4.15 | Local Mode search | [ ] | 调用 Part 06 的 USearch 向量搜索 |
-| 4.16 | Local Mode deps | [ ] | 调用 Part 06 的 InMemoryGraph 遍历 |
-| 4.17 | Local Mode impact | [ ] | 简化版影响分析（仅下游依赖，返回 degraded: true + suggestion） |
+| 4.0 | 创建 mcp-query 包 | [x] | packages/mcp-query/ 包结构初始化（package.json, tsconfig.json） |
+| 4.1 | c4a_query_search 输入参数 | [x] | query/scope/proposal_id/limit 参数定义（复用 SearchParams） |
+| 4.2 | c4a_query_search 返回结果 | [x] | items/degraded/degraded_reason/search_mode 返回结构 |
+| 4.3 | SearchHit 类型 | [x] | id/type/score/summary/highlights 搜索结果项 |
+| 4.4 | c4a_query_deps 输入参数 | [x] | id/source_project/direction/depth/proposal_id 参数定义（复用 DepsParams） |
+| 4.5 | c4a_query_deps 返回结果 | [x] | items/degraded/degraded_reason/degraded_message 返回结构 |
+| 4.6 | DepsNode 类型 | [x] | id/type/distance/relation_type/path 依赖节点 |
+| 4.7 | c4a_query_impact 输入参数 | [x] | id/source_project/change_type(upgrade\|deprecate\|remove)/depth/proposal_id 参数定义（复用 ImpactParams） |
+| 4.8 | c4a_query_impact 返回结果 | [x] | items/degraded/degraded_reason/suggestion 返回结构 |
+| 4.9 | ImpactNode 类型 | [x] | id/type/distance/impact_level/reason 影响节点 |
+| 4.10 | 查询一致性检测 | [x] | checkSyncStatus 检查 pendingSync 状态（Server 模式，Local 跳过） |
+| 4.11 | QueryContext 类型 | [x] | degraded/degraded_reason/degraded_message/affected_entities |
+| 4.12 | 降级行为 - deps | [ ] | 挂起：依赖 Part 13 Server（MongoDB $graphLookup） |
+| 4.13 | 降级行为 - impact | [ ] | 挂起：依赖 Part 13 Server（降级模式返回错误） |
+| 4.14 | 降级行为 - search | [ ] | 挂起：依赖 Part 13 Server（全文搜索降级） |
+| 4.15 | Local Mode search | [x] | 调用 Part 06 的 USearch 向量搜索 |
+| 4.16 | Local Mode deps | [x] | 调用 Part 06 的 InMemoryGraph 遍历 |
+| 4.17 | Local Mode impact | [x] | 简化版影响分析（仅下游依赖，返回 degraded: true + suggestion） |
 | 4.18 | StorageAdapter 接口 | [x] | search/queryDeps/queryImpact 方法签名（已在 adapterSearchTypes.ts 定义） |
-| 4.19 | LiteAdapter 实现 | [ ] | Local 模式 Query 方法实现（调用 Part 06 基础设施） |
-| 4.20 | MCP Handler 层 | [ ] | packages/cli/src/mcp/query/*.ts 工具处理器 |
-| 4.21 | MCP Server 注册 | [ ] | 3 个工具注册到 c4a-data-mcp Server |
-| 4.22 | 单元测试 | [ ] | 各工具基本功能测试 |
+| 4.19 | LiteAdapter 实现 | [x] | Local 模式 Query 方法实现（调用 Part 06 基础设施） |
+| 4.20 | MCP Handler 层 | [x] | packages/mcp-query/src/tools/*.ts 工具实现 |
+| 4.21 | MCP Server 注册 | [x] | 3 个工具注册到 mcp-query Server |
+| 4.22 | 单元测试 | [x] | 各工具基本功能测试 |
 
 ---
 
@@ -37,19 +38,19 @@
 
 | # | 功能 | 文件 | 章节 | 行号 | 已读 | 已实现 |
 |---|------|------|------|------|:----:|:------:|
-| 4.1-4.3 | c4a_query_search | `mcp/query.md` | §4.1 search | L3-16 | [ ] | [ ] |
-| 4.4-4.6 | c4a_query_deps | `mcp/query.md` | §4.2 deps | L18-21 | [ ] | [ ] |
-| 4.7-4.9 | c4a_query_impact | `mcp/query.md` | §4.3 impact | L23-26 | [ ] | [ ] |
-| 4.10-4.11 | 一致性检测 | `mcp/query.md` | §4.4.1 不一致状态检测 | L34-69 | [ ] | [ ] |
-| 4.12-4.14 | 降级行为 | `mcp/query.md` | §4.4.2 降级行为 | L72-78 | [ ] | [ ] |
-| 4.12-4.14 | 返回格式扩展 | `mcp/query.md` | §4.4.3 返回格式扩展 | L80-101 | [ ] | [ ] |
-| 4.12-4.14 | 实现要点 | `mcp/query.md` | §4.4.4 实现要点 | L103-111 | [ ] | [ ] |
-| 4.15-4.17 | Local Mode 能力对比 | `mcp/query.md` | §4.5.1 能力对比 | L117-123 | [ ] | [ ] |
-| 4.17 | Local Mode impact | `mcp/query.md` | §4.5.2 impact 实现 | L125-155 | [ ] | [ ] |
+| 4.1-4.3 | c4a_query_search | `mcp/query.md` | §4.1 search | L3-16 | [x] | [x] |
+| 4.4-4.6 | c4a_query_deps | `mcp/query.md` | §4.2 deps | L18-21 | [x] | [x] |
+| 4.7-4.9 | c4a_query_impact | `mcp/query.md` | §4.3 impact | L23-26 | [x] | [x] |
+| 4.10-4.11 | 一致性检测 | `mcp/query.md` | §4.4.1 不一致状态检测 | L34-69 | [x] | [x] |
+| 4.12-4.14 | 降级行为 | `mcp/query.md` | §4.4.2 降级行为 | L72-78 | [x] | [ ] |
+| 4.12-4.14 | 返回格式扩展 | `mcp/query.md` | §4.4.3 返回格式扩展 | L80-101 | [x] | [ ] |
+| 4.12-4.14 | 实现要点 | `mcp/query.md` | §4.4.4 实现要点 | L103-111 | [x] | [ ] |
+| 4.15-4.17 | Local Mode 能力对比 | `mcp/query.md` | §4.5.1 能力对比 | L117-123 | [x] | [x] |
+| 4.17 | Local Mode impact | `mcp/query.md` | §4.5.2 impact 实现 | L125-155 | [x] | [x] |
 | - | Skill 降级处理 | `mcp/query.md` | §4.5.3 Skill 降级处理 | L157-179 | [ ] | [ ] |
 | - | 工具分组 | `mcp/overview.md` | §1.1 工具分组 | L9-18 | [ ] | [ ] |
 | - | 核心工具 | `mcp/overview.md` | §1.2 核心工具 | L24-46 | [ ] | [ ] |
-| - | 知识生命周期 Query | `architecture.md` | §1.3 知识生命周期 | L92-113 | [ ] | [ ] |
+| - | 知识生命周期 Query | `architecture.md` | §1.3 知识生命周期 | L96-115 | [ ] | [ ] |
 
 ---
 
@@ -59,14 +60,18 @@
 |---------|---------|------|:----:|
 | 适配器类型 | `packages/storage/src/adapterSearchTypes.ts` | SearchParams/DepsParams/ImpactParams 类型 | ✅ |
 | 适配器接口 | `packages/storage/src/adapter.ts` | search/queryDeps/queryImpact 方法签名 | [ ] |
-| LiteAdapter | `packages/storage/src/lite-adapter/query-operations.ts` | Local 模式 Query 实现（调用 Part 06） | [ ] |
-| MCP Handler | `packages/cli/src/mcp/query/search.ts` | c4a_query_search 处理器 | [ ] |
-| MCP Handler | `packages/cli/src/mcp/query/deps.ts` | c4a_query_deps 处理器 | [ ] |
-| MCP Handler | `packages/cli/src/mcp/query/impact.ts` | c4a_query_impact 处理器 | [ ] |
-| MCP Handler | `packages/cli/src/mcp/query/index.ts` | Query 工具统一导出 | [ ] |
-| Schema 定义 | `packages/cli/src/mcp/querySchemas.ts` | Zod Schema 定义 | [ ] |
-| Server 注册 | `packages/cli/src/mcp/server.ts` | 注册 3 个 Query 工具 | [ ] |
-| 单元测试 | `packages/storage/src/__tests__/query-operations.test.ts` | Query 操作测试 | [ ] |
+| LiteAdapter | `packages/storage/src/lite-adapter/search-operations.ts` | Local 模式 Query 实现（Search） | [x] |
+| LiteAdapter | `packages/storage/src/lite-adapter/graph-operations.ts` | Local 模式 Query 实现（Deps/Impact） | [x] |
+| MCP Server | `packages/mcp-query/src/server.ts` | MCP Server 工厂函数 | [x] |
+| 入口文件 | `packages/mcp-query/src/index.ts` | 模块入口 | [x] |
+| Schema 定义 | `packages/mcp-query/src/schemas.ts` | Zod Schema 定义 | [x] |
+| 工具实现 | `packages/mcp-query/src/tools/search.ts` | c4a_query_search 实现 | [x] |
+| 工具实现 | `packages/mcp-query/src/tools/deps.ts` | c4a_query_deps 实现 | [x] |
+| 工具实现 | `packages/mcp-query/src/tools/impact.ts` | c4a_query_impact 实现 | [x] |
+| 工具导出 | `packages/mcp-query/src/tools/index.ts` | 工具统一导出 | [x] |
+| 类型定义 | `packages/mcp-query/src/types.ts` | QueryResult/SearchHit/DepsNode/ImpactNode | [x] |
+| 单元测试 | `packages/mcp-query/src/__tests__/smoke.test.ts` | 冒烟测试 | [x] |
+| 单元测试 | `packages/storage/src/__tests__/query-operations.test.ts` | Query 操作测试 | [x] |
 
 > **注意**：Part 06 已完成的基础设施（vector-search.ts, in-memory-graph.ts, graph-query-cache.ts）由 Part 04 调用，不在此列表重复。
 
@@ -136,6 +141,15 @@ interface QueryResult<T> {
 
 ---
 
+## 阻塞清单
+
+- **4.12 降级行为 - deps**：需要 Part 13 Server 模式能力（MongoDB `$graphLookup` + Neo4j 健康检查），当前 ServerAdapter 未实现查询降级
+- **4.13 降级行为 - impact**：需要 Part 13 Server 模式能力（一致性检测 + 降级模式返回错误）
+- **4.14 降级行为 - search**：需要 Part 13 Server 模式能力（Milvus 不可用时降级到 MongoDB 全文搜索）
+- **checkSyncStatus 真正实现**：依赖 Server 模式数据源与 pendingSync/sync_status 读写路径
+
+---
+
 ## 验收标准
 
 - [ ] 3 个 MCP 工具注册到 Server
@@ -145,7 +159,7 @@ interface QueryResult<T> {
 - [ ] Local 模式 deps 使用 InMemoryGraph
 - [ ] Local 模式 impact 返回简化版结果
 - [ ] 降级模式返回 degraded: true
-- [ ] 单元测试通过
+- [x] 单元测试通过
 
 ---
 

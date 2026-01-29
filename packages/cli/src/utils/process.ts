@@ -51,7 +51,7 @@ export async function checkPortAvailable(port: number): Promise<boolean> {
  * @param port 端口号
  * @returns 是否成功释放端口
  */
-export function killProcessOnPort(port: number): boolean {
+export function killProcessOnPort(port: number, service: string = "mcp-store"): boolean {
   try {
     // 使用 lsof 查找占用端口的进程
     const result = spawnSync("lsof", ["-t", `-i:${port}`], { encoding: "utf-8" });
@@ -61,13 +61,13 @@ export function killProcessOnPort(port: number): boolean {
       return true; // 没有进程占用
     }
 
-    appendLog("mcp-data", `发现 ${pids.length} 个进程占用端口 ${port}: ${pids.join(", ")}`);
+    appendLog(service, `发现 ${pids.length} 个进程占用端口 ${port}: ${pids.join(", ")}`);
 
     // 先尝试 SIGTERM
     for (const pid of pids) {
       try {
         process.kill(Number(pid), "SIGTERM");
-        appendLog("mcp-data", `已发送 SIGTERM 到进程 ${pid}`);
+        appendLog(service, `已发送 SIGTERM 到进程 ${pid}`);
       } catch {
         // 进程可能已经退出
       }
@@ -82,11 +82,11 @@ export function killProcessOnPort(port: number): boolean {
 
     if (remainingPids.length > 0) {
       // 强制杀死
-      appendLog("mcp-data", `进程未响应 SIGTERM，使用 SIGKILL: ${remainingPids.join(", ")}`);
+      appendLog(service, `进程未响应 SIGTERM，使用 SIGKILL: ${remainingPids.join(", ")}`);
       for (const pid of remainingPids) {
         try {
           process.kill(Number(pid), "SIGKILL");
-          appendLog("mcp-data", `已发送 SIGKILL 到进程 ${pid}`);
+          appendLog(service, `已发送 SIGKILL 到进程 ${pid}`);
         } catch {
           // 进程可能已经退出
         }
@@ -100,14 +100,14 @@ export function killProcessOnPort(port: number): boolean {
     const finalPids = finalResult.stdout.trim().split("\n").filter(Boolean);
 
     if (finalPids.length === 0) {
-      appendLog("mcp-data", `端口 ${port} 已成功释放`);
+      appendLog(service, `端口 ${port} 已成功释放`);
       return true;
     } else {
-      appendLog("mcp-data", `无法释放端口 ${port}，仍有进程占用: ${finalPids.join(", ")}`);
+      appendLog(service, `无法释放端口 ${port}，仍有进程占用: ${finalPids.join(", ")}`);
       return false;
     }
   } catch (err) {
-    appendLog("mcp-data", `检查/杀死端口进程时出错: ${(err as Error).message}`);
+    appendLog(service, `检查/杀死端口进程时出错: ${(err as Error).message}`);
     return false;
   }
 }
@@ -170,43 +170,43 @@ export function getProcessStatus(name: string): { running: boolean; pid?: number
 }
 
 /**
- * 启动 mcp-data 服务
+ * 启动 mcp-store 服务
  * @param options 配置选项
  * @returns 进程 PID
  */
-export async function startMcpData(options?: {
+export async function startMcpStore(options?: {
   force?: boolean;      // 强制重启
   retries?: number;     // 重试次数（默认 3）
   startupWait?: number; // 启动等待时间（毫秒，默认 5000）
 }): Promise<number> {
   const { force = false, retries = 3, startupWait = 5000 } = options || {};
 
-  const pidFile = getPidFile("mcp-data");
-  const mcpDataDir = `${PROJECT_ROOT}/packages/mcp-data`;
-  const port = 8050;
+  const pidFile = getPidFile("mcp-store");
+  const mcpStoreDir = `${PROJECT_ROOT}/packages/mcp-store`;
+  const port = 8051;
 
-  appendLog("mcp-data", `=== 尝试启动 (force=${force}) ===`);
+  appendLog("mcp-store", `=== 尝试启动 (force=${force}) ===`);
 
   // 检查是否已在运行
-  const status = getProcessStatus("mcp-data");
+  const status = getProcessStatus("mcp-store");
   if (status.running && !force) {
     // 进一步检查 HTTP 健康状态
     const isHealthy = await checkHttpHealth("localhost", port);
     if (isHealthy) {
-      appendLog("mcp-data", `服务已在运行且健康 (PID: ${status.pid})`);
-      console.log(`✅ mcp-data 已在运行 (PID: ${status.pid})`);
+      appendLog("mcp-store", `服务已在运行且健康 (PID: ${status.pid})`);
+      console.log(`✅ mcp-store 已在运行 (PID: ${status.pid})`);
       return status.pid!;
     } else {
       // 进程存在但服务不健康，强制重启
-      appendLog("mcp-data", `进程存在 (PID: ${status.pid}) 但 HTTP 不响应，将重启`);
-      await stopMcpData();
+      appendLog("mcp-store", `进程存在 (PID: ${status.pid}) 但 HTTP 不响应，将重启`);
+      await stopMcpStore();
     }
   }
 
   // 检查端口是否可用，如果被占用则自动杀死占用进程
   let portAvailable = await checkPortAvailable(port);
   if (!portAvailable) {
-    appendLog("mcp-data", `端口 ${port} 被占用，尝试自动释放...`);
+    appendLog("mcp-store", `端口 ${port} 被占用，尝试自动释放...`);
     console.log(`⚠️  端口 ${port} 被占用，正在自动释放...`);
 
     const released = killProcessOnPort(port);
@@ -216,7 +216,7 @@ export async function startMcpData(options?: {
     }
 
     if (!portAvailable) {
-      appendLog("mcp-data", `无法释放端口 ${port}`);
+      appendLog("mcp-store", `无法释放端口 ${port}`);
       throw new Error(`端口 ${port} 被占用且无法自动释放，请手动检查: lsof -i :${port}`);
     }
 
@@ -225,13 +225,13 @@ export async function startMcpData(options?: {
 
   // 启动进程（带重试）
   let lastError: Error | null = null;
-  const logFile = pathResolve(LOGS_DIR, "mcp-data.stdout.log");
+  const logFile = pathResolve(LOGS_DIR, "mcp-store.stdout.log");
 
   for (let attempt = 1; attempt <= retries; attempt++) {
-    appendLog("mcp-data", `启动尝试 ${attempt}/${retries}`);
+    appendLog("mcp-store", `启动尝试 ${attempt}/${retries}`);
 
-    const proc = spawn("uv", ["run", "python", "-m", "c4a_data_mcp.server"], {
-      cwd: mcpDataDir,
+    const proc = spawn("bun", ["run", "src/index.ts"], {
+      cwd: mcpStoreDir,
       detached: true,
       stdio: ["ignore", "pipe", "pipe"], // 捕获 stdout 和 stderr 以便调试
       env: {
@@ -243,7 +243,7 @@ export async function startMcpData(options?: {
 
     if (!proc.pid) {
       lastError = new Error("启动失败: 无法获取进程 PID");
-      appendLog("mcp-data", lastError.message);
+      appendLog("mcp-store", lastError.message);
       if (attempt < retries) continue;
       throw lastError;
     }
@@ -262,33 +262,33 @@ export async function startMcpData(options?: {
 
     // 监听进程退出
     proc.on('exit', (code, signal) => {
-      appendLog("mcp-data", `进程退出: code=${code}, signal=${signal}`);
+      appendLog("mcp-store", `进程退出: code=${code}, signal=${signal}`);
     });
 
     proc.on('error', (err) => {
-      appendLog("mcp-data", `进程错误: ${err.message}`);
+      appendLog("mcp-store", `进程错误: ${err.message}`);
     });
 
     writeFileSync(pidFile, String(proc.pid));
-    appendLog("mcp-data", `进程已启动: PID=${proc.pid}`);
+    appendLog("mcp-store", `进程已启动: PID=${proc.pid}`);
 
     proc.unref();
 
     // 等待服务启动
-    appendLog("mcp-data", `等待服务启动 (${startupWait}ms)...`);
+    appendLog("mcp-store", `等待服务启动 (${startupWait}ms)...`);
     await new Promise(r => setTimeout(r, startupWait));
 
     // 验证服务是否健康
     const isHealthy = await checkHttpHealth("localhost", port);
 
     if (isHealthy) {
-      appendLog("mcp-data", `✅ 服务启动成功 (PID: ${proc.pid})`);
-      console.log(`✅ mcp-data 已启动 (PID: ${proc.pid})`);
+      appendLog("mcp-store", `✅ 服务启动成功 (PID: ${proc.pid})`);
+      console.log(`✅ mcp-store 已启动 (PID: ${proc.pid})`);
       return proc.pid;
     } else {
-      appendLog("mcp-data", `❌ HTTP 健康检查失败，尝试 ${attempt}/${retries}`);
+      appendLog("mcp-store", `❌ HTTP 健康检查失败，尝试 ${attempt}/${retries}`);
       // 停止不健康的进程
-      await stopMcpData();
+      await stopMcpStore();
       if (attempt < retries) {
         await new Promise(r => setTimeout(r, 1000)); // 重试前等待 1 秒
         continue;
@@ -297,28 +297,28 @@ export async function startMcpData(options?: {
   }
 
   const error = new Error(
-    `mcp-data 启动失败，已重试 ${retries} 次。\n` +
+    `mcp-store 启动失败，已重试 ${retries} 次。\n` +
     `详细日志: ${logFile}`
   );
-  appendLog("mcp-data", error.message);
+  appendLog("mcp-store", error.message);
   throw error;
 }
 
 /**
- * 停止 mcp-data 服务
+ * 停止 mcp-store 服务
  * @param waitForPort 是否等待端口释放（默认 true）
  * @param timeout 等待超时时间（毫秒，默认 5000）
  */
-export async function stopMcpData(waitForPort: boolean = true, timeout: number = 5000): Promise<boolean> {
-  const port = 8050;
-  const status = getProcessStatus("mcp-data");
+export async function stopMcpStore(waitForPort: boolean = true, timeout: number = 5000): Promise<boolean> {
+  const port = 8051;
+  const status = getProcessStatus("mcp-store");
 
   // 1. 通过 PID 文件停止
   if (status.running && status.pid) {
     try {
       process.kill(status.pid, "SIGTERM");
-      appendLog("mcp-data", `已发送 SIGTERM 到进程 ${status.pid}`);
-      const pidFile = getPidFile("mcp-data");
+      appendLog("mcp-store", `已发送 SIGTERM 到进程 ${status.pid}`);
+      const pidFile = getPidFile("mcp-store");
       if (existsSync(pidFile)) {
         unlinkSync(pidFile);
       }
@@ -330,7 +330,7 @@ export async function stopMcpData(waitForPort: boolean = true, timeout: number =
   // 2. 额外检查：确保端口上没有残留进程
   const portAvailable = await checkPortAvailable(port);
   if (!portAvailable) {
-    appendLog("mcp-data", `端口 ${port} 仍被占用，尝试释放...`);
+    appendLog("mcp-store", `端口 ${port} 仍被占用，尝试释放...`);
     killProcessOnPort(port);
   }
 
@@ -340,12 +340,181 @@ export async function stopMcpData(waitForPort: boolean = true, timeout: number =
     while (Date.now() - startTime < timeout) {
       const available = await checkPortAvailable(port);
       if (available) {
-        appendLog("mcp-data", `端口 ${port} 已释放`);
+        appendLog("mcp-store", `端口 ${port} 已释放`);
         return true;
       }
       await new Promise(r => setTimeout(r, 200));
     }
-    appendLog("mcp-data", `等待端口 ${port} 释放超时`);
+    appendLog("mcp-store", `等待端口 ${port} 释放超时`);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * 启动 mcp-query 服务
+ * @param options 配置选项
+ * @returns 进程 PID
+ */
+export async function startMcpQuery(options?: {
+  force?: boolean;
+  retries?: number;
+  startupWait?: number;
+}): Promise<number> {
+  const { force = false, retries = 3, startupWait = 5000 } = options || {};
+
+  const pidFile = getPidFile("mcp-query");
+  const mcpQueryDir = `${PROJECT_ROOT}/packages/mcp-query`;
+  const port = 8054;
+
+  appendLog("mcp-query", `=== 尝试启动 (force=${force}) ===`);
+
+  const status = getProcessStatus("mcp-query");
+  if (status.running && !force) {
+    const isHealthy = await checkHttpHealth("localhost", port);
+    if (isHealthy) {
+      appendLog("mcp-query", `服务已在运行且健康 (PID: ${status.pid})`);
+      console.log(`✅ mcp-query 已在运行 (PID: ${status.pid})`);
+      return status.pid!;
+    } else {
+      appendLog("mcp-query", `进程存在 (PID: ${status.pid}) 但 HTTP 不响应，将重启`);
+      await stopMcpQuery();
+    }
+  }
+
+  let portAvailable = await checkPortAvailable(port);
+  if (!portAvailable) {
+    appendLog("mcp-query", `端口 ${port} 被占用，尝试自动释放...`);
+    console.log(`⚠️  端口 ${port} 被占用，正在自动释放...`);
+
+    const released = killProcessOnPort(port, "mcp-query");
+    if (released) {
+      portAvailable = await checkPortAvailable(port);
+    }
+
+    if (!portAvailable) {
+      appendLog("mcp-query", `无法释放端口 ${port}`);
+      throw new Error(`端口 ${port} 被占用且无法自动释放，请手动检查: lsof -i :${port}`);
+    }
+
+    console.log(`✅ 端口 ${port} 已释放`);
+  }
+
+  let lastError: Error | null = null;
+  const logFile = pathResolve(LOGS_DIR, "mcp-query.stdout.log");
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    appendLog("mcp-query", `启动尝试 ${attempt}/${retries}`);
+
+    const proc = spawn("bun", ["run", "src/index.ts"], {
+      cwd: mcpQueryDir,
+      detached: true,
+      stdio: ["ignore", "pipe", "pipe"],
+      env: {
+        ...process.env,
+        MCP_TRANSPORT: "streamable-http",
+        MCP_PORT: String(port),
+      },
+    });
+
+    if (!proc.pid) {
+      lastError = new Error("启动失败: 无法获取进程 PID");
+      appendLog("mcp-query", lastError.message);
+      if (attempt < retries) continue;
+      throw lastError;
+    }
+
+    if (proc.stdout) {
+      proc.stdout.on("data", (data) => {
+        appendFileSync(logFile, `[STDOUT] ${data}`);
+      });
+    }
+    if (proc.stderr) {
+      proc.stderr.on("data", (data) => {
+        appendFileSync(logFile, `[STDERR] ${data}`);
+      });
+    }
+
+    proc.on("exit", (code, signal) => {
+      appendLog("mcp-query", `进程退出: code=${code}, signal=${signal}`);
+    });
+
+    proc.on("error", (err) => {
+      appendLog("mcp-query", `进程错误: ${err.message}`);
+    });
+
+    writeFileSync(pidFile, String(proc.pid));
+    appendLog("mcp-query", `进程已启动: PID=${proc.pid}`);
+
+    proc.unref();
+
+    appendLog("mcp-query", `等待服务启动 (${startupWait}ms)...`);
+    await new Promise((r) => setTimeout(r, startupWait));
+
+    const isHealthy = await checkHttpHealth("localhost", port);
+
+    if (isHealthy) {
+      appendLog("mcp-query", `✅ 服务启动成功 (PID: ${proc.pid})`);
+      console.log(`✅ mcp-query 已启动 (PID: ${proc.pid})`);
+      return proc.pid;
+    } else {
+      appendLog("mcp-query", `❌ HTTP 健康检查失败，尝试 ${attempt}/${retries}`);
+      await stopMcpQuery();
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 1000));
+        continue;
+      }
+    }
+  }
+
+  const error = new Error(
+    `mcp-query 启动失败，已重试 ${retries} 次。\n` + `详细日志: ${logFile}`
+  );
+  appendLog("mcp-query", error.message);
+  throw error;
+}
+
+/**
+ * 停止 mcp-query 服务
+ */
+export async function stopMcpQuery(
+  waitForPort: boolean = true,
+  timeout: number = 5000
+): Promise<boolean> {
+  const port = 8054;
+  const status = getProcessStatus("mcp-query");
+
+  if (status.running && status.pid) {
+    try {
+      process.kill(status.pid, "SIGTERM");
+      appendLog("mcp-query", `已发送 SIGTERM 到进程 ${status.pid}`);
+      const pidFile = getPidFile("mcp-query");
+      if (existsSync(pidFile)) {
+        unlinkSync(pidFile);
+      }
+    } catch {
+      // 进程可能已经退出
+    }
+  }
+
+  const portAvailable = await checkPortAvailable(port);
+  if (!portAvailable) {
+    appendLog("mcp-query", `端口 ${port} 仍被占用，尝试释放...`);
+    killProcessOnPort(port, "mcp-query");
+  }
+
+  if (waitForPort) {
+    const startTime = Date.now();
+    while (Date.now() - startTime < timeout) {
+      const available = await checkPortAvailable(port);
+      if (available) {
+        appendLog("mcp-query", `端口 ${port} 已释放`);
+        return true;
+      }
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    appendLog("mcp-query", `等待端口 ${port} 释放超时`);
     return false;
   }
 

@@ -1,7 +1,7 @@
 /**
  * 工具名称解析器
  *
- * 负责展开通配符工具名称（如 c4a_dsl_*）为显式列表
+ * 负责展开通配符工具名称（如 c4a_store_*）为显式列表
  */
 
 /**
@@ -9,27 +9,45 @@
  * 实际使用时应查询 MCP Server 获取动态工具列表
  */
 const KNOWN_TOOLS: Record<string, string[]> = {
-  c4a_dsl: ["c4a_dsl_parse", "c4a_dsl_validate", "c4a_dsl_generate", "c4a_dsl_schema"],
-  c4a_code: ["c4a_code_extract", "c4a_code_analyze", "c4a_code_ast", "c4a_code_contract"],
-  c4a_local: [
-    "c4a_local_init_repo",
-    "c4a_local_list_files",
-    "c4a_local_read_file",
-    "c4a_local_write_file",
-    "c4a_local_transition_status",
+  c4a_extract: [
+    "c4a_extract_interfaces",
+    "c4a_extract_analyze",
+    "c4a_extract_ast",
+    "c4a_extract_contract",
   ],
   c4a_store: [
     "c4a_store_save",
     "c4a_store_read",
+    "c4a_store_list",
     "c4a_store_delete",
-    "c4a_store_sync_file",
     "c4a_store_sync",
+    "c4a_store_plan_sync",
+    "c4a_store_feat_lifecycle",
+    "c4a_store_feat_merge",
+    "c4a_store_feat_checklist",
+    "c4a_store_update_workflow_step",
+    "c4a_store_read_history",
+    "c4a_store_backup",
+    "c4a_store_restore",
+    "c4a_store_repair",
+    "c4a_store_validate",
   ],
   c4a_query: [
     "c4a_query_search",
     "c4a_query_deps",
     "c4a_query_impact",
-    "c4a_query_exec_cypher",
+  ],
+  c4a_visual: [
+    "c4a_visual_generate",
+    "c4a_visual_render",
+    "c4a_visual_list_templates",
+    "c4a_visual_render_template",
+    "c4a_visual_save",
+    "c4a_visual_get_reference",
+    "c4a_visual_render_c4",
+    "c4a_visual_cleanup",
+    "c4a_visual_storage_stats",
+    "c4a_visual_get_style",
   ],
 };
 
@@ -39,11 +57,10 @@ const KNOWN_TOOLS: Record<string, string[]> = {
  * Claude Code 中 MCP 工具的完整格式是 mcp__<server-name>__<tool-name>
  */
 const TOOL_PREFIX_TO_SERVER: Record<string, string> = {
-  c4a_dsl: "c4a-dsl-mcp",
-  c4a_local: "c4a-dsl-mcp", // c4a_local_* 工具由 c4a-dsl-mcp 提供
-  c4a_code: "c4a-code-mcp",
-  c4a_store: "c4a-data-mcp",
-  c4a_query: "c4a-data-mcp",
+  c4a_extract: "c4a-extract-mcp",
+  c4a_store: "c4a-store-mcp",
+  c4a_query: "c4a-query-mcp",
+  c4a_visual: "c4a-visual-mcp",
 };
 
 /**

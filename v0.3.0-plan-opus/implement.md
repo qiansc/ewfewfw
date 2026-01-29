@@ -170,7 +170,7 @@ git diff --name-only
 | 02 | [02-architecture.md](02-architecture.md) | 30 | 系统架构 |
 | 03 | [03-mcp-store.md](03-mcp-store.md) | 23 | MCP Store 工具 |
 | 04 | [04-mcp-query.md](04-mcp-query.md) | 6 | MCP Query 工具 |
-| 05 | [05-mcp-code.md](05-mcp-code.md) | 4 | MCP Code 工具 |
+| 05 | [05-mcp-code.md](05-mcp-code.md) | 4 | MCP Extract 工具 |
 | 06 | [06-local-mode.md](06-local-mode.md) | 35 | Local 模式存储 |
 | 07 | [07-data-ops.md](07-data-ops.md) | 48 | 数据操作 |
 | 08 | [08-user-cli.md](08-user-cli.md) | 35 | 用户 CLI |

@@ -16,6 +16,7 @@ export interface SearchParams {
   scope?: EntityType | 'all';
   proposal_id?: string | null;
   limit?: number;
+  offset?: number;
 }
 
 /**
@@ -53,6 +54,10 @@ export interface SearchResult {
   degraded_message?: string;
   /** 搜索模式 */
   search_mode: SearchMode;
+  /** 匹配总数（用于分页） */
+  total?: number;
+  /** 是否还有更多结果 */
+  has_more?: boolean;
 }
 
 /**
@@ -97,4 +102,5 @@ export interface ImpactNode {
   type: EntityType;
   distance: number;
   impact_level: 'direct' | 'indirect';
+  reason?: string;
 }

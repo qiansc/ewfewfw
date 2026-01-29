@@ -220,7 +220,7 @@
 **问题描述**：
 - 实现中存在 `c4a_dsl_*` 前缀的工具（`c4a_dsl_parse`、`c4a_dsl_validate`、`c4a_dsl_generate`、`c4a_dsl_schema`）
 - 这些工具不在 `v0.3.0/detailed-design/mcp-tools.md` 定义的工具列表中
-- 文档只定义了四种前缀：`c4a_code_*`、`c4a_store_*`、`c4a_query_*`、`c4a_visual_*`
+- 文档只定义了四种前缀：`c4a_extract_*`、`c4a_store_*`、`c4a_query_*`、`c4a_visual_*`
 
 **修复方案**：
 - 删除 `packages/mcp-dsl/src/tools/parse.ts`

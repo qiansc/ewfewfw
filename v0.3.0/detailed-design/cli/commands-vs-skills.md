@@ -68,7 +68,7 @@ c4a help              # 帮助信息
 ### 5.2 开发 CLI 的 MCP 工具
 
 **来源**：
-- 本地源码：`packages/mcp-code/`, `packages/mcp-data/`
+- 本地源码：`packages/mcp-extract/`, `packages/mcp-store/`, `packages/mcp-query/`
 - 用于开发和调试
 
 **不混用**：

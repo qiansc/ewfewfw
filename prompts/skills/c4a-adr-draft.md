@@ -100,12 +100,11 @@ ADR 应聚焦于：
 根据你的决策内容，查询到以下可能相关的现有架构：
 
 🔍 相关容器：
-  - c4a-data-mcp: 当前使用同步 HTTP，可能需要适配
-  - c4a-code-mcp: 有数据依赖关系
+  - c4a-store-mcp: 当前使用同步 HTTP，可能需要适配
+  - c4a-extract-mcp: 有数据依赖关系
 
 🔗 依赖链：
-  c4a-dsl-mcp → c4a-data-mcp → MongoDB
-                            → Neo4j
+  c4a-store-mcp → MongoDB/Neo4j/Milvus
 
 是否将这些纳入 ADR 的影响分析（consequences）？
   1. 是，自动添加（推荐）

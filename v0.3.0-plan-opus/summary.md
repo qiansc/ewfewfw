@@ -98,7 +98,7 @@
 | # | 功能 | 完成 | 描述 |
 |---|------|:----:|------|
 | 2.1 | 三模式对比 | [x] | Local/Server/Remote 特性对比 |
-| 2.2 | Code MCP 本地运行 | [x] | c4a_code_* 必须 stdio 本地 |
+| 2.2 | Extract MCP 本地运行 | [x] | c4a_extract_* 必须 stdio 本地 |
 | 2.3 | 存储层可插拔 | [x] | 同一套 MCP 工具接口 |
 | 2.4 | 知识生命周期阶段 | [x] | Extract→Model→Store→Query |
 | 2.5 | 架构图 | [x] | 用户层/MCP 工具层/存储适配层 |
@@ -124,24 +124,24 @@
 
 | 功能 | 文件 | 章节 | 行号 | 已读 | 已实现 |
 |------|------|------|------|:----:|:------:|
-| 2.1-2.2 | `architecture.md` | §1.1 模式对比 | L16-72 | [x] | [x] |
-| 2.3 | `architecture.md` | §1.2 存储层可插拔 | L73-91 | [x] | [x] |
-| 2.4 | `architecture.md` | §1.3 知识生命周期 | L92-111 | [x] | [x] |
-| 2.5 | `architecture.md` | §1.4 架构图 | L112-178 | [x] | [x] |
-| 2.6 | `architecture.md` | §1.5 Skills/Commands | L179-231 | [x] | [x] |
-| 2.7 | `architecture.md` | §2.1 存储位置 | L234-250 | [x] | [x] |
-| 2.8 | `architecture.md` | §2.2 工作目录结构 | L251-333 | [x] | [x] |
-| 2.9 | `architecture.md` | §2.3 项目配置 | L334-353 | [x] | [x] |
-| 2.10 | `architecture.md` | §2.4 ID 命名规范 | L354-434 | [x] | [x] |
-| 2.11 | `architecture.md` | §2.5 文件命名规则 | L435-495 | [x] | [x] |
-| 2.12 | `architecture.md` | §2.5 checklist 处理 | L472-495 | [x] | [x] |
-| 2.13 | `architecture.md` | §2.7 Schema 校验 | L543-615 | [x] | [x] |
-| 2.14 | `architecture.md` | §2.8 子 .context | L616-628 | [x] | [x] |
-| 2.15-2.17 | `architecture.md` | §3 数据模型 | L629-684 | [x] | [x] |
-| 2.18 | `architecture.md` | §3.4.1 跨层级引用 | L700-731 | [x] | [x] |
-| 2.19 | `architecture.md` | §7 feat 机制 | L988-1101 | [x] | [x] |
-| 2.20 | `architecture.md` | §7.5 合并策略 | L1106-1114 | [x] | [x] |
-| 2.21 | `architecture.md` | §7.7 跨项目 feat | L1121-1130 | [x] | [x] |
+| 2.1-2.2 | `architecture.md` | §1.1 模式对比 | L16-76 | [x] | [x] |
+| 2.3 | `architecture.md` | §1.2 存储层可插拔 | L77-95 | [x] | [x] |
+| 2.4 | `architecture.md` | §1.3 知识生命周期 | L96-115 | [x] | [x] |
+| 2.5 | `architecture.md` | §1.4 架构图 | L116-182 | [x] | [x] |
+| 2.6 | `architecture.md` | §1.5 Skills/Commands | L183-235 | [x] | [x] |
+| 2.7 | `architecture.md` | §2.1 存储位置 | L238-254 | [x] | [x] |
+| 2.8 | `architecture.md` | §2.2 工作目录结构 | L255-337 | [x] | [x] |
+| 2.9 | `architecture.md` | §2.3 项目配置 | L338-357 | [x] | [x] |
+| 2.10 | `architecture.md` | §2.4 ID 命名规范 | L358-446 | [x] | [x] |
+| 2.11 | `architecture.md` | §2.5 文件命名规则 | L447-507 | [x] | [x] |
+| 2.12 | `architecture.md` | §2.5 checklist 处理 | L484-507 | [x] | [x] |
+| 2.13 | `architecture.md` | §2.7 Schema 校验 | L555-627 | [x] | [x] |
+| 2.14 | `architecture.md` | §2.8 子 .context | L628-640 | [x] | [x] |
+| 2.15-2.17 | `architecture.md` | §3 数据模型 | L641-696 | [x] | [x] |
+| 2.18 | `architecture.md` | §3.4.1 跨层级引用 | L712-743 | [x] | [x] |
+| 2.19 | `architecture.md` | §7 feat 机制 | L990-1103 | [x] | [x] |
+| 2.20 | `architecture.md` | §7.5 合并策略 | L1108-1116 | [x] | [x] |
+| 2.21 | `architecture.md` | §7.7 跨项目 feat | L1123-1132 | [x] | [x] |
 
 **实现产物：**
 
@@ -217,18 +217,54 @@
 
 ---
 
+## Part 03.5: MCP 包架构清理与命名规范化
+
+> 详细计划见: [03.5-architecture-cleanup.md](03.5-architecture-cleanup.md)
+
+| # | 功能 | 完成 | 描述 |
+|---|------|:----:|------|
+| 3.5.1-2 | 清理遗留包 | [x] | 删除 mcp-data、mcp-dsl |
+| 3.5.3-5 | Extract 包重构 | [x] | mcp-code → mcp-extract + 工具重命名 |
+| 3.5.6-9 | Store 包迁移 | [x] | cli/src/mcp → mcp-store + c4a-store-mcp Server |
+| 3.5.10-12 | Query 包创建 | [x] | mcp-query 空壳 + c4a-query-mcp Server |
+| 3.5.13-15 | 配置更新 | [x] | Claude MCP 配置 + monorepo 配置 |
+| 3.5.16-18 | 验证 | [x] | build + test + MCP Server 启动 |
+
+**MCP Server 命名规范**：
+
+| MCP Server | 工具前缀 | 说明 |
+|------------|----------|------|
+| `c4a-extract-mcp` | `c4a_extract_*` | 知识采集 (从 c4a-code-mcp 重命名) |
+| `c4a-store-mcp` | `c4a_store_*` | 知识存储 (从 c4a-dsl-mcp 迁出) |
+| `c4a-query-mcp` | `c4a_query_*` | 知识消费 (新建) |
+| `c4a-visual-mcp` | `c4a_visual_*` | 可视化 (已规范 ✅) |
+
+**目标包结构**：
+```
+packages/
+├── mcp-extract/    # c4a_extract_* (知识采集)
+├── mcp-store/      # c4a_store_* (知识存储)
+├── mcp-query/      # c4a_query_* (知识消费)
+├── mcp-visual/     # c4a_visual_* (可视化)
+├── storage/        # StorageAdapter 层
+├── core/           # 核心类型
+└── cli/            # CLI (不含 MCP Server)
+```
+
+---
+
 ## Part 04: MCP Query 工具
 
 > 详细计划见: [04-mcp-query.md](04-mcp-query.md)
 
 | # | 功能 | 完成 | 描述 |
 |---|------|:----:|------|
-| 4.1 | c4a_query_search | [ ] | 语义搜索（复用 SearchParams，含 proposal_id） |
-| 4.2 | c4a_query_deps | [ ] | 依赖查询（复用 DepsParams，含 proposal_id） |
-| 4.3 | c4a_query_impact | [ ] | 影响分析（复用 ImpactParams，含 proposal_id） |
-| 4.4 | 查询一致性检测 | [ ] | 不一致状态检测 |
+| 4.1 | c4a_query_search | [x] | 语义搜索（复用 SearchParams，含 proposal_id） |
+| 4.2 | c4a_query_deps | [x] | 依赖查询（复用 DepsParams，含 proposal_id） |
+| 4.3 | c4a_query_impact | [x] | 影响分析（复用 ImpactParams，含 proposal_id） |
+| 4.4 | 查询一致性检测 | [x] | 不一致状态检测（Local stub 已就绪） |
 | 4.5 | 降级行为 | [ ] | Neo4j/Milvus 不可用时（返回 degraded: true） |
-| 4.6 | Local Mode 查询策略 | [ ] | 调用 Part 06 的 USearch + InMemoryGraph |
+| 4.6 | Local Mode 查询策略 | [x] | 调用 Part 06 的 USearch + InMemoryGraph |
 
 **已完成基础设施（Part 06）**：
 - ✅ `adapterSearchTypes.ts` - SearchParams/DepsParams/ImpactParams 类型（含 proposal_id）
@@ -236,41 +272,50 @@
 - ✅ `in-memory-graph.ts` - 图查询
 - ✅ `graph-query-cache.ts` - 图查询缓存
 
+**测试状态（2026-01-29）**：
+- ✅ `@c4a/mcp-query` 与 `@c4a/storage` 单元测试通过（局部执行）
+
 **相关设计文档：**
 
 | 功能 | 文件 | 章节 | 行号 | 已读 | 已实现 |
 |------|------|------|------|:----:|:------:|
-| 4.1 | `mcp/query.md` | §4.1 search | L1-16 | [ ] | [ ] |
-| 4.2 | `mcp/query.md` | §4.2 deps | L18-21 | [ ] | [ ] |
-| 4.3 | `mcp/query.md` | §4.3 impact | L23-26 | [ ] | [ ] |
-| 4.4-4.5 | `mcp/query.md` | §4.4 一致性/降级 | L30-111 | [ ] | [ ] |
-| 4.6 | `mcp/query.md` | §4.5 Local Mode | L113-180 | [ ] | [ ] |
+| 4.1 | `mcp/query.md` | §4.1 search | L1-16 | [x] | [x] |
+| 4.2 | `mcp/query.md` | §4.2 deps | L18-21 | [x] | [x] |
+| 4.3 | `mcp/query.md` | §4.3 impact | L23-26 | [x] | [x] |
+| 4.4-4.5 | `mcp/query.md` | §4.4 一致性/降级 | L30-111 | [x] | [ ] |
+| 4.6 | `mcp/query.md` | §4.5 Local Mode | L113-180 | [x] | [x] |
+
+**阻塞清单（等待 Part 13 Server）**：
+- 降级行为：deps/impact/search 依赖 MongoDB/Neo4j/Milvus Server 模式实现
+- checkSyncStatus：pendingSync/sync_status 数据源与健康检查逻辑
 
 ---
 
-## Part 05: MCP Code 工具
+## Part 05: MCP Extract 工具 (知识采集)
 
 > 详细计划见: [05-mcp-code.md](05-mcp-code.md)
+>
+> **注意**：包名将从 `mcp-code` 重命名为 `mcp-extract`（Part 03.5），工具名 `c4a_extract_*`。
 
 | # | 功能 | 完成 | 描述 |
 |---|------|:----:|------|
-| 5.1 | c4a_code_extract | [x] | 提取接口/类型/类（已有基础实现） |
-| 5.2 | c4a_code_analyze | [x] | 代码结构 + 依赖分析（已有基础实现） |
-| 5.3 | c4a_code_ast | [x] | 获取 AST（已有基础实现） |
-| 5.4 | c4a_code_contract | [x] | 生成 API 契约（已有基础实现） |
+| 5.1 | c4a_extract_interfaces | [x] | 提取接口/类型/类（已有基础实现） |
+| 5.2 | c4a_extract_analyze | [x] | 代码结构 + 依赖分析（已有基础实现） |
+| 5.3 | c4a_extract_ast | [x] | 获取 AST（已有基础实现） |
+| 5.4 | c4a_extract_contract | [x] | 生成 API 契约（已有基础实现） |
 | 5.5 | TypeScript 解析器 | [x] | 使用 typescript 编译器 API |
-| 5.6 | Go/Python 解析器 | [ ] | tree-sitter（需验证 Bun 兼容性） |
-| 5.7 | 接口一致性验证 | [ ] | 对照 mcp/code.md 验证现有实现 |
-| 5.8 | 单元测试 | [ ] | 各工具基本功能测试 |
+| 5.6 | Go/Python 解析器 | [x] | tree-sitter（需验证 Bun 兼容性） |
+| 5.7 | 接口一致性验证 | [x] | 对照 mcp/code.md 验证现有实现 |
+| 5.8 | 单元测试 | [x] | 各工具基本功能测试 |
 
 **相关设计文档：**
 
 | 功能 | 文件 | 章节 | 行号 | 已读 | 已实现 |
 |------|------|------|------|:----:|:------:|
-| 5.1 | `mcp/code.md` | §2.1 extract | L1-15 | [ ] | [x] |
-| 5.2 | `mcp/code.md` | §2.2 analyze | L17-32 | [ ] | [x] |
-| 5.3 | `mcp/code.md` | §2.3 ast | L34-45 | [ ] | [x] |
-| 5.4 | `mcp/code.md` | §2.4 contract | L47-61 | [ ] | [x] |
+| 5.1 | `mcp/code.md` | §2.1 extract | L1-15 | [x] | [x] |
+| 5.2 | `mcp/code.md` | §2.2 analyze | L17-32 | [x] | [x] |
+| 5.3 | `mcp/code.md` | §2.3 ast | L34-45 | [x] | [x] |
+| 5.4 | `mcp/code.md` | §2.4 contract | L47-61 | [x] | [x] |
 
 ---
 
@@ -458,40 +503,35 @@
 
 ## Part 10: Skills 体系
 
+> 详细计划见: [10-skills.md](10-skills.md)
+
 | # | 功能 | 完成 | 描述 |
 |---|------|:----:|------|
-| 10.1 | Skills 设计原则 | [ ] | 完整流程/路由/禁止直接MCP |
-| 10.2 | Skills 触发方式 | [ ] | 显式命令/自然语言/意图识别 |
-| 10.3 | Skills 架构概述 | [ ] | 7公开+1内部 Skill 定义 |
-| 10.4 | /c4a:feat | [ ] | Feature 全生命周期 |
-| 10.5 | /c4a:specify | [ ] | 功能规格定义 |
-| 10.6 | /c4a:plan | [ ] | 技术方案+契约+清单 |
-| 10.7 | /c4a:analyze | [ ] | 一致性检查 |
-| 10.8 | /c4a:implement | [ ] | 实现代码+清单跟踪 |
-| 10.9 | /c4a:know:learn | [ ] | 快速知识录入 |
-| 10.10 | /c4a:know:search | [ ] | 语义搜索 |
-| 10.11 | /c4a:model (内部) | [ ] | DSL 生成规则+提示词内联 |
-| 10.12 | 三种场景流程 | [ ] | 需求/架构变更/纯知识 |
-| 10.13 | 建模阶段规则 | [ ] | 实体识别/层级判断/关系推断 |
-| 10.14 | ADR 关联逻辑 | [ ] | 架构变更定义+检测时机 |
-| 10.15 | ADR 检测性能优化 | [ ] | 按依赖范围检查+延迟检查 |
-| 10.16 | ADR 检测实现 | [ ] | /c4a:plan 和 /c4a:analyze 中检测 |
-| 10.17 | ADR 模板 | [ ] | 架构变更 ADR 模板 |
-| 10.18 | ADR 实现要点 | [ ] | 变更对比/关联/警告级别/完整性检查 |
-| 10.19 | Checklist 格式 | [ ] | YAML 结构规范+字段定义 |
-| 10.20 | Checklist 存储 | [ ] | 数据库存储+本地只读视图 |
-| 10.21 | Skill 文件结构 | [ ] | 目录/路由表/状态拆分 |
-| 10.22 | Skill 执行规则 | [ ] | 路由匹配+状态流转 |
-| 10.23 | 错误处理规范 | [ ] | recoverable_actions |
-| 10.24 | Feat 上下文注入 | [ ] | proposal_id 必传 |
-| 10.25 | 系统集成 | [ ] | 与现有系统集成+实现阶段 |
-| 10.26 | 悬空引用定义 | [ ] | 状态感知+合并视图查询 |
-| 10.27 | 悬空引用检测 | [ ] | 精确匹配+类型推断 |
-| 10.28 | 悬空引用可视化 | [ ] | 图表样式+CLI 报告 |
-| 10.29 | Diff 视图优化 | [ ] | 冲突对比+智能分析 |
-| 10.30 | 未来 Skills 规划 | [ ] | v0.4.0+ 规划 |
+| 10.1-10.7 | 基础设施 | [ ] | 设计原则/触发方式/文件结构/路由表/执行规则/上下文注入/错误处理 |
+| 10.8-10.11 | /c4a:feat Skill | [ ] | Feature 管理（类型识别/上下文切换/状态流转） |
+| 10.12 | /c4a:specify Skill | [ ] | Functional Spec 生成 |
+| 10.13-10.16 | /c4a:plan Skill | [ ] | Technical Spec + ADR 检测 + 契约补充 + 验收清单 |
+| 10.17-10.19 | /c4a:implement Skill | [ ] | 实现代码（状态校验/清单生成） |
+| 10.20-10.22 | /c4a:analyze Skill | [ ] | 一致性检查（检查项/悬空引用） |
+| 10.23-10.26 | /c4a:know:learn Skill | [ ] | 快速录入知识（输入识别/流程控制/错误恢复） |
+| 10.27 | /c4a:know:search Skill | [ ] | 语义搜索知识库 |
+| 10.28 | /c4a:model 内部 Skill | [ ] | 建模规则（内联到父 Skill） |
+| 10.29-10.30 | Checklist 集成 | [ ] | 格式定义 + MCP 集成 |
+| 10.31-10.33 | ADR 检测 | [ ] | 模板定义 + 架构变更规则 + 性能优化 |
+| 10.34 | 悬空引用可视化 | [ ] | Mermaid 样式 + CLI 报告 |
+| 10.35 | 三种场景流程 | [ ] | 需求开发/架构变更/纯知识 |
+| 10.36-10.38 | 集成与文档 | [ ] | c4a.md 更新 + CLAUDE.md 更新 + 单元测试 |
 
-**详细计划：** [10-skills.md](10-skills.md)
+**Skills 体系概览**：
+
+| 类型 | Skills | 说明 |
+|------|--------|------|
+| 工作流 | `/c4a:feat`, `/c4a:specify`, `/c4a:plan`, `/c4a:implement`, `/c4a:analyze` | 5 个工作流 Skills |
+| 知识 | `/c4a:know:learn`, `/c4a:know:search` | 2 个知识 Skills |
+| 内部 | `/c4a:model` | 1 个内部 Skill（建模规则，内联到父 Skill） |
+
+**阻塞清单**：
+- 10.14 ADR 检测、10.22 悬空引用、10.30 Checklist MCP 集成依赖 Part 03/04 完成
 
 ---
 
@@ -598,14 +638,14 @@
 
 | 功能 | 文件 | 章节 | 行号 | 已读 | 已实现 |
 |------|------|------|------|:----:|:------:|
-| 13.1-13.2 | `architecture.md` | §1.4 架构图 | L112-178 | [ ] | [ ] |
+| 13.1-13.2 | `architecture.md` | §1.4 架构图 | L116-182 | [ ] | [ ] |
 | 13.3 | `data-ops/cross-project-transaction.md` | §6.1 MongoDB 事务 | L70-150 | [ ] | [ ] |
 | 13.4 | `data-ops/cross-project-transaction.md` | §6.2 Neo4j 同步 | L150-220 | [ ] | [ ] |
 | 13.5 | `data-ops/cross-project-transaction.md` | §6.2 Milvus 同步 | L220-280 | [ ] | [ ] |
-| 13.6 | `architecture.md` | §1.2 存储层可插拔 | L73-91 | [ ] | [ ] |
+| 13.6 | `architecture.md` | §1.2 存储层可插拔 | L77-95 | [ ] | [ ] |
 | 13.7-13.9 | `data-ops/cross-project-transaction.md` | §6.3 同步状态 | L280-360 | [ ] | [ ] |
-| 13.10 | `architecture.md` | §1.5 MCP 架构 | L179-231 | [ ] | [ ] |
-| 13.11 | `architecture.md` | §1.1 模式对比 | L16-72 | [ ] | [ ] |
+| 13.10 | `architecture.md` | §1.5 MCP 架构 | L183-235 | [ ] | [ ] |
+| 13.11 | `architecture.md` | §1.1 模式对比 | L16-76 | [ ] | [ ] |
 | 13.12 | `mcp/store-feat-lifecycle.md` | §3.7.9 多库一致性 | L344-534 | [ ] | [ ] |
 
 **实现产物：**
@@ -614,11 +654,14 @@
 |------|------|
 | `docker/docker-compose.yml` | 基础编排 |
 | `docker/docker-compose.server.yml` | Server 模式 |
-| `packages/mcp-data/src/store/mongo_store.py` | MongoDB 操作 |
-| `packages/mcp-data/src/store/neo4j_store.py` | Neo4j 操作 |
-| `packages/mcp-data/src/store/milvus_store.py` | Milvus 操作 |
-| `packages/mcp-data/src/store/server_store.py` | 统一接口 |
-| `packages/mcp-data/src/server.py` | FastMCP 入口 |
+| `packages/storage/src/server-adapter.ts` | ServerAdapter (TypeScript HTTP/gRPC 客户端) |
+| `packages/storage-backend/` | Python 存储后端服务 |
+| `packages/storage-backend/src/mongo_store.py` | MongoDB 操作封装 |
+| `packages/storage-backend/src/neo4j_store.py` | Neo4j 操作封装 |
+| `packages/storage-backend/src/milvus_store.py` | Milvus 操作封装 |
+| `packages/storage-backend/src/server.py` | HTTP/gRPC Server |
+
+> **架构说明**：MCP Server 层统一使用 TypeScript，对用户透明。Server 模式下 ServerAdapter 通过 HTTP/gRPC 调用 Python 后端（storage-backend），Python 封装 MongoDB/Neo4j/Milvus 访问。这样设计是因为 Bun/Node.js 对这三个数据库的驱动支持不如 Python 成熟稳定。
 
 **详细计划：** [13-server-mode.md](13-server-mode.md)
 
@@ -631,17 +674,18 @@
 | 01 核心概念 | 34 | 5 |
 | 02 架构 | 33 | 1 |
 | 03 MCP Store | 23 | 5 |
+| 03.5 架构清理 | 18 | 1 |
 | 04 MCP Query | 6 | 1 |
-| 05 MCP Code | 4 | 1 |
+| 05 MCP Extract | 8 | 1 |
 | 06 Local 模式 | 33 | 5 |
 | 07 数据操作 | 48 | 5 |
 | 08 用户 CLI | 44 | 6 |
 | 09 开发者 CLI | 16 | 1 |
-| 10 Skills | 18 | 8 |
+| 10 Skills | 38 | 12 |
 | 11 权限错误 | 30 | 3 |
 | 12 用户故事+测试 | 43 | 6 |
 | 13 Server 模式 | 12 | 4 |
-| **总计** | **344** | **50** |
+| **总计** | **386** | **56** |
 
 ---
 
@@ -652,25 +696,49 @@
 根据 architecture.md §1.2 设计，MCP 工具通过 **Storage Adapter Layer** 访问存储：
 
 ```
-MCP Tools (c4a_store_*, c4a_query_*)
-              │
-              ▼
-    ┌─────────────────────┐
-    │  StorageAdapter     │  ← 统一接口（Part 06 定义）
-    │  (抽象层)            │
-    └─────────┬───────────┘
-              │
-     ┌────────┴────────┐
-     ▼                 ▼
-┌─────────┐      ┌─────────┐
-│  Lite   │      │ Server  │
-│ Adapter │      │ Adapter │
-│  (TS)   │      │(Python) │
-└────┬────┘      └────┬────┘
-     │                │
-     ▼                ▼
-  SQLite         MongoDB/Neo4j/Milvus
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          用户 / Agent                                        │
+│                    (连接同一套 MCP Server)                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                     MCP Server 层 (TypeScript)                               │
+│              c4a-extract-mcp / c4a-store-mcp / c4a-query-mcp                 │
+│                    (工具名完全一致，用户无感知)                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                     StorageAdapter 接口 (TypeScript)                         │
+│                save / read / list / search / queryDeps / ...                 │
+├──────────────────────────────┬──────────────────────────────────────────────┤
+│       LiteAdapter            │           ServerAdapter                       │
+│       (TypeScript)           │           (TypeScript)                        │
+│            │                 │                │                              │
+│            ▼                 │                ▼                              │
+│   SQLite + USearch           │        HTTP/gRPC 调用                         │
+│   (Local 模式)               │                │                              │
+│                              │                ▼                              │
+│                              │      storage-backend (Python)                 │
+│                              │      MongoDB + Neo4j + Milvus                 │
+│                              │      (Server 模式)                            │
+└──────────────────────────────┴──────────────────────────────────────────────┘
 ```
+
+**核心原则**：MCP 工具对用户透明，底层存储切换不影响用户体验。
+
+| 层级 | 实现语言 | 说明 |
+|------|----------|------|
+| MCP Server | TypeScript | 统一入口，用户只连接这一层 |
+| StorageAdapter 接口 | TypeScript | 定义 `save/read/list/search` 等方法 |
+| LiteAdapter | TypeScript | SQLite + USearch (Local 模式) |
+| ServerAdapter | TypeScript | 调用 Python 后端的 HTTP/gRPC 客户端 |
+| storage-backend | Python | 封装 MongoDB/Neo4j/Milvus 访问 |
+
+**为什么 Server 模式后端用 Python？**
+
+| 数据库 | Bun/Node.js 兼容性 | 风险 |
+|--------|-------------------|------|
+| MongoDB | ✅ 验证过 | 低 |
+| Neo4j | ⚠️ JS driver 有性能问题 | 中 |
+| Milvus | ⚠️ gRPC 在 Bun 上较新 | 高 |
+
+Python 生态对这三个数据库的支持更成熟稳定，因此 Server 模式的存储后端使用 Python 实现。
 
 ### P0 - Core Loop（Local 模式优先）
 
@@ -679,16 +747,20 @@ MCP Tools (c4a_store_*, c4a_query_*)
 │                           P0 - Core Loop                                │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│  01 Core ──► 02 Arch ──► 06 Local ──► 03 Store ──► 04 Query            │
-│     │                        │            │           │                 │
-│     │                   (含 Adapter)      │           │                 │
-│     │                        │            ▼           │                 │
-│     │                        │        05 Code        │                 │
-│     │                        │            │           │                 │
-│     ▼                        ▼            ▼           ▼                 │
-│  08 User CLI ◄────────── 07 Data Ops ◄── 10 Skills ◄─┘                 │
+│  01 Core ──► 02 Arch ──► 03.5 Cleanup ──► 06 Local ──► 03 Store        │
+│     │                        │                │            │            │
+│     │                   (包结构重组)      (含 Adapter)      │            │
+│     │                        │                │            ▼            │
+│     │                        │                │        04 Query         │
+│     │                        │                │            │            │
+│     │                        │                ▼            ▼            │
+│     │                        │            05 Extract ◄────┘            │
+│     │                        │                │                         │
+│     ▼                        ▼                ▼                         │
+│  08 User CLI ◄────────── 07 Data Ops ◄── 10 Skills                     │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
+```
 
 ### P1 - Server & Advanced
 

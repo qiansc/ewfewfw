@@ -102,7 +102,7 @@ drafts/adr-002-introduce-mq/
 ├── adr-002.c4a.yaml              # ADR 本身
 ├── containers/
 │   ├── c4a-mq.c4a.yaml           # 新增容器
-│   └── c4a-data-mcp.c4a.yaml     # 修改的容器
+│   └── c4a-store-mcp.c4a.yaml    # 修改的容器
 └── README.md                     # 提案说明（可选）
 ```
 

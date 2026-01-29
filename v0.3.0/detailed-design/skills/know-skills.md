@@ -44,7 +44,7 @@
    - 描述文本 → 与用户对话获取详情
    - 文件路径 → Read 读取内容（Claude Code 内置）
    - URL → WebFetch 获取内容（Claude Code 内置）
-   - 目录 → c4a_code_analyze 分析代码（C4A MCP）
+   - 目录 → c4a_extract_analyze 分析代码（C4A MCP）
 
 2. 调用 /c4a:feat（内部）：
    - 创建 Feature：feat-xxx-<slug>

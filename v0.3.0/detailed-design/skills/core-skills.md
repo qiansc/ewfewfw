@@ -267,8 +267,8 @@ Agent:
 1. c4a_store_read 读取 Functional Spec
 2. 技术调研：
    - c4a_query_search 查询现有架构
-   - c4a_code_analyze 分析相关代码（如有）
-     > **降级处理**：如果代码库为空（Greenfield 项目）或 c4a_code_analyze 返回空，
+   - c4a_extract_analyze 分析相关代码（如有）
+     > **降级处理**：如果代码库为空（Greenfield 项目）或 c4a_extract_analyze 返回空，
      > 平滑过渡到"纯设计模式"，跳过代码分析步骤，直接进入技术方案设计。
 3. 架构变更检测（智能检查）：
    - 检测是否有以下架构变更：
@@ -289,7 +289,7 @@ Agent:
    - 检查契约完整性
    - 询问用户补充缺失的契约
    - 契约生成方式：
-     * 有代码：c4a_code_contract 从代码提取契约
+     * 有代码：c4a_extract_contract 从代码提取契约
      * 无代码（Greenfield）：Agent 基于用户描述生成契约模板，引导用户补充细节
    - 契约类型选择（Agent 根据技术方案自动推断，用户可覆盖）：
      * HTTP API → OpenAPI

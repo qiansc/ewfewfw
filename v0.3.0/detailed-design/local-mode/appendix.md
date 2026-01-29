@@ -655,18 +655,18 @@ properties: '{"target_scope": "enterprise"}'
 
 ```yaml
 # entities 表
-id: mcp-data
+id: storage-backend
 type: container
 kind: implementation
 scope: project
 perspective: technical
 data:
-  name: MCP Data Service
+  name: Storage Backend Service
   technology: [{language: Python}]
-  code_path: packages/mcp-data/
+  code_path: packages/storage-backend/
 
 # metadata 表
-entity_id: mcp-data
+entity_id: storage-backend
 source_project: c4a-core
 source_repo: company/bytedance-context
 status: published

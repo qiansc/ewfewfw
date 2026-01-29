@@ -16,11 +16,13 @@ import {
 } from "../utils/docker.js";
 import {
   checkBun,
-  checkUv,
   checkOpencode,
   checkTtyd,
-  startMcpData,
-  stopMcpData,
+  checkHttpHealth,
+  startMcpStore,
+  stopMcpStore,
+  startMcpQuery,
+  stopMcpQuery,
   getProcessStatus,
   runForeground,
   getLocalIPs,
@@ -81,15 +83,6 @@ async function checkDependencies(deps: string[]): Promise<boolean> {
     }
   }
 
-  if (deps.includes("uv")) {
-    if (checkUv()) {
-      success("uv 已安装");
-    } else {
-      error("uv 未安装，请安装: curl -LsSf https://astral.sh/uv/install.sh | sh");
-      allOk = false;
-    }
-  }
-
   return allOk;
 }
 
@@ -131,12 +124,15 @@ export async function runCommand(command: string, args: string[] = []) {
       await cmdProd();
       break;
     case "debug:dsl":
+    case "debug:store":
       await cmdDebugDsl();
       break;
     case "debug:code":
+    case "debug:extract":
       await cmdDebugCode();
       break;
     case "debug:data":
+    case "debug:query":
       await cmdDebugData();
       break;
     case "status":
@@ -226,22 +222,37 @@ async function cmdDev(forceRestart = false) {
     success("所有存储服务已就绪");
   }
 
-  // 5. 启动 mcp-data（带健康检查和重试）
-  info("启动 mcp-data...");
+  // 5. 启动 mcp-store（带健康检查和重试）
+  info("启动 mcp-store...");
   try {
-    const mcpPid = await startMcpData({
+    const mcpStorePid = await startMcpStore({
       force: forceRestart,
       retries: 3,
       startupWait: 5000,
     });
-    success(`mcp-data 已启动 (PID: ${mcpPid})`);
+    success(`mcp-store 已启动 (PID: ${mcpStorePid})`);
   } catch (e) {
-    error(`mcp-data 启动失败: ${e}`);
-    error("请检查日志: .context/logs/mcp-data.log");
+    error(`mcp-store 启动失败: ${e}`);
+    error("请检查日志: .c4a/logs/mcp-store.log");
     process.exit(1);
   }
 
-  // 6. 启动 ttyd (Web 终端，可选)
+  // 6. 启动 mcp-query（带健康检查和重试）
+  info("启动 mcp-query...");
+  try {
+    const mcpQueryPid = await startMcpQuery({
+      force: forceRestart,
+      retries: 3,
+      startupWait: 5000,
+    });
+    success(`mcp-query 已启动 (PID: ${mcpQueryPid})`);
+  } catch (e) {
+    error(`mcp-query 启动失败: ${e}`);
+    error("请检查日志: .c4a/logs/mcp-query.log");
+    process.exit(1);
+  }
+
+  // 7. 启动 ttyd (Web 终端，可选)
   let ttydPid: number | null = null;
   if (checkTtyd()) {
     info("启动 Web 终端 (ttyd)...");
@@ -255,7 +266,7 @@ async function cmdDev(forceRestart = false) {
     warn("ttyd 未安装，跳过 Web 终端。安装: brew install ttyd");
   }
 
-  // 7. 显示端口和访问信息
+  // 8. 显示端口和访问信息
   const ips = getLocalIPs();
 
   console.log("\n" + green("═".repeat(50)));
@@ -266,7 +277,8 @@ async function cmdDev(forceRestart = false) {
   console.log("    - MongoDB:  localhost:27017");
   console.log("    - Neo4j:    localhost:7474 (HTTP), localhost:7687 (Bolt)");
   console.log("    - Milvus:   localhost:19530");
-  console.log("    - mcp-data: localhost:8050");
+  console.log("    - mcp-store: localhost:8051");
+  console.log("    - mcp-query: localhost:8054");
 
   if (ttydPid) {
     console.log("\n  远程终端 (Web 访问 OpenCode 开发环境):");
@@ -283,7 +295,7 @@ async function cmdDev(forceRestart = false) {
   console.log(`    ${getOpencodeCommand()}`);
   console.log("");
   console.log(yellow("服务已在后台运行，使用 ./start.sh stop 停止"));
-  console.log(yellow("遇到问题？查看日志: .context/logs/"));
+  console.log(yellow("遇到问题？查看日志: .c4a/logs/"));
   console.log("");
 }
 
@@ -301,9 +313,9 @@ async function cmdDocker() {
   success("所有服务已启动");
 
   console.log("\n  MCP 端点:");
-  console.log("    - mcp-dsl:  http://localhost:8051/mcp");
-  console.log("    - mcp-code: http://localhost:8052/mcp");
-  console.log("    - mcp-data: http://localhost:8050/mcp\n");
+  console.log("    - mcp-store:  http://localhost:8051/mcp");
+  console.log("    - mcp-extract: http://localhost:8052/mcp");
+  console.log("    - mcp-query:  http://localhost:8054/mcp\n");
 }
 
 async function cmdProd() {
@@ -320,33 +332,32 @@ async function cmdProd() {
   success("生产环境已启动");
 
   console.log("\n  MCP 端点:");
-  console.log("    - mcp-dsl:  http://localhost:8051/mcp");
-  console.log("    - mcp-code: http://localhost:8052/mcp");
-  console.log("    - mcp-data: http://localhost:8050/mcp\n");
+  console.log("    - mcp-store:  http://localhost:8051/mcp");
+  console.log("    - mcp-extract: http://localhost:8052/mcp");
+  console.log("    - mcp-query:  http://localhost:8054/mcp\n");
 }
 
 async function cmdDebugDsl() {
-  info("前台运行 mcp-dsl (stdio 模式)...");
+  info("前台运行 mcp-store (stdio 模式)...");
   info("按 Ctrl+C 退出\n");
-  await runForeground("bun", ["run", "packages/mcp-dsl/src/index.ts"], {
+  await runForeground("bun", ["run", "packages/mcp-store/src/index.ts"], {
     cwd: PROJECT_ROOT,
   });
 }
 
 async function cmdDebugCode() {
-  info("前台运行 mcp-code (stdio 模式)...");
+  info("前台运行 mcp-extract (stdio 模式)...");
   info("按 Ctrl+C 退出\n");
-  await runForeground("bun", ["run", "packages/mcp-code/src/index.ts"], {
+  await runForeground("bun", ["run", "packages/mcp-extract/src/index.ts"], {
     cwd: PROJECT_ROOT,
   });
 }
 
 async function cmdDebugData() {
-  info("前台运行 mcp-data (HTTP 模式)...");
+  info("前台运行 mcp-query (stdio 模式)...");
   info("按 Ctrl+C 退出\n");
-  await runForeground("uv", ["run", "python", "-m", "c4a_data_mcp.server"], {
-    cwd: resolve(PROJECT_ROOT, "packages/mcp-data"),
-    env: { MCP_TRANSPORT: "streamable-http", MCP_PORT: "8050" },
+  await runForeground("bun", ["run", "packages/mcp-query/src/index.ts"], {
+    cwd: PROJECT_ROOT,
   });
 }
 
@@ -355,17 +366,28 @@ async function cmdStatus() {
   await showStatus();
 
   console.log("\n" + blue("本地进程状态:"));
-  const mcpDataStatus = getProcessStatus("mcp-data");
-  if (mcpDataStatus.running) {
-    // 检查 HTTP 健康状态
-    const isHealthy = await (await import("../utils/process.js")).checkHttpHealth("localhost", 8050);
+  const mcpStoreStatus = getProcessStatus("mcp-store");
+  if (mcpStoreStatus.running) {
+    const isHealthy = await checkHttpHealth("localhost", 8051);
     if (isHealthy) {
-      console.log(green(`  mcp-data: 运行中 (PID: ${mcpDataStatus.pid}) ✅ 健康`));
+      console.log(green(`  mcp-store: 运行中 (PID: ${mcpStoreStatus.pid}) ✅ 健康`));
     } else {
-      console.log(red(`  mcp-data: 运行中 (PID: ${mcpDataStatus.pid}) ❌ HTTP 不响应`));
+      console.log(red(`  mcp-store: 运行中 (PID: ${mcpStoreStatus.pid}) ❌ HTTP 不响应`));
     }
   } else {
-    console.log(yellow("  mcp-data: 未运行"));
+    console.log(yellow("  mcp-store: 未运行"));
+  }
+
+  const mcpQueryStatus = getProcessStatus("mcp-query");
+  if (mcpQueryStatus.running) {
+    const isHealthy = await checkHttpHealth("localhost", 8054);
+    if (isHealthy) {
+      console.log(green(`  mcp-query: 运行中 (PID: ${mcpQueryStatus.pid}) ✅ 健康`));
+    } else {
+      console.log(red(`  mcp-query: 运行中 (PID: ${mcpQueryStatus.pid}) ❌ HTTP 不响应`));
+    }
+  } else {
+    console.log(yellow("  mcp-query: 未运行"));
   }
 
   const ttydStatus = getProcessStatus("ttyd");
@@ -377,9 +399,11 @@ async function cmdStatus() {
 
   console.log("\n" + blue("日志文件位置:"));
   const { resolve } = await import("node:path");
-  const logsDir = resolve(PROJECT_ROOT, ".context/logs");
-  console.log(`  ${logsDir}/mcp-data.log`);
-  console.log(`  ${logsDir}/mcp-data.stdout.log`);
+  const logsDir = resolve(PROJECT_ROOT, ".c4a/logs");
+  console.log(`  ${logsDir}/mcp-store.log`);
+  console.log(`  ${logsDir}/mcp-store.stdout.log`);
+  console.log(`  ${logsDir}/mcp-query.log`);
+  console.log(`  ${logsDir}/mcp-query.stdout.log`);
   console.log("");
 }
 
@@ -391,9 +415,14 @@ async function cmdStop() {
     success("ttyd 已停止");
   }
 
-  // 停止本地 mcp-data
-  if (await stopMcpData()) {
-    success("mcp-data 已停止");
+  // 停止本地 mcp-query
+  if (await stopMcpQuery()) {
+    success("mcp-query 已停止");
+  }
+
+  // 停止本地 mcp-store
+  if (await stopMcpStore()) {
+    success("mcp-store 已停止");
   }
 
   // 停止 Docker 服务
@@ -411,8 +440,11 @@ async function cmdRestart() {
   if (stopTtyd()) {
     success("ttyd 已停止");
   }
-  if (await stopMcpData()) {
-    success("mcp-data 已停止");
+  if (await stopMcpQuery()) {
+    success("mcp-query 已停止");
+  }
+  if (await stopMcpStore()) {
+    success("mcp-store 已停止");
   }
 
   // 2. 停止并重启存储服务
@@ -433,18 +465,29 @@ async function cmdRestart() {
   }
   success("所有存储服务已就绪");
 
-  // 4. 启动 mcp-data
-  info("启动 mcp-data...");
+  // 4. 启动 mcp-store
+  info("启动 mcp-store...");
   try {
-    const mcpPid = await startMcpData({ force: true, retries: 3, startupWait: 5000 });
-    success(`mcp-data 已启动 (PID: ${mcpPid})`);
+    const mcpStorePid = await startMcpStore({ force: true, retries: 3, startupWait: 5000 });
+    success(`mcp-store 已启动 (PID: ${mcpStorePid})`);
   } catch (e) {
-    error(`mcp-data 启动失败: ${e}`);
-    error("请检查日志: .context/logs/mcp-data.log");
+    error(`mcp-store 启动失败: ${e}`);
+    error("请检查日志: .c4a/logs/mcp-store.log");
     process.exit(1);
   }
 
-  // 5. 启动 ttyd（可选）
+  // 5. 启动 mcp-query
+  info("启动 mcp-query...");
+  try {
+    const mcpQueryPid = await startMcpQuery({ force: true, retries: 3, startupWait: 5000 });
+    success(`mcp-query 已启动 (PID: ${mcpQueryPid})`);
+  } catch (e) {
+    error(`mcp-query 启动失败: ${e}`);
+    error("请检查日志: .c4a/logs/mcp-query.log");
+    process.exit(1);
+  }
+
+  // 6. 启动 ttyd（可选）
   if (checkTtyd()) {
     info("启动 Web 终端 (ttyd)...");
     try {
@@ -478,7 +521,8 @@ async function cmdCleanStorage() {
   });
 
   if (confirmed) {
-    await stopMcpData();
+    await stopMcpQuery();
+    await stopMcpStore();
     await cleanData();
     success("已清理远程存储数据");
     info("提示：下次启动时 Ollama 需要重新下载 embedding 模型（约 300MB）");
@@ -497,7 +541,7 @@ async function cmdCleanLocal() {
       ".context/feat/ - feat 迭代目录",
       ".context/assets/ - 资源文件",
       ".context/.schemas/ - 本地 Schema 缓存",
-      ".context/logs/ - 本地日志",
+      ".c4a/logs/ - 本地日志",
     ],
     warning: "远程存储（MongoDB/Neo4j/Milvus）和日志文件不受影响",
   });
@@ -540,7 +584,8 @@ async function cmdCleanAll() {
 
   if (confirmed) {
     // 停止服务
-    await stopMcpData();
+    await stopMcpQuery();
+    await stopMcpStore();
 
     // 清理远程存储
     info("清理远程存储...");
@@ -581,15 +626,6 @@ async function cmdInstall() {
   await runForeground("bun", ["install"], { cwd: PROJECT_ROOT });
   success("TypeScript 依赖安装完成");
 
-  if (checkUv()) {
-    info("安装 Python 依赖 (mcp-data)...");
-    await runForeground("uv", ["sync"], {
-      cwd: resolve(PROJECT_ROOT, "packages/mcp-data"),
-    });
-    success("Python 依赖安装完成");
-  } else {
-    warn("uv 未安装，跳过 Python 依赖安装");
-  }
 }
 
 async function cmdTest() {

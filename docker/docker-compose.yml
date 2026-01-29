@@ -102,16 +102,16 @@ services:
 
   # ==================== MCP Servers ====================
 
-  # TypeScript DSL MCP Server
-  c4a-dsl-mcp:
+  # TypeScript Store MCP Server
+  c4a-store-mcp:
     build:
       context: ..
       dockerfile: docker/Dockerfile.mcp-ts
-    container_name: c4a-dsl-mcp
+    container_name: c4a-store-mcp
     ports:
-      - "${DSL_MCP_PORT:-8051}:8051"
+      - "${STORE_MCP_PORT:-8051}:8051"
     environment:
-      MCP_SERVER: mcp-dsl
+      MCP_SERVER: mcp-store
       MCP_TRANSPORT: streamable-http
       MCP_PORT: 8051
     healthcheck:
@@ -123,20 +123,20 @@ services:
       - mcp
       - prod
 
-  # TypeScript Code MCP Server
-  c4a-code-mcp:
+  # TypeScript Query MCP Server
+  c4a-query-mcp:
     build:
       context: ..
       dockerfile: docker/Dockerfile.mcp-ts
-    container_name: c4a-code-mcp
+    container_name: c4a-query-mcp
     ports:
-      - "${CODE_MCP_PORT:-8052}:8052"
+      - "${QUERY_MCP_PORT:-8054}:8054"
     environment:
-      MCP_SERVER: mcp-code
+      MCP_SERVER: mcp-query
       MCP_TRANSPORT: streamable-http
-      MCP_PORT: 8052
+      MCP_PORT: 8054
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8052/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8054/health"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -166,51 +166,6 @@ services:
       VISUAL_TEMPLATES_PATH: /app/prompts/visual-templates
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8053/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-    profiles:
-      - mcp
-      - prod
-
-  # Python Data MCP Server (MongoDB + Neo4j + Milvus)
-  c4a-data-mcp:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.data
-    container_name: c4a-data-mcp
-    ports:
-      - "${DATA_MCP_PORT:-8050}:8050"
-    depends_on:
-      mongodb:
-        condition: service_healthy
-      neo4j:
-        condition: service_healthy
-      milvus:
-        condition: service_healthy
-      ollama:
-        condition: service_healthy
-    environment:
-      # MongoDB
-      MONGODB_URI: mongodb://mongodb:27017/c4a
-      # Neo4j
-      NEO4J_URI: bolt://neo4j:7687
-      NEO4J_USER: neo4j
-      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-c4a_password}
-      # Milvus
-      MILVUS_URI: http://milvus:19530
-      # Embedding (Ollama default, OpenAI if API key provided)
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
-      OLLAMA_HOST: http://ollama:11434
-      OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
-      # Server
-      MCP_TRANSPORT: streamable-http
-      MCP_PORT: 8050
-      DEBUG: ${DEBUG:-false}
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8050/health"]
       interval: 10s
       timeout: 5s
       retries: 3

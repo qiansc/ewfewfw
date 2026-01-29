@@ -10,7 +10,7 @@
 |---|------|:---:|------|
 | 2.0 | 文档结构 | [x] | 相关文档链接与导航 |
 | 2.1 | 三模式对比 | [x] | Local/Server/Remote 特性对比表 |
-| 2.2 | Code MCP 本地运行 | [x] | c4a_code_* 必须 stdio 本地运行约束 |
+| 2.2 | Extract MCP 本地运行 | [x] | c4a_extract_* 必须 stdio 本地运行约束 |
 | 2.3 | 存储层可插拔 | [x] | 同一套 MCP 工具接口适配多存储 |
 | 2.4 | 知识生命周期阶段 | [x] | Extract→Model→Store→Query 四阶段 |
 | 2.5 | 架构图 | [x] | 用户层/MCP 工具层/存储适配层 |
@@ -50,36 +50,36 @@
 | # | 功能 | 文件 | 章节 | 行号 | 已读 | 已实现 |
 |---|------|------|------|------|:----:|:------:|
 | 2.0 | 文档结构 | `architecture.md` | 文档头部 | L1-15 | [x] | [x] |
-| 2.1-2.2 | 模式对比 | `architecture.md` | §1.1 模式对比 | L16-72 | [x] | [x] |
-| 2.3 | 存储层可插拔 | `architecture.md` | §1.2 存储层可插拔 | L73-91 | [x] | [x] |
-| 2.4 | 知识生命周期阶段 | `architecture.md` | §1.3 知识生命周期 | L92-111 | [x] | [x] |
-| 2.5 | 架构图 | `architecture.md` | §1.4 架构图 | L112-178 | [x] | [x] |
-| 2.6 | Skills/Commands | `architecture.md` | §1.5 Skills/Commands | L179-231 | [x] | [x] |
-| 2.7 | 存储位置 | `architecture.md` | §2.1 存储位置 | L234-250 | [x] | [x] |
-| 2.8 | 工作目录结构 | `architecture.md` | §2.2 工作目录结构 | L251-333 | [x] | [x] |
-| 2.9 | 项目配置 | `architecture.md` | §2.3 项目配置 | L334-353 | [x] | [x] |
-| 2.10 | ID 命名规范 | `architecture.md` | §2.4 ID 命名规范 | L354-434 | [x] | [x] |
-| 2.11 | 文件命名规则 | `architecture.md` | §2.5 文件命名规则 | L435-495 | [x] | [x] |
-| 2.12 | checklist 处理 | `architecture.md` | §2.5 checklist 处理 | L472-495 | [x] | [x] |
-| 2.12a | ADR 定位 | `architecture.md` | §2.6 ADR 的定位 | L496-542 | [x] | [x] |
-| 2.13 | Schema 校验 | `architecture.md` | §2.7 Schema 校验 | L543-615 | [x] | [x] |
-| 2.14 | 子 .context 规则 | `architecture.md` | §2.8 子 .context | L616-628 | [x] | [x] |
-| 2.15-2.17 | 数据模型 | `architecture.md` | §3 数据模型 | L629-684 | [x] | [x] |
-| 2.18 | 跨层级引用 | `architecture.md` | §3.4.1 跨层级引用 | L700-731 | [x] | [x] |
-| 2.18a | 状态生命周期 | `architecture.md` | §3.5 状态生命周期 | L732-750 | [x] | [x] |
-| 2.18b | 表结构设计 | `architecture.md` | §3.6 表结构 | L751-762 | [x] | [x] |
-| 2.18c | 示例数据 | `architecture.md` | §3.7 示例数据 | L763-795 | [x] | [x] |
-| 2.18d | data 字段结构 | `architecture.md` | §3.8 data 字段结构 | L796-819 | [x] | [x] |
-| 2.18e | Local 模式技术栈 | `architecture.md` | §4 Local 模式技术栈 | L830-840 | [x] | [x] |
-| 2.18e+ | 包结构 | `architecture.md` | §4.1 包结构 | L841-855 | [x] | [x] |
-| 2.18f | 数据流设计 | `architecture.md` | §5 数据流 | L856-896 | [x] | [x] |
-| 2.18g | CLI 架构 | `architecture.md` | §6 CLI 架构 | L897-987 | [x] | [x] |
-| 2.19 | feat 机制 | `architecture.md` | §7 feat 机制 | L988-1101 | [x] | [x] |
-| 2.20 | 合并策略 | `architecture.md` | §7.5 合并策略 | L1106-1114 | [x] | [x] |
-| 2.20a | MCP 工具与 feat | `architecture.md` | §7.4 MCP 工具与 feat | L1102-1105 | [x] | [x] |
-| 2.20b | 冲突解决与回滚 | `architecture.md` | §7.6 冲突解决与回滚 | L1115-1120 | [x] | [x] |
-| 2.21 | 跨项目 feat | `architecture.md` | §7.7 跨项目 feat | L1121-1130 | [x] | [x] |
-| 2.21a | 查询策略 | `architecture.md` | §7.8 查询策略 | L1131-1145 | [x] | [x] |
+| 2.1-2.2 | 模式对比 | `architecture.md` | §1.1 模式对比 | L16-76 | [x] | [x] |
+| 2.3 | 存储层可插拔 | `architecture.md` | §1.2 存储层可插拔 | L77-95 | [x] | [x] |
+| 2.4 | 知识生命周期阶段 | `architecture.md` | §1.3 知识生命周期 | L96-115 | [x] | [x] |
+| 2.5 | 架构图 | `architecture.md` | §1.4 架构图 | L116-182 | [x] | [x] |
+| 2.6 | Skills/Commands | `architecture.md` | §1.5 Skills/Commands | L183-235 | [x] | [x] |
+| 2.7 | 存储位置 | `architecture.md` | §2.1 存储位置 | L238-254 | [x] | [x] |
+| 2.8 | 工作目录结构 | `architecture.md` | §2.2 工作目录结构 | L255-337 | [x] | [x] |
+| 2.9 | 项目配置 | `architecture.md` | §2.3 项目配置 | L338-357 | [x] | [x] |
+| 2.10 | ID 命名规范 | `architecture.md` | §2.4 ID 命名规范 | L358-446 | [x] | [x] |
+| 2.11 | 文件命名规则 | `architecture.md` | §2.5 文件命名规则 | L447-507 | [x] | [x] |
+| 2.12 | checklist 处理 | `architecture.md` | §2.5 checklist 处理 | L484-507 | [x] | [x] |
+| 2.12a | ADR 定位 | `architecture.md` | §2.6 ADR 的定位 | L508-554 | [x] | [x] |
+| 2.13 | Schema 校验 | `architecture.md` | §2.7 Schema 校验 | L555-627 | [x] | [x] |
+| 2.14 | 子 .context 规则 | `architecture.md` | §2.8 子 .context | L628-640 | [x] | [x] |
+| 2.15-2.17 | 数据模型 | `architecture.md` | §3 数据模型 | L641-696 | [x] | [x] |
+| 2.18 | 跨层级引用 | `architecture.md` | §3.4.1 跨层级引用 | L712-743 | [x] | [x] |
+| 2.18a | 状态生命周期 | `architecture.md` | §3.5 状态生命周期 | L744-762 | [x] | [x] |
+| 2.18b | 表结构设计 | `architecture.md` | §3.6 表结构 | L763-774 | [x] | [x] |
+| 2.18c | 示例数据 | `architecture.md` | §3.7 示例数据 | L775-807 | [x] | [x] |
+| 2.18d | data 字段结构 | `architecture.md` | §3.8 data 字段结构 | L808-831 | [x] | [x] |
+| 2.18e | Local 模式技术栈 | `architecture.md` | §4 Local 模式技术栈 | L832-842 | [x] | [x] |
+| 2.18e+ | 包结构 | `architecture.md` | §4.1 包结构 | L843-857 | [x] | [x] |
+| 2.18f | 数据流设计 | `architecture.md` | §5 数据流 | L858-898 | [x] | [x] |
+| 2.18g | CLI 架构 | `architecture.md` | §6 CLI 架构 | L899-989 | [x] | [x] |
+| 2.19 | feat 机制 | `architecture.md` | §7 feat 机制 | L990-1103 | [x] | [x] |
+| 2.20 | 合并策略 | `architecture.md` | §7.5 合并策略 | L1108-1116 | [x] | [x] |
+| 2.20a | MCP 工具与 feat | `architecture.md` | §7.4 MCP 工具与 feat | L1104-1107 | [x] | [x] |
+| 2.20b | 冲突解决与回滚 | `architecture.md` | §7.6 冲突解决与回滚 | L1117-1122 | [x] | [x] |
+| 2.21 | 跨项目 feat | `architecture.md` | §7.7 跨项目 feat | L1123-1132 | [x] | [x] |
+| 2.21a | 查询策略 | `architecture.md` | §7.8 查询策略 | L1133-1147 | [x] | [x] |
 
 ---
 
@@ -101,6 +101,62 @@
 ---
 
 ## 设计决策
+
+### 存储架构（用户透明）
+
+**核心原则**：MCP 工具对用户透明，底层存储切换不影响用户体验。
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          用户 / Agent                                        │
+│                    (连接同一套 MCP Server)                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                     MCP Server 层 (TypeScript)                               │
+│              c4a-extract-mcp / c4a-store-mcp / c4a-query-mcp                 │
+│                    (工具名完全一致，用户无感知)                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                     StorageAdapter 接口 (TypeScript)                         │
+│                save / read / list / search / queryDeps / ...                 │
+├──────────────────────────────┬──────────────────────────────────────────────┤
+│       LiteAdapter            │           ServerAdapter                       │
+│       (TypeScript)           │           (TypeScript)                        │
+│            │                 │                │                              │
+│            ▼                 │                ▼                              │
+│   SQLite + USearch           │        HTTP/gRPC 调用                         │
+│   (Local 模式)               │                │                              │
+│                              │                ▼                              │
+│                              │      storage-backend (Python)                 │
+│                              │      MongoDB + Neo4j + Milvus                 │
+│                              │      (Server 模式)                            │
+└──────────────────────────────┴──────────────────────────────────────────────┘
+```
+
+**设计要点**：
+
+| 层级 | 实现语言 | 说明 |
+|------|----------|------|
+| MCP Server | TypeScript | 统一入口，用户只连接这一层 |
+| StorageAdapter 接口 | TypeScript | 定义 `save/read/list/search` 等方法 |
+| LiteAdapter | TypeScript | SQLite + USearch (Local 模式) |
+| ServerAdapter | TypeScript | 调用 Python 后端的 HTTP/gRPC 客户端 |
+| storage-backend | Python | 封装 MongoDB/Neo4j/Milvus 访问 |
+
+**为什么 Server 模式后端用 Python？**
+
+| 数据库 | Bun/Node.js 兼容性 | 风险 |
+|--------|-------------------|------|
+| MongoDB | ✅ 验证过 | 低 |
+| Neo4j | ⚠️ JS driver 有性能问题 | 中 |
+| Milvus | ⚠️ gRPC 在 Bun 上较新 | 高 |
+
+Python 生态对这三个数据库的支持更成熟稳定，因此 Server 模式的存储后端使用 Python 实现。
+
+**包命名对照**：
+
+| 模式 | TypeScript 包 | Python 包 |
+|------|--------------|-----------|
+| Local | `@c4a/storage` (LiteAdapter) | - |
+| Server | `@c4a/storage` (ServerAdapter) | `storage-backend` |
 
 ### 类型系统分层
 

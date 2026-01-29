@@ -9,7 +9,7 @@
 | 文件 | 内容 | 工具前缀 |
 |------|------|----------|
 | [mcp/overview.md](mcp/overview.md) | 工具命名约定、返回格式、版本策略 | - |
-| [mcp/code.md](mcp/code.md) | 代码分析与提取 | `c4a_code_*` |
+| [mcp/code.md](mcp/code.md) | 知识采集与提取 | `c4a_extract_*` |
 | [mcp/store.md](mcp/store.md) | 存储与同步（索引） | `c4a_store_*` |
 | [mcp/query.md](mcp/query.md) | 查询与分析 | `c4a_query_*` |
 | [mcp/visual.md](mcp/visual.md) | 可视化渲染 | `c4a_visual_*` |
@@ -28,14 +28,14 @@ Store 工具因内容较多，进一步拆分为：
 
 ## 工具速查表
 
-### Code 工具 (`c4a_code_*`)
+### Extract 工具 (`c4a_extract_*`)
 
 | 工具 | 用途 | 详细文档 |
 |------|------|---------|
-| `c4a_code_extract` | 从代码中提取接口/类型/类 | [code.md](mcp/code.md) |
-| `c4a_code_analyze` | 分析代码结构与依赖 | [code.md](mcp/code.md) |
-| `c4a_code_ast` | 获取 AST | [code.md](mcp/code.md) |
-| `c4a_code_contract` | 生成契约 | [code.md](mcp/code.md) |
+| `c4a_extract_interfaces` | 从代码中提取接口/类型/类 | [code.md](mcp/code.md) |
+| `c4a_extract_analyze` | 分析代码结构与依赖 | [code.md](mcp/code.md) |
+| `c4a_extract_ast` | 获取 AST | [code.md](mcp/code.md) |
+| `c4a_extract_contract` | 生成契约 | [code.md](mcp/code.md) |
 
 ### Store 工具 (`c4a_store_*`)
 

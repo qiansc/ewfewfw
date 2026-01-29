@@ -388,7 +388,7 @@ feat 内保存 → status = draft (强制)
 | D12: 向量导出矛盾 | 设计 | ✅ 已更新 | mode-switch.md L323-360 (不导出向量，导入时重建) |
 | D13: CLI 并发访问表述 | 设计 | ✅ 已更新 | sqlite-schema.md L27 (明确单进程架构，请求通过 MCP Server) |
 | D14: USearch 检测时机 | 设计 | ✅ 已更新 | appendix.md L11 (MCP Server 初始化时检测) |
-| D15: 运维工具 MCP 暴露 | 设计 | ✅ 已确认 | architecture.md L870-881 (方案 A: MCP 工具供 CLI 内部调用) |
+| D15: 运维工具 MCP 暴露 | 设计 | ✅ 已确认 | architecture.md L874-885 (方案 A: MCP 工具供 CLI 内部调用) |
 | D16: 全文搜索降级方案 | 设计 | ✅ 已更新 | sqlite-schema.md L283-411, appendix.md L56-145 (引入 FTS5 表结构) |
 | D17: 索引命名不一致 | 设计 | ✅ 已更新 | sqlite-schema.md L272 (统一为 idx_vectors_lookup) |
 | D18: FTS5 tokenizer 配置无效 | 设计 | ✅ 已更新 | sqlite-schema.md L294, L298-311 (改为 unicode61，添加 tokenizer 选择说明) |
@@ -408,7 +408,7 @@ feat 内保存 → status = draft (强制)
 | D32: vector_key 写入缺失 | 设计 | ✅ 已更新 | vector-search.md L506-544 (补充向量写入逻辑) |
 | D33: 备份导出向量矛盾 | 文档 | ✅ 已更新 | appendix.md L417-426 (删除"导出向量"，与 mode-switch.md 保持一致) |
 | D34: Bun 运行时兼容性风险 | 文档 | ✅ 已更新 | mode-switch.md L407-419 (添加运行时兼容性说明和回退方案) |
-| D35: 实体唯一性约束描述错误 | 设计 | ✅ 已更新 | architecture.md L356-380, L627, L714 (修正为 source_project,id,proposal_id 三元组) |
+| D35: 实体唯一性约束描述错误 | 设计 | ✅ 已更新 | architecture.md L360-394, L641, L726 (修正为 source_project,id,proposal_id 三元组) |
 | D36: FTS5 触发器 source_project NULL 处理 | 设计 | ✅ 已更新 | sqlite-schema.md L344, L361 (添加 source_project IS NULL 判断) |
 | D37: 向量重建时间说明不清晰 | 文档 | ✅ 已更新 | mode-switch.md L105-121 (区分 SQLite 批量插入和 Embedding 生成两阶段) |
 | D38: InMemoryGraph 缓存失效局限性 | 文档 | ✅ 已更新 | graph-query.md L171-182 (添加 key.includes() 误匹配风险说明) |
@@ -418,7 +418,7 @@ feat 内保存 → status = draft (强制)
 | D42: relations.status 与 metadata.status 混淆 | 文档 | ✅ 已更新 | mode-switch.md L355 (添加说明区分两种 status) |
 | D43: FTS 索引字段与实体类型映射不明确 | 文档 | ✅ 已更新 | sqlite-schema.md L374-385 (添加字段映射说明和设计考量) |
 | D44: RWLock 实现未说明 | 文档 | ✅ 已更新 | graph-query.md L7 (添加伪代码说明和第三方库建议) |
-| D45: Bun 兼容性说明位置不完整 | 文档 | ✅ 已更新 | architecture.md L22, L30 (添加脚注说明可回退 Node.js) |
+| D45: Bun 兼容性说明位置不完整 | 文档 | ✅ 已更新 | architecture.md L22, L30-32 (添加脚注说明可回退 Node.js) |
 | D46: SQLite 主键不支持 COALESCE 表达式 | 设计 | ✅ 已更新 | sqlite-schema.md L102-191 (改用空字符串哨兵值，添加应用层转换说明) |
 | D47: NULL 语义未贯穿查询示例 | 设计 | ✅ 已更新 | sqlite-schema.md, vector-search.md, graph-query.md (统一使用空字符串比较) |
 | D48: entity_history 表 source_project NOT NULL | 设计 | ✅ 已更新 | sqlite-schema.md L211-233 (改用空字符串哨兵值) |
@@ -431,7 +431,7 @@ feat 内保存 → status = draft (强制)
 | D55: appendix.md FTS 降级示例 NULL 引用 | 设计 | ✅ 已更新 | appendix.md L123-161 (ftsSearch 函数改用空字符串哨兵值) |
 | D56: appendix.md 数据示例 null 引用 | 文档 | ✅ 已更新 | appendix.md L562-715 (数据示例改用空字符串，添加哨兵值说明) |
 | D57: graph-query.md NodeKey 哨兵值转换 | 文档 | ✅ 已更新 | graph-query.md L11-19 (添加 makeNodeKey 函数的哨兵值转换说明) |
-| D58: architecture.md NULL 引用 | 设计 | ✅ 已更新 | architecture.md L358-390, L805-812, L1131-1147 (唯一性约束、metadata 示例、查询策略添加哨兵值说明) |
+| D58: architecture.md NULL 引用 | 设计 | ✅ 已更新 | architecture.md L362-404, L817-824, L1133-1149 (唯一性约束、metadata 示例、查询策略添加哨兵值说明) |
 | D59: appendix.md external 实体示例 | 文档 | ✅ 已更新 | appendix.md L672-695 (external 实体 source_project/source_repo 改用空字符串) |
 | D60: 图查询缓存缺少项目维度 | 实现 | ✅ 已修复 | graph-operations.ts (缓存 key 加入 source_project) |
 | D61: 缓存失效粒度过粗 | 实现 | ✅ 已修复 | crud-read.ts + cache-keys.ts (按 source_project:id 失效) |

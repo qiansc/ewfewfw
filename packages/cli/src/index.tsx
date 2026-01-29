@@ -5,7 +5,7 @@
  * 用法:
  *   ./start.sh              # 交互式菜单
  *   ./start.sh dev          # 直接执行命令
- *   ./start.sh debug:dsl    # 执行子命令
+ *   ./start.sh debug:store  # 执行子命令
  */
 import { render } from "ink";
 import React from "react";

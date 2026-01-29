@@ -275,7 +275,7 @@ c4a_store_validate({
           code: "MISSING_CONTRACT",
           entity_id: "user-service",
           message: "HTTP API 缺少 OpenAPI 契约",
-          suggestion: "使用 c4a_code_contract 生成契约"
+          suggestion: "使用 c4a_extract_contract 生成契约"
         }
       ]
     },
