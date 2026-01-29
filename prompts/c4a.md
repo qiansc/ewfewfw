@@ -153,59 +153,81 @@ DSL 的 `knowledge` 字段用于描述**当前状态**，保持精简。决策�
 
    **正确做法**：报告错误原因，提示用户检查配置（如 Embedding 服务、数据库连接等），待问题解决后重新执行
 
-## ADR 工作流
+## 错误处理（recoverable_actions）
 
-当用户执行 ADR 工作流 Skill 命令（以 `/c4a:` 开头）时，严格按照 Skill 定义的流程执行。
+当 MCP 工具返回 `recoverable_actions` 时：
 
-### ADR 生命周期
+1. 解析可用操作，并向用户展示 `label`
+2. 用户选择后，按 `action` 执行对应操作（如 `retry`、`force`、`skip`）
+3. 若无可恢复操作，直接返回错误并给出修复建议
 
+## Skills 路由
+
+当用户描述需求时，自动识别意图并路由到对应 Skill：
+
+| 用户意图 | 路由到 | 说明 |
+|---------|--------|------|
+| "我想开发一个功能"、"实现 xxx" | `/c4a:feat` | 需求开发流程 |
+| "我想整理知识"、"记录规范" | `/c4a:know:learn` | 纯知识快速录入 |
+| "我想升级/迁移/重构" | `/c4a:feat` (ADR) | 架构变更流程 |
+| "定义功能规格"、"写需求" | `/c4a:specify` | 功能规格定义 |
+| "设计技术方案"、"技术设计" | `/c4a:plan` | 技术方案设计 |
+| "开始实现"、"写代码" | `/c4a:implement` | 代码实现辅助 |
+| "检查一致性"、"验证方案" | `/c4a:analyze` | 一致性检查 |
+| "批准方案" | `/c4a:feat --status=approved` | 状态流转 |
+| "发布" | `/c4a:feat --status=published` | 发布（含一致性检查） |
+| "搜索 xxx"、"查找 xxx" | `/c4a:know:search` | 知识库搜索 |
+| "同步到知识库" | `c4a sync` | CLI 同步 |
+| "查看状态" | `c4a status` | CLI 状态 |
+
+### 路由消歧规则
+
+当用户意图不明确时，按以下优先级判断：
+
+1. **显式命令优先**：用户输入 `/c4a:xxx` 时直接执行对应 Skill
+2. **关键词匹配**：根据关键词匹配最可能的 Skill
+3. **上下文推断**：根据当前 Feature 状态推断下一步操作
+4. **主动询问**：无法确定时，列出可能的选项让用户选择
+
+### 三种场景流程
+
+**场景 1：需求开发**
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                      ADR 完整生命周期                              │
-├──────────────────────────────────────────────────────────────────┤
-│                                                                    │
-│  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐       │
-│  │ RESEARCH │──►│  DRAFT   │──►│ APPROVED │──►│PUBLISHED │       │
-│  │  调研    │   │  草稿    │   │  已批准   │   │  已发布   │       │
-│  └──────────┘   └──────────┘   └──────────┘   └──────────┘       │
-│       │              │              │              │              │
-│       ▼              ▼              ▼              ▼              │
-│  /c4a:research  1-draft       3-approve      8-release           │
-│                 2-review                                          │
-│                 validate                                          │
-│                                                                    │
-└──────────────────────────────────────────────────────────────────┘
+/c4a:feat → /c4a:specify → /c4a:plan → /c4a:feat --status=approved
+→ /c4a:implement → /c4a:feat --status=published → c4a sync
 ```
 
-### 可用 Skill 命令
+**场景 2：架构变更 (ADR)**
+```
+/c4a:feat (ADR) → /c4a:plan → /c4a:feat --status=approved
+→ /c4a:implement → /c4a:feat --status=published → c4a sync
+```
 
-**Research（调研）**：
-- `/c4a:research [url|path]` - 开始调研
-- `/c4a:research:list` - 列出调研文档
-- `/c4a:research:clean` - 清空调研目录
+**场景 3：纯知识**
+```
+/c4a:feat → /c4a:specify → /c4a:plan → /c4a:feat --status=approved
+→ /c4a:feat --status=published → c4a sync
+（跳过 implement）
+```
 
-**ADR 主流程**：
-- `/c4a:adr:1-draft` - 创建 ADR 草稿
-- `/c4a:adr:2-review <adr-id>` - 开始评审
-- `/c4a:adr:3-approve <adr-id>` - 批准 ADR
-- `/c4a:adr:8-release <adr-id>` - 发布 ADR
+或使用快捷方式：
+```
+/c4a:know:learn <内容> → 自动完成全流程
+```
 
-**ADR 辅助**：
-- `/c4a:adr:validate <adr-id>` - 验证 DSL
-- `/c4a:adr:status [adr-id]` - 查看状态
-- `/c4a:adr:list [status]` - 列出 ADR
-- `/c4a:adr:reject <adr-id>` - 拒绝 ADR
+### ADR 增强检测
 
-### 执行规则
+在 `/c4a:analyze` 和 `/c4a:feat --status=published` 时，检测架构变更并提示创建 ADR：
 
-1. **识别命令**：用户输入以 `/c4a:` 开头时，识别为 Skill 命令
-2. **查找定义**：在 `.opencode/skills.md` 或已加载的 Skill 配置中查找对应 Skill
-3. **严格执行**：按 Skill prompt 中定义的步骤顺序执行，不跳过、不简化
-4. **工具确定性**：每个步骤使用明确指定的工具
-5. **用户确认**：关键操作（删除、状态流转）必须请求用户确认
+| 检测项 | 级别 | 触发条件 |
+|--------|------|----------|
+| 新增 Container | Warning | 创建新的 Container 实体 |
+| 删除 Container | Error | 删除现有 Container |
+| 修改 Container 技术栈 | Warning | 变更 technology 字段 |
+| 新增外部依赖 | Warning | 添加 external=true 的依赖 |
+| 修改数据流向 | Warning | 变更 DEPENDS_ON 关系 |
 
-### 错误处理
-
-- **工具调用失败**：展示错误信息，询问是否重试
-- **验证失败**：展示验证错误详情，询问是否修正
-- **状态不匹配**：提示当前状态和可执行的命令
+**检测结果处理**：
+- **Error 级别**：必须创建 ADR 才能继续
+- **Warning 级别**：提示建议创建 ADR，可通过 `--force` 跳过
+- **Info 级别**：仅提示，不阻塞流程
