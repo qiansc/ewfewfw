@@ -11,6 +11,7 @@
 | 原位置 | 新位置 | 说明 |
 |--------|--------|------|
 | `mcp-dsl/src/store/*` | `packages/storage/src/` | StorageAdapter + SQLiteStore + LiteAdapter |
+| `packages/core/src/store/*` | `packages/storage/src/` | Local 模式存储实现（SQLite + 向量搜索） |
 | `mcp-dsl/src/tools/store/*` | `packages/cli/src/mcp/store/` | MCP Store 工具 handlers |
 | `mcp-dsl/src/schemas/storeSchemas.ts` | `packages/cli/src/mcp/storeSchemas.ts` | Zod Schema 定义 |
 | `mcp-dsl/src/server.ts` | `packages/cli/src/mcp/server.ts` | MCP Server 工厂函数 |
@@ -177,13 +178,13 @@
 | 3.15 | c4a_store_feat_checklist | [x] | Checklist CRUD |
 | 3.16 | 本地文件保护机制 | [x] | 文件指纹 + 明确阻断 |
 | 3.17 | c4a_store_update_workflow_step | [x] | 原子更新 workflow 步骤 |
-| 3.18 | 并发修改预警 | [ ] | 多 feat 修改同一实体 |
-| 3.19 | 引用完整性预警 | [ ] | 删除实体时检测依赖 |
-| 3.20 | c4a_store_read_history | [ ] | 变更历史查询 |
-| 3.21 | c4a_store_backup/restore | [ ] | 备份恢复 |
-| 3.22 | c4a_store_repair | [ ] | 数据一致性修复 |
-| 3.23 | c4a_store_validate | [ ] | 架构一致性检查 |
-| 3.24 | 移除 legacy MCP 接口 | [ ] | 删除 c4a_db_* 旧接口与别名 |
+| 3.18 | 并发修改预警 | [x] | 多 feat 修改同一实体 |
+| 3.19 | 引用完整性预警 | [x] | 删除实体时检测依赖 |
+| 3.20 | c4a_store_read_history | [x] | 变更历史查询 |
+| 3.21 | c4a_store_backup/restore | [x] | 备份恢复 |
+| 3.22 | c4a_store_repair | [x] | 数据一致性修复 |
+| 3.23 | c4a_store_validate | [x] | 架构一致性检查 |
+| 3.24 | 移除 legacy MCP 接口 | [x] | 删除旧接口与别名 |
 
 **相关设计文档：**
 
@@ -207,25 +208,33 @@
 | 3.15 | `mcp/store-feat-checklist.md` | §3.8 checklist | L1-203 | [x] | [x] |
 | 3.16 | `mcp/store-feat-checklist.md` | §3.8.1 文件保护 | L206-324 | [x] | [x] |
 | 3.17 | `mcp/store-feat-checklist.md` | §3.9 workflow_step | L325-570 | [x] | [x] |
-| 3.18 | `mcp/store-feat-checklist.md` | §3.10 并发预警 | L572-658 | [ ] | [ ] |
-| 3.19 | `mcp/store-feat-checklist.md` | §3.11 引用预警 | L660-707 | [ ] | [ ] |
-| 3.20 | `mcp/store-utils.md` | §3.11 read_history | L1-46 | [ ] | [ ] |
-| 3.21 | `mcp/store-utils.md` | §3.13-3.14 backup/restore | L65-153 | [ ] | [ ] |
-| 3.22 | `mcp/store-utils.md` | §3.15 repair | L155-205 | [ ] | [ ] |
-| 3.23 | `mcp/store-utils.md` | §3.16 validate | L208-373 | [ ] | [ ] |
+| 3.18 | `mcp/store-feat-checklist.md` | §3.10 并发预警 | L572-658 | [x] | [x] |
+| 3.19 | `mcp/store-feat-checklist.md` | §3.11 引用预警 | L660-707 | [x] | [x] |
+| 3.20 | `mcp/store-utils.md` | §3.11 read_history | L1-46 | [x] | [x] |
+| 3.21 | `mcp/store-utils.md` | §3.13-3.14 backup/restore | L65-153 | [x] | [x] |
+| 3.22 | `mcp/store-utils.md` | §3.15 repair | L155-205 | [x] | [x] |
+| 3.23 | `mcp/store-utils.md` | §3.16 validate | L208-373 | [x] | [x] |
 
 ---
 
 ## Part 04: MCP Query 工具
 
+> 详细计划见: [04-mcp-query.md](04-mcp-query.md)
+
 | # | 功能 | 完成 | 描述 |
 |---|------|:----:|------|
-| 4.1 | c4a_query_search | [ ] | 语义搜索 |
-| 4.2 | c4a_query_deps | [ ] | 依赖查询 |
-| 4.3 | c4a_query_impact | [ ] | 影响分析 |
+| 4.1 | c4a_query_search | [ ] | 语义搜索（复用 SearchParams，含 proposal_id） |
+| 4.2 | c4a_query_deps | [ ] | 依赖查询（复用 DepsParams，含 proposal_id） |
+| 4.3 | c4a_query_impact | [ ] | 影响分析（复用 ImpactParams，含 proposal_id） |
 | 4.4 | 查询一致性检测 | [ ] | 不一致状态检测 |
-| 4.5 | 降级行为 | [ ] | Neo4j/Milvus 不可用时 |
-| 4.6 | Local Mode 查询策略 | [ ] | SQLite + InMemoryGraph |
+| 4.5 | 降级行为 | [ ] | Neo4j/Milvus 不可用时（返回 degraded: true） |
+| 4.6 | Local Mode 查询策略 | [ ] | 调用 Part 06 的 USearch + InMemoryGraph |
+
+**已完成基础设施（Part 06）**：
+- ✅ `adapterSearchTypes.ts` - SearchParams/DepsParams/ImpactParams 类型（含 proposal_id）
+- ✅ `vector-search.ts` - USearch 向量搜索
+- ✅ `in-memory-graph.ts` - 图查询
+- ✅ `graph-query-cache.ts` - 图查询缓存
 
 **相关设计文档：**
 
@@ -241,21 +250,27 @@
 
 ## Part 05: MCP Code 工具
 
+> 详细计划见: [05-mcp-code.md](05-mcp-code.md)
+
 | # | 功能 | 完成 | 描述 |
 |---|------|:----:|------|
-| 5.1 | c4a_code_extract | [ ] | 提取接口/类型/类 |
-| 5.2 | c4a_code_analyze | [ ] | 代码结构 + 依赖分析 |
-| 5.3 | c4a_code_ast | [ ] | 获取 AST |
-| 5.4 | c4a_code_contract | [ ] | 生成 API 契约 |
+| 5.1 | c4a_code_extract | [x] | 提取接口/类型/类（已有基础实现） |
+| 5.2 | c4a_code_analyze | [x] | 代码结构 + 依赖分析（已有基础实现） |
+| 5.3 | c4a_code_ast | [x] | 获取 AST（已有基础实现） |
+| 5.4 | c4a_code_contract | [x] | 生成 API 契约（已有基础实现） |
+| 5.5 | TypeScript 解析器 | [x] | 使用 typescript 编译器 API |
+| 5.6 | Go/Python 解析器 | [ ] | tree-sitter（需验证 Bun 兼容性） |
+| 5.7 | 接口一致性验证 | [ ] | 对照 mcp/code.md 验证现有实现 |
+| 5.8 | 单元测试 | [ ] | 各工具基本功能测试 |
 
 **相关设计文档：**
 
 | 功能 | 文件 | 章节 | 行号 | 已读 | 已实现 |
 |------|------|------|------|:----:|:------:|
-| 5.1 | `mcp/code.md` | §2.1 extract | L1-15 | [ ] | [ ] |
-| 5.2 | `mcp/code.md` | §2.2 analyze | L17-32 | [ ] | [ ] |
-| 5.3 | `mcp/code.md` | §2.3 ast | L34-45 | [ ] | [ ] |
-| 5.4 | `mcp/code.md` | §2.4 contract | L47-61 | [ ] | [ ] |
+| 5.1 | `mcp/code.md` | §2.1 extract | L1-15 | [ ] | [x] |
+| 5.2 | `mcp/code.md` | §2.2 analyze | L17-32 | [ ] | [x] |
+| 5.3 | `mcp/code.md` | §2.3 ast | L34-45 | [ ] | [x] |
+| 5.4 | `mcp/code.md` | §2.4 contract | L47-61 | [ ] | [x] |
 
 ---
 

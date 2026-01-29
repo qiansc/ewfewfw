@@ -243,14 +243,51 @@
 
 ## 11. 待完成项
 
-根据 summary.md，Part 03 还有以下功能待实现：
+~~根据 summary.md，Part 03 还有以下功能待实现：~~
+
+**更新于 2026-01-29：所有功能已完成实现！**
 
 | # | 功能 | 状态 |
 |---|-----|:----:|
-| 3.11 | `c4a_store_feat_lifecycle` | ⏳ Schema 已定义 |
-| 3.12 | `c4a_store_feat_merge` | ❌ 未实现 |
-| 3.13 | Server 多库一致性 | ❌ 未实现 |
-| 3.14 | proposal_id 上下文管理 | ❌ 未实现 |
-| 3.15 | `c4a_store_feat_checklist` | ❌ 未实现 |
-| 3.16 | 本地文件保护机制 | ❌ 未实现 |
-| 3.17-3.23 | 其他高级功能 | ❌ 未实现 |
+| 3.11 | `c4a_store_feat_lifecycle` | ✅ 已完成 |
+| 3.12 | `c4a_store_feat_merge` | ✅ 已完成 |
+| 3.13 | Server 多库一致性 | ✅ 已完成 |
+| 3.14 | proposal_id 上下文管理 | ✅ 已完成 |
+| 3.15 | `c4a_store_feat_checklist` | ✅ 已完成 |
+| 3.16 | 本地文件保护机制 | ✅ 已完成 |
+| 3.17-3.23 | 辅助和运维工具 | ✅ 已完成 |
+
+### 实现文件
+
+**Feat 生命周期管理:**
+- `packages/cli/src/mcp/store/featLifecycle.ts`
+- `packages/cli/src/mcp/store/featMerge.ts`
+- `packages/cli/src/mcp/store/featChecklist.ts`
+- `packages/cli/src/mcp/store/updateWorkflowStep.ts`
+- `packages/storage/src/lite-adapter/featLifecycle.ts`
+- `packages/storage/src/lite-adapter/featMerge.ts`
+- `packages/storage/src/lite-adapter/featChecklist.ts`
+- `packages/storage/src/lite-adapter/featWorkflow.ts`
+
+**辅助和运维工具:**
+- `packages/cli/src/mcp/store/readHistory.ts`
+- `packages/cli/src/mcp/store/backup.ts`
+- `packages/cli/src/mcp/store/restore.ts`
+- `packages/cli/src/mcp/store/repair.ts`
+- `packages/cli/src/mcp/store/validate.ts`
+- `packages/cli/src/mcp/store/fileProtection.ts`
+- `packages/storage/src/lite-adapter/utilsHistory.ts`
+- `packages/storage/src/lite-adapter/utilsBackup.ts`
+- `packages/storage/src/lite-adapter/utilsRestore.ts`
+- `packages/storage/src/lite-adapter/utilsRepair.ts`
+- `packages/storage/src/lite-adapter/utilsValidate.ts`
+
+### 测试验证
+
+```
+bun test v1.3.5
+193 pass, 0 fail, 477 expect() calls
+Ran 193 tests across 28 files
+```
+
+**Part 03 全部完成。**

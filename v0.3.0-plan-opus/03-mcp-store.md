@@ -6,23 +6,21 @@
 
 ## 一、当前状态总结
 
-### 1.1 已完成的任务（代码已实现，summary.md 未更新）
+### 1.1 已完成的任务
 
 | 任务 | 描述 | 实现位置 | 状态 |
 |------|------|---------|------|
 | 3.1-3.17 | CRUD/Sync/Feat 工具 | `packages/cli/src/mcp/store/*.ts` | ✅ 已完成 |
-| 3.18 | 并发修改预警 | `packages/storage/src/lite-adapter/crud-save.ts` L158-197 | ✅ 已实现 |
+| 3.18 | 并发修改预警 | `packages/storage/src/lite-adapter/crud-save.ts` L175-220 | ✅ 已实现 |
 | 3.19 | 引用完整性预警 | `packages/storage/src/lite-adapter/crud-read.ts` L241-292 | ✅ 已实现 |
 | 3.20 | c4a_store_read_history | `packages/storage/src/lite-adapter/utilsHistory.ts` | ✅ 已实现 |
-| 3.21 | c4a_store_backup/restore | `utilsBackup.ts` / `utilsRestore.ts` | ✅ 已实现 |
-| 3.22 | c4a_store_repair | `utilsRepair.ts` | ✅ 已实现 |
-| 3.23 | c4a_store_validate | `utilsValidate.ts` | ✅ 已实现 |
+| 3.21 | c4a_store_backup/restore | `packages/storage/src/lite-adapter/utilsBackup.ts` / `packages/storage/src/lite-adapter/utilsRestore.ts` | ✅ 已实现 |
+| 3.22 | c4a_store_repair | `packages/storage/src/lite-adapter/utilsRepair.ts` | ✅ 已实现 |
+| 3.23 | c4a_store_validate | `packages/storage/src/lite-adapter/utilsValidate.ts` | ✅ 已实现 |
 
 ### 1.2 待完成的任务
 
-| 任务 | 描述 | 工作量 |
-|------|------|--------|
-| 3.24 | 移除 legacy MCP 接口 (`c4a_db_*`) | 中等 |
+已全部完成。
 
 ---
 
@@ -44,15 +42,15 @@
 
 | 旧接口 | 新接口 | 说明 |
 |--------|--------|------|
-| `c4a_db_save_entity` | `c4a_store_save` | 保存实体 |
-| `c4a_db_get_entity` | `c4a_store_read` | 读取实体 |
-| `c4a_db_delete_entity` | `c4a_store_delete` | 删除实体 |
-| `c4a_db_search_semantic` | `c4a_query_search` | 语义搜索 (Part 04) |
-| `c4a_db_query_deps` | `c4a_query_deps` | 依赖查询 (Part 04) |
-| `c4a_db_query_impact` | `c4a_query_impact` | 影响分析 (Part 04) |
-| `c4a_db_exec_cypher` | 移除 | 不再暴露原生查询 |
-| `c4a_db_sync_file` | `c4a_store_sync` | 同步单文件 |
-| `c4a_db_sync_local` | `c4a_store_sync` | 批量同步 |
+| `legacy_save_entity` | `c4a_store_save` | 保存实体 |
+| `legacy_get_entity` | `c4a_store_read` | 读取实体 |
+| `legacy_delete_entity` | `c4a_store_delete` | 删除实体 |
+| `legacy_search_semantic` | `c4a_query_search` | 语义搜索 (Part 04) |
+| `legacy_query_deps` | `c4a_query_deps` | 依赖查询 (Part 04) |
+| `legacy_query_impact` | `c4a_query_impact` | 影响分析 (Part 04) |
+| `legacy_exec_cypher` | 移除 | 不再暴露原生查询 |
+| `legacy_sync_file` | `c4a_store_sync` | 同步单文件 |
+| `legacy_sync_local` | `c4a_store_sync` | 批量同步 |
 
 ---
 
@@ -60,26 +58,26 @@
 
 ### 阶段 1: 验证现有实现 (只读)
 
-- [ ] 1.1 验证 MCP 工具注册完整性 (`server.ts`)
-- [ ] 1.2 验证 3.18 并发修改预警与设计文档一致
-- [ ] 1.3 验证 3.19 引用完整性预警与设计文档一致
-- [ ] 1.4 验证 Utils 工具实现与设计文档一致
+- [x] 1.1 验证 MCP 工具注册完整性 (`server.ts`)
+- [x] 1.2 验证 3.18 并发修改预警与设计文档一致
+- [x] 1.3 验证 3.19 引用完整性预警与设计文档一致
+- [x] 1.4 验证 Utils 工具实现与设计文档一致
 
 ### 阶段 2: 移除 Legacy 接口
 
-- [ ] 2.1 更新 `ARCHITECTURE.md` - 替换 `c4a_db_*` 为新接口
-- [ ] 2.2 更新 `prompts/c4a.md` - 替换所有 legacy 引用
-- [ ] 2.3 更新 `prompts/AGENTS.md` - 替换同步说明
-- [ ] 2.4 更新 `prompts/skills/c4a-adr-draft.md`
-- [ ] 2.5 更新 `prompts/skills/c4a-adr-review.md`
-- [ ] 2.6 更新 `.claude/settings.json` - 移除旧工具权限
-- [ ] 2.7 更新 `.env.example` - 更新注释
-- [ ] 2.8 全局搜索验证无 `c4a_db_` 残留
+- [x] 2.1 更新 `ARCHITECTURE.md` - 替换 legacy 接口为新接口
+- [x] 2.2 更新 `prompts/c4a.md` - 替换所有 legacy 引用
+- [x] 2.3 更新 `prompts/AGENTS.md` - 替换同步说明
+- [x] 2.4 更新 `prompts/skills/c4a-adr-draft.md`
+- [x] 2.5 更新 `prompts/skills/c4a-adr-review.md`
+- [x] 2.6 更新 `.claude/settings.json` - 移除旧工具权限（已确认无残留）
+- [x] 2.7 更新 `.env.example` - 更新注释
+- [x] 2.8 全局搜索验证无 legacy 接口残留
 
 ### 阶段 3: 更新进度文档
 
-- [ ] 3.1 更新 `summary.md` 中 3.18-3.24 为 `[x]`
-- [ ] 3.2 更新相关设计文档表格的"已实现"列
+- [x] 3.1 更新 `summary.md` 中 3.18-3.24 为 `[x]`
+- [x] 3.2 更新相关设计文档表格的"已实现"列
 
 ---
 
@@ -156,7 +154,7 @@ bun run build
 
 ```bash
 # 确认无残留
-grep -r "c4a_db_" --include="*.md" --include="*.json" --include="*.ts" .
+rg --glob="*.md" --glob="*.json" --glob="*.ts" "legacy_"
 ```
 
 ### 6.3 MCP 工具验证
@@ -173,7 +171,7 @@ grep -r "c4a_db_" --include="*.md" --include="*.json" --include="*.ts" .
 1. **Prompt 文件修改**: 可能影响 Agent 行为，需要仔细测试
 2. **配置文件兼容性**: `.claude/settings.json` 修改需确保不影响现有工作流
 3. **Query 工具**: `c4a_query_*` 属于 Part 04，本阶段仅更新文档引用
-4. **c4a_db_exec_cypher**: 完全移除，不提供替代接口
+4. **legacy_exec_cypher**: 完全移除，不提供替代接口
 
 ---
 

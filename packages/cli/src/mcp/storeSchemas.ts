@@ -614,7 +614,7 @@ export type StoreUpdateWorkflowStepResult = z.infer<typeof StoreUpdateWorkflowSt
 export const HistoryItemSchema = z.object({
   entity_id: z.string().optional().describe("实体 ID"),
   feat_id: z.string().nullable().describe("Feat ID"),
-  action: z.enum(["create", "update", "delete"]).describe("操作类型"),
+  action: z.enum(["create", "update", "delete", "archive"]).describe("操作类型"),
   changed_fields: z.array(z.string()).optional().describe("变更字段"),
   changed_by: z.string().optional().describe("变更人"),
   changed_at: z.string().describe("变更时间"),
@@ -660,7 +660,7 @@ export const BackupStatsSchema = z.object({
 export const StoreBackupInputSchema = z.object({
   output: z.string().describe("备份文件路径"),
   status_filter: z.enum(["published", "approved", "all"]).default("published").describe("按实体状态筛选"),
-  format: z.enum(["tar.gz", "json"]).default("json").describe("备份格式"),
+  format: z.enum(["tar.gz", "json"]).default("tar.gz").describe("备份格式"),
   include_metadata: z.boolean().default(true).describe("是否包含元数据"),
 });
 

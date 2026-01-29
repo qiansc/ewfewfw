@@ -39,8 +39,16 @@ export interface ServerConfig {
 export interface C4AConfig {
   mode?: StorageMode;
   server?: ServerConfig;
+  project_id?: string;
+  repo_id?: string;
+  feat?: {
+    concurrent_warning?: boolean;
+    auto_notify?: boolean;
+  };
   local?: {
     dbPath?: string;
+    defaultProject?: string;
+    enableVectorSearch?: boolean;
   };
 }
 
@@ -85,6 +93,11 @@ function buildAdapterConfigKey(params: {
     dbPath?: string;
     defaultProject?: string;
     enableVectorSearch?: boolean;
+    repoId?: string | null;
+    feat?: {
+      concurrent_warning?: boolean;
+      auto_notify?: boolean;
+    };
   };
   server?: ServerConfig;
 }): string {
@@ -94,6 +107,13 @@ function buildAdapterConfigKey(params: {
       dbPath: params.local?.dbPath ?? null,
       defaultProject: params.local?.defaultProject ?? null,
       enableVectorSearch: params.local?.enableVectorSearch ?? null,
+      repoId: params.local?.repoId ?? null,
+      feat: params.local?.feat
+        ? {
+            concurrent_warning: params.local.feat.concurrent_warning ?? null,
+            auto_notify: params.local.feat.auto_notify ?? null,
+          }
+        : null,
     },
     server: params.server
       ? {
@@ -121,10 +141,21 @@ export function getAdapter(options?: {
 }): StorageAdapter {
   const config = loadConfig(options?.basePath);
   const mode = options?.forceMode || config.mode || 'local';
+  const featConfig = {
+    concurrent_warning:
+      options?.config?.feat?.concurrent_warning ?? config.feat?.concurrent_warning,
+    auto_notify: options?.config?.feat?.auto_notify ?? config.feat?.auto_notify,
+  };
   const localConfig = {
     dbPath: config.local?.dbPath || options?.config?.dbPath,
-    defaultProject: options?.config?.defaultProject,
-    enableVectorSearch: options?.config?.enableVectorSearch,
+    defaultProject:
+      options?.config?.defaultProject ||
+      config.local?.defaultProject ||
+      config.project_id,
+    enableVectorSearch:
+      options?.config?.enableVectorSearch ?? config.local?.enableVectorSearch,
+    repoId: options?.config?.repoId ?? config.repo_id ?? null,
+    feat: featConfig,
   };
   const configKey = buildAdapterConfigKey({
     mode,

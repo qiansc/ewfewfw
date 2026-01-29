@@ -90,8 +90,8 @@ ADR 应聚焦于：
 
 **步骤**：
 1. 从用户输入中提取关键词（技术选型、功能描述）
-2. 调用 `c4a_db_search_semantic(query: <关键词>)` 查询相关实体
-3. 如果 ADR 涉及修改现有容器，调用 `c4a_db_query_impact(entity_id: <容器id>)` 分析影响
+2. 调用 `c4a_query_search(query: <关键词>)` 查询相关实体
+3. 如果 ADR 涉及修改现有容器，调用 `c4a_query_impact(entity_id: <容器id>)` 分析影响
 
 **输出格式**：
 ```

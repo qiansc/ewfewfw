@@ -117,18 +117,16 @@
 ## 5. 验收结论
 
 - **验收人:** AI Agent (Claude Opus 4.5)
-- **验收时间:** 2026-01-27 18:00
+- **验收时间:** 2026-01-27 18:00（初次）/ 2026-01-29（最终）
 - **结果:** [x] 通过
-- **完成度:** 骨架实现完成，类型定义完整，工具注册正确
-- **遗留问题:**
-  - 工具处理函数为骨架实现，需要后续补充具体业务逻辑
-  - c4a_store_sync 需要实现路径安全校验和文件系统操作
-  - c4a_store_plan_sync 需要实现三方对比逻辑和事务处理
-  - Double Check 机制需要在 CLI 层实现
-  - 大批量同步优化需要在 CLI 和 Server 层实现
-- **下一步:**
-  - 继续实现 3.11-3.19（Feat 生命周期管理工具）
-  - 或者先实现 Store Sync 工具的具体业务逻辑
+- **完成度:** ✅ 100% - 所有功能已完整实现
+- **遗留问题:** 无
+- **最终状态:**
+  - ✅ 工具处理函数已完整实现（调用 @c4a/storage 适配器）
+  - ✅ c4a_store_sync 已实现路径安全校验和文件系统操作
+  - ✅ c4a_store_plan_sync 已实现三方对比逻辑和事务处理
+  - ✅ Double Check 机制已实现
+  - ✅ 大批量同步优化已实现
 
 ---
 
@@ -152,49 +150,37 @@
 
 ## 7. 本次会话完成总结
 
-### 已完成任务（3.1-3.10）
+### 已完成任务（3.1-3.23 全部完成）
 
 1. ✅ **MCP 工具规范**（3.1-3.2）- 工具分组、可见性分层
-2. ✅ **Store CRUD 工具**（3.3-3.6）- save/read/list/delete 骨架实现
-3. ✅ **Store Sync 工具**（3.7-3.8）- sync/plan_sync 骨架实现
-4. ✅ **Double Check 机制**（3.9）- 类型定义完整
-5. ✅ **大批量同步优化**（3.10）- 设计已包含在类型定义中
+2. ✅ **Store CRUD 工具**（3.3-3.6）- save/read/list/delete 完整实现
+3. ✅ **Store Sync 工具**（3.7-3.8）- sync/plan_sync 完整实现
+4. ✅ **Double Check 机制**（3.9）- 完整实现
+5. ✅ **大批量同步优化**（3.10）- 完整实现
+6. ✅ **Feat 生命周期管理**（3.11-3.19）- 完整实现
+7. ✅ **辅助和运维工具**（3.20-3.23）- 完整实现
 
-### 创建的文件
+### 实现文件清单
 
-- `packages/mcp-dsl/src/schemas/storeSchemas.ts` - 完整的 Store 工具类型定义（448 行）
-- `packages/mcp-dsl/src/tools/store/save.ts` - c4a_store_save 骨架
-- `packages/mcp-dsl/src/tools/store/read.ts` - c4a_store_read 骨架
-- `packages/mcp-dsl/src/tools/store/list.ts` - c4a_store_list 骨架
-- `packages/mcp-dsl/src/tools/store/delete.ts` - c4a_store_delete 骨架
-- `packages/mcp-dsl/src/tools/store/sync.ts` - c4a_store_sync 骨架
-- `packages/mcp-dsl/src/tools/store/planSync.ts` - c4a_store_plan_sync 骨架
-- `packages/mcp-dsl/src/tools/store/index.ts` - Store 工具统一导出
+**MCP Handler 层** (`packages/cli/src/mcp/store/`):
+- `save.ts`, `read.ts`, `list.ts`, `delete.ts` - CRUD 工具
+- `sync.ts`, `planSync.ts` - Sync 工具
+- `featLifecycle.ts`, `featMerge.ts`, `featChecklist.ts` - Feat 管理
+- `updateWorkflowStep.ts` - Workflow 步骤更新
+- `readHistory.ts`, `backup.ts`, `restore.ts`, `repair.ts`, `validate.ts` - 辅助工具
+- `fileProtection.ts` - 本地文件保护
 
-### 更新的文件
+**Storage 适配器层** (`packages/storage/src/`):
+- `lite-adapter/` - Local 模式完整实现
+- `server-adapter.ts` - Server 模式适配器
+- `mode-switch.ts` - 模式切换逻辑
 
-- `packages/mcp-dsl/src/server.ts` - 注册了 6 个 Store 工具
-- `v0.3.0-plan-opus/03-mcp-store.md` - 更新任务完成状态
-- `v0.3.0-plan-opus/checklist/03-01-06-store-crud-skeleton.md` - CRUD 工具验收清单
+### 测试验证
 
-### 下一步建议
+```
+bun test v1.3.5
+193 pass, 0 fail, 477 expect() calls
+Ran 193 tests across 28 files
+```
 
-**选项 1：继续实现 Feat 生命周期管理工具（3.11-3.19）**
-- c4a_store_feat_lifecycle（Feat 创建/流转/删除）
-- c4a_store_feat_merge（Feat 合并 + 冲突解决）
-- c4a_store_feat_checklist（Checklist CRUD）
-- c4a_store_update_workflow_step（原子更新 workflow 步骤）
-- 并发修改预警、引用完整性预警
-
-**选项 2：实现 Store 工具的具体业务逻辑**
-- 补充 CRUD 和 Sync 工具的实际实现
-- 实现与 Python 服务层（mcp-data）的交互
-- 实现 ADR 检查、并发修改检查等副作用逻辑
-
-**选项 3：实现辅助和运维工具（3.20-3.23）**
-- c4a_store_read_history（变更历史查询）
-- c4a_store_backup/restore（备份恢复）
-- c4a_store_repair（数据一致性修复）
-- c4a_store_validate（架构一致性检查）
-
-您希望我继续哪个方向？
+**Part 03 全部完成，无遗留任务。**

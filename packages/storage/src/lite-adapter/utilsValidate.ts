@@ -44,15 +44,13 @@ export async function validate(
   let errors = 0;
 
   try {
-    // 查询实体
-    const entitiesQuery = `
+    const baseEntities = db.prepare(`
       SELECT e.id, e.type, e.data, m.status
       FROM entities e
       JOIN metadata m ON e.source_project = m.source_project
         AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
       WHERE ${proposalClause}
-    `;
-    const entities = db.prepare(entitiesQuery).all(
+    `).all(
       ...(dbProposalId === '' ? [] : [dbProposalId])
     ) as Array<{
       id: string;
@@ -61,16 +59,28 @@ export async function validate(
       status: string;
     }>;
 
-    // 按类型分组
+    const checkDepth = proposalId ? (params.options?.check_depth ?? 2) : null;
+    const scopeIds = proposalId
+      ? resolveCheckScope(db, baseEntities, proposalId, checkDepth)
+      : null;
+
+    const entities = proposalId
+      ? loadEntitiesForScope(db, baseEntities, scopeIds)
+      : baseEntities;
+
     const byType: Record<string, typeof entities> = {};
     for (const e of entities) {
       if (!byType[e.type]) byType[e.type] = [];
       byType[e.type].push(e);
     }
 
+    const changesDetected = proposalId
+      ? detectArchitectureChanges(db, baseEntities)
+      : [];
+
     // 执行各项检查
     for (const check of checksToRun) {
-      const result = runCheck(db, check, entities, byType, proposalId);
+      const result = runCheck(db, check, byType, proposalId, scopeIds, changesDetected);
       checks[check] = result;
 
       if (result.status === 'passed') passed++;
@@ -136,9 +146,10 @@ export async function validate(
 function runCheck(
   db: ReturnType<typeof import('../sqlite-store.js').SQLiteStore.prototype.getDatabase>,
   check: ValidateCheckType,
-  entities: Array<{ id: string; type: string; data: string; status: string }>,
-  byType: Record<string, typeof entities>,
-  proposalId: string | null
+  byType: Record<string, Array<{ id: string; type: string; data: string; status: string }>>,
+  proposalId: string | null,
+  scopeIds: Set<string> | null,
+  changesDetected: ValidateCheckResult['changes_detected']
 ): ValidateCheckResult {
   switch (check) {
     case 'functional_spec':
@@ -148,14 +159,113 @@ function runCheck(
     case 'contracts':
       return checkContracts(db, byType, proposalId);
     case 'references':
-      return checkReferences(db, entities, proposalId);
+      return checkReferences(db, proposalId, scopeIds);
     case 'adr_completeness':
-      return checkAdrCompleteness(byType);
+      return checkAdrCompleteness(byType, changesDetected);
     case 'checklist':
       return checkChecklist(db, proposalId);
     default:
       return { status: 'passed', message: '未知检查项' };
   }
+}
+
+function resolveCheckScope(
+  db: ReturnType<typeof import('../sqlite-store.js').SQLiteStore.prototype.getDatabase>,
+  baseEntities: Array<{ id: string }>,
+  proposalId: string,
+  checkDepth: number | null
+): Set<string> {
+  const scope = new Set<string>(baseEntities.map(e => e.id));
+  if (scope.size === 0) return scope;
+  const depth = Math.max(checkDepth ?? 0, 0);
+  let frontier = new Set(scope);
+
+  for (let i = 0; i < depth; i++) {
+    const frontierIds = Array.from(frontier);
+    if (frontierIds.length === 0) break;
+    const placeholders = frontierIds.map(() => '?').join(', ');
+    const rows = db.prepare(`
+      SELECT DISTINCT to_id
+      FROM relations
+      WHERE from_id IN (${placeholders})
+        AND (proposal_id IS NULL OR proposal_id = '' OR proposal_id = ?)
+        AND (status IS NULL OR status != 'deleted')
+    `).all(...frontierIds, proposalId) as Array<{ to_id: string }>;
+    frontier = new Set();
+    for (const row of rows) {
+      if (!scope.has(row.to_id)) {
+        scope.add(row.to_id);
+        frontier.add(row.to_id);
+      }
+    }
+  }
+
+  return scope;
+}
+
+function loadEntitiesForScope(
+  db: ReturnType<typeof import('../sqlite-store.js').SQLiteStore.prototype.getDatabase>,
+  baseEntities: Array<{ id: string; type: string; data: string; status: string }>,
+  scopeIds: Set<string> | null
+): Array<{ id: string; type: string; data: string; status: string }> {
+  const scopeList = scopeIds && scopeIds.size > 0 ? Array.from(scopeIds) : baseEntities.map(e => e.id);
+  const featIds = new Set(baseEntities.map(e => e.id));
+  const missingIds = scopeList.filter(id => !featIds.has(id));
+  if (missingIds.length === 0) return baseEntities;
+
+  const placeholders = missingIds.map(() => '?').join(', ');
+  const mainEntities = db.prepare(`
+    SELECT e.id, e.type, e.data, m.status
+    FROM entities e
+    JOIN metadata m ON e.source_project = m.source_project
+      AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+    WHERE (e.proposal_id IS NULL OR e.proposal_id = '')
+      AND e.id IN (${placeholders})
+  `).all(...missingIds) as Array<{ id: string; type: string; data: string; status: string }>;
+
+  return [...baseEntities, ...mainEntities];
+}
+
+function detectArchitectureChanges(
+  db: ReturnType<typeof import('../sqlite-store.js').SQLiteStore.prototype.getDatabase>,
+  baseEntities: Array<{ id: string; type: string; data: string }>
+): ValidateCheckResult['changes_detected'] {
+  const targetTypes = new Set(['system', 'container', 'component']);
+  const featEntities = baseEntities.filter(entity => targetTypes.has(entity.type));
+  if (featEntities.length === 0) return [];
+
+  const ids = featEntities.map(entity => entity.id);
+  const placeholders = ids.map(() => '?').join(', ');
+  const mainEntities = db.prepare(`
+    SELECT e.id, e.data
+    FROM entities e
+    WHERE (e.proposal_id IS NULL OR e.proposal_id = '')
+      AND e.id IN (${placeholders})
+  `).all(...ids) as Array<{ id: string; data: string }>;
+
+  const mainMap = new Map(mainEntities.map(entity => [entity.id, entity.data]));
+  const changes: NonNullable<ValidateCheckResult['changes_detected']> = [];
+
+  for (const featEntity of featEntities) {
+    const mainData = mainMap.get(featEntity.id);
+    if (!mainData) {
+      changes.push({
+        type: 'created',
+        entity_id: featEntity.id,
+        detail: 'feat 中新增实体',
+      });
+      continue;
+    }
+    if (mainData !== featEntity.data) {
+      changes.push({
+        type: 'modified',
+        entity_id: featEntity.id,
+        detail: '实体数据发生变更',
+      });
+    }
+  }
+
+  return changes;
 }
 
 /**
@@ -254,7 +364,7 @@ function checkContracts(
       const dbProposalId = proposalId ?? '';
       const proposalClause = dbProposalId === ''
         ? '(proposal_id IS NULL OR proposal_id = \'\')'
-        : 'proposal_id = ?';
+        : '(proposal_id IS NULL OR proposal_id = \'\' OR proposal_id = ?)';
       const relatedContract = db.prepare(`
         SELECT 1 FROM relations
         WHERE (from_id = ? OR to_id = ?) AND rel_type = 'IMPLEMENTS'
@@ -294,39 +404,54 @@ function checkContracts(
  */
 function checkReferences(
   db: ReturnType<typeof import('../sqlite-store.js').SQLiteStore.prototype.getDatabase>,
-  entities: Array<{ id: string; type: string; data: string }>,
-  proposalId: string | null
+  proposalId: string | null,
+  scopeIds: Set<string> | null
 ): ValidateCheckResult {
-  const entityIds = new Set(entities.map(e => e.id));
-
-  // 查询所有关系
   const dbProposalId = proposalId ?? '';
-  const proposalClause = dbProposalId === ''
-    ? '(proposal_id IS NULL OR proposal_id = \'\')'
-    : 'proposal_id = ?';
-  const relations = db.prepare(`
-    SELECT from_id, to_id FROM relations
-    WHERE ${proposalClause}
-      AND (status IS NULL OR status != 'deleted')
-  `).all(
-    ...(dbProposalId === '' ? [] : [dbProposalId])
-  ) as Array<{ from_id: string; to_id: string }>;
+  const scopeList = scopeIds && scopeIds.size > 0 ? Array.from(scopeIds) : [];
+  const scopeClause = scopeList.length > 0
+    ? `AND r.from_id IN (${scopeList.map(() => '?').join(', ')})`
+    : '';
 
-  let danglingCount = 0;
-  const errors: ValidateError[] = [];
+  const params: Array<string | null> = [];
+  let dangling: Array<{ from_id: string; to_id: string }>;
 
-  for (const rel of relations) {
-    if (!entityIds.has(rel.to_id)) {
-      danglingCount++;
-      if (errors.length < 5) {
-        errors.push({
-          code: 'DANGLING_REFERENCE',
-          entity_id: rel.from_id,
-          message: `引用的实体 '${rel.to_id}' 不存在`,
-        });
-      }
-    }
+  if (dbProposalId === '') {
+    dangling = db.prepare(`
+      SELECT r.from_id, r.to_id
+      FROM relations r
+      LEFT JOIN entities e_main
+        ON e_main.source_project = r.to_project AND e_main.id = r.to_id
+        AND (e_main.proposal_id IS NULL OR e_main.proposal_id = '')
+      WHERE (r.proposal_id IS NULL OR r.proposal_id = '')
+        AND (r.status IS NULL OR r.status != 'deleted')
+        ${scopeClause}
+        AND e_main.id IS NULL
+    `).all(...scopeList) as Array<{ from_id: string; to_id: string }>;
+  } else {
+    params.push(dbProposalId, dbProposalId);
+    dangling = db.prepare(`
+      SELECT r.from_id, r.to_id
+      FROM relations r
+      LEFT JOIN entities e_main
+        ON e_main.source_project = r.to_project AND e_main.id = r.to_id
+        AND (e_main.proposal_id IS NULL OR e_main.proposal_id = '')
+      LEFT JOIN entities e_feat
+        ON e_feat.source_project = r.to_project AND e_feat.id = r.to_id
+        AND e_feat.proposal_id = ?
+      WHERE (r.proposal_id IS NULL OR r.proposal_id = '' OR r.proposal_id = ?)
+        AND (r.status IS NULL OR r.status != 'deleted')
+        ${scopeClause}
+        AND e_main.id IS NULL AND e_feat.id IS NULL
+    `).all(...params, ...scopeList) as Array<{ from_id: string; to_id: string }>;
   }
+
+  const danglingCount = dangling.length;
+  const errors: ValidateError[] = dangling.slice(0, 5).map(rel => ({
+    code: 'DANGLING_REFERENCE',
+    entity_id: rel.from_id,
+    message: `引用的实体 '${rel.to_id}' 不存在`,
+  }));
 
   if (danglingCount > 0) {
     return {
@@ -348,10 +473,21 @@ function checkReferences(
  * ADR 完备度检查
  */
 function checkAdrCompleteness(
-  byType: Record<string, Array<{ id: string; type: string; data: string }>>
+  byType: Record<string, Array<{ id: string; type: string; data: string }>>,
+  changesDetected: ValidateCheckResult['changes_detected']
 ): ValidateCheckResult {
   const adrs = byType['adr'] || [];
   const warnings: ValidateError[] = [];
+
+  // 变更但无 ADR
+  if (changesDetected && changesDetected.length > 0 && adrs.length === 0) {
+    return {
+      status: 'warning',
+      message: '检测到架构变更，但未找到关联的 ADR',
+      changes_detected: changesDetected,
+      suggestion: '创建 ADR 记录架构变更的背景和决策',
+    };
+  }
 
   // 检查 ADR 必需字段
   for (const adr of adrs) {
@@ -377,12 +513,14 @@ function checkAdrCompleteness(
       status: 'warning',
       message: 'ADR 完备度检查有警告',
       warnings,
+      changes_detected: changesDetected && changesDetected.length > 0 ? changesDetected : undefined,
     };
   }
 
   return {
     status: 'passed',
     message: 'ADR 完备',
+    changes_detected: changesDetected && changesDetected.length > 0 ? changesDetected : undefined,
   };
 }
 

@@ -27,9 +27,36 @@ export interface LiteAdapterConfig {
    * 默认: true (如果 USearch 可用)
    */
   enableVectorSearch?: boolean;
+
+  /**
+   * 仓库标识（用于备份元数据）
+   */
+  repoId?: string | null;
+
+  /**
+   * Feat 相关配置
+   */
+  feat?: {
+    /**
+     * 是否启用并发修改预警
+     * 默认: true
+     */
+    concurrent_warning?: boolean;
+    /**
+     * 是否自动通知并发 feat 负责人
+     * 默认: false
+     */
+    auto_notify?: boolean;
+  };
 }
 
-export type RequiredConfig = Required<LiteAdapterConfig>;
+export interface RequiredConfig extends Required<LiteAdapterConfig> {
+  repoId: string | null;
+  feat: {
+    concurrent_warning: boolean;
+    auto_notify: boolean;
+  };
+}
 
 // ============================================================
 // 数据库行类型

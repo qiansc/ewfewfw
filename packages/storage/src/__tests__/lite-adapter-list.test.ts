@@ -28,6 +28,11 @@ function createContext(): AdapterContext {
       dbPath: DB_PATH,
       defaultProject: 'alpha',
       enableVectorSearch: false,
+      repoId: null,
+      feat: {
+        concurrent_warning: true,
+        auto_notify: false,
+      },
     },
   };
 }

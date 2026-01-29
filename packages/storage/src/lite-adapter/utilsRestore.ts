@@ -17,6 +17,18 @@ type BackupRelation = {
   rel_type: string;
 };
 
+function extractTarPayload(buffer: Buffer): string | null {
+  if (buffer.length < 512) return null;
+  const magic = buffer.subarray(257, 262).toString('utf-8');
+  if (magic !== 'ustar') return null;
+  const sizeText = buffer.subarray(124, 136).toString('utf-8').replace(/\0/g, '').trim();
+  const size = parseInt(sizeText || '0', 8);
+  const start = 512;
+  const end = start + size;
+  if (end > buffer.length) return null;
+  return buffer.subarray(start, end).toString('utf-8');
+}
+
 // ============================================================
 // Restore 操作
 // ============================================================
@@ -44,10 +56,11 @@ export async function restore(
     if (fileContent[0] === 0x1f && fileContent[1] === 0x8b) {
       // gzip 压缩格式
       const decompressed = gunzipSync(fileContent);
-      content = decompressed.toString('utf-8');
+      const tarPayload = extractTarPayload(decompressed);
+      content = tarPayload ?? decompressed.toString('utf-8');
     } else {
-      // 纯 JSON 格式
-      content = fileContent.toString('utf-8');
+      const tarPayload = extractTarPayload(fileContent);
+      content = tarPayload ?? fileContent.toString('utf-8');
     }
 
     const backupData = JSON.parse(content) as {
@@ -92,6 +105,15 @@ export async function restore(
           format_version: backupData.format_version,
           compatible: true,
           error: '实体数据校验和不匹配',
+        };
+      }
+      const relationsChecksum = computeChecksum(JSON.stringify(backupData.relations));
+      if (relationsChecksum !== backupData.checksums.relations) {
+        return {
+          success: false,
+          format_version: backupData.format_version,
+          compatible: true,
+          error: '关系数据校验和不匹配',
         };
       }
     }

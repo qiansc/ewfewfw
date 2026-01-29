@@ -21,6 +21,11 @@ function createContext(graph: InMemoryGraph, defaultProject = 'alpha'): AdapterC
       dbPath: 'memory',
       defaultProject,
       enableVectorSearch: false,
+      repoId: null,
+      feat: {
+        concurrent_warning: true,
+        auto_notify: false,
+      },
     },
   };
 }

@@ -115,4 +115,28 @@
 - 类型检查通过
 - 代码风格符合项目规范
 
-**下一步**: 继续任务 6.11 (Embedding 生成)
+**Part 06 任务 6.1-6.10 已完成，后续任务 6.11-6.33 也已全部完成。**
+
+---
+
+## Part 06 完整实现清单（更新于 2026-01-29）
+
+| 任务范围 | 功能 | 实现文件 | 状态 |
+|---------|------|----------|:----:|
+| 6.1-6.10 | SQLite Schema | `sqlite-store.ts` | ✅ |
+| 6.11-6.12 | Embedding 生成 | `vector-search.ts` | ✅ |
+| 6.13-6.18 | 向量搜索 + 图查询 | `write-queue.ts`, `in-memory-graph.ts`, `graph-query-cache.ts` | ✅ |
+| 6.19-6.25 | 模式切换逻辑 | `mode-switch.ts`, `modeSwitchBackup.ts`, `modeSwitchRestore.ts` | ✅ |
+| 6.26-6.27 | 已知限制 + 最佳实践 | 文档 | ✅ |
+| 6.28 | 性能测试 | `benchmark.ts` | ✅ |
+| 6.29-6.33 | FAQ、验证命令 | 文档 + 测试 | ✅ |
+
+### 测试验证
+
+```
+bun test v1.3.5
+193 pass, 0 fail, 477 expect() calls
+Ran 193 tests across 28 files
+```
+
+**Part 06 全部完成，无遗留任务。**
