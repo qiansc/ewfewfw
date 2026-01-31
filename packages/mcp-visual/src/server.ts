@@ -51,7 +51,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `GENERATE_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -83,7 +83,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `RENDER_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -115,7 +115,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `LIST_TEMPLATES_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -145,7 +145,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `RENDER_TEMPLATE_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -177,7 +177,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `SAVE_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -207,7 +207,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `GET_REFERENCE_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -239,7 +239,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `RENDER_C4_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -271,7 +271,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `CLEANUP_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -301,7 +301,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `STORAGE_STATS_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -332,7 +332,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `GET_STYLE_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -342,4 +342,31 @@ export function createServer(): McpServer {
   );
 
   return server;
+}
+
+interface ErrorResponse {
+  code: string;
+  message: string;
+  details?: {
+    field?: string;
+    expected?: string;
+    actual?: string;
+    suggestion?: string;
+  };
+  timestamp: string;
+  request_id?: string;
+  recoverable_actions?: Array<{
+    action: string;
+    label: string;
+    params?: object;
+  }>;
+}
+
+function buildErrorResponse(error: unknown): ErrorResponse {
+  const message = error instanceof Error ? error.message : String(error);
+  return {
+    code: "C4A-VISUAL-001",
+    message,
+    timestamp: new Date().toISOString(),
+  };
 }

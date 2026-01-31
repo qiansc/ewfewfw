@@ -91,7 +91,22 @@ export function detectFeatConflicts(
   for (const entity of featEntities) {
     const mainEntity = storage.getMainEntityForConflict(entity.id, entity.source_project);
 
-    if (mainEntity && mainEntity.content_hash !== entity.content_hash) {
+    if (!mainEntity) {
+      continue;
+    }
+
+    if (mainEntity.type !== entity.type || (mainEntity.kind ?? null) !== (entity.kind ?? null)) {
+      conflicts.push({
+        entity_id: entity.id,
+        conflict_type: 'type',
+        main_branch: JSON.parse(mainEntity.data),
+        feat_branch: JSON.parse(entity.data),
+        suggested_resolution: 'keep_feat',
+      });
+      continue;
+    }
+
+    if (mainEntity.content_hash !== entity.content_hash) {
       conflicts.push({
         entity_id: entity.id,
         conflict_type: 'both_modified',

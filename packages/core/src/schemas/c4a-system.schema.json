@@ -55,6 +55,11 @@
           "$ref": "c4a-common.schema.json#/$defs/tags",
           "description": "分类标签"
         },
+        "references": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "引用其他实体（跨层级/跨项目）"
+        },
         "corresponds_to": {
           "type": "string",
           "description": "对应的 Product ID（1:1 双视角映射）"

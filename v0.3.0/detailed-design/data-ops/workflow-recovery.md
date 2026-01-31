@@ -25,7 +25,31 @@
 
 ## 2. 数据结构
 
-### 2.1 workflow_steps 字段
+### 2.1 workflow_states 表（整体状态）
+
+为便于快速查询与恢复，Workflow 运行时状态会写入独立表 `workflow_states`：
+
+```sql
+CREATE TABLE IF NOT EXISTS workflow_states (
+  id TEXT PRIMARY KEY,
+  workflow_type TEXT NOT NULL,
+  current_step INTEGER DEFAULT 0,
+  total_steps INTEGER NOT NULL,
+  state TEXT DEFAULT 'pending',  -- pending/running/paused/completed/failed
+  context_json TEXT,              -- steps 快照 + checkpoint
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_workflow_states_state ON workflow_states(state);
+```
+
+**职责划分**：
+- `workflow_states`：整体状态与进度（便于列表/查询），`context_json` 保存步骤快照与 checkpoint。
+- `feats.workflow_steps`：步骤级细节（每个步骤的 status/metadata），用于精细恢复与审计。
+
+两者都是**运行时状态**，不参与本地文件同步。
+
+### 2.2 workflow_steps 字段
 
 将流程步骤记录在 Feat 元数据的 `workflow_steps` 字段中：
 
@@ -69,7 +93,7 @@ workflow_steps:
       workflow: /c4a:know:learn
 ```
 
-### 2.2 步骤状态
+### 2.3 步骤状态
 
 ```
 pending → in_progress → completed
@@ -84,7 +108,7 @@ pending → in_progress → completed
 | `completed` | 已完成 |
 | `failed` | 执行失败 |
 
-### 2.3 步骤类型
+### 2.4 步骤类型
 
 | 步骤类型 | 说明 | 完成判定 |
 |---------|------|---------|

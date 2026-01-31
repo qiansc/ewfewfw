@@ -256,6 +256,18 @@ export const ERROR_MESSAGES: Record<ErrorCode, { zh: string; en: string }> = {
 // ============================================================================
 
 /**
+ * 可恢复操作
+ */
+export interface RecoverableAction {
+  /** 操作标识 */
+  action: string;
+  /** 操作描述 */
+  label: string;
+  /** 重试时需要的参数 */
+  params?: Record<string, unknown>;
+}
+
+/**
  * 错误详情
  */
 export interface ErrorDetails {
@@ -272,7 +284,7 @@ export interface ErrorDetails {
   /** 相关项目 */
   project?: string;
   /** 可恢复操作 */
-  recoverable_actions?: string[];
+  recoverable_actions?: RecoverableAction[];
   /** 扩展数据 */
   [key: string]: unknown;
 }
@@ -291,6 +303,8 @@ export interface ErrorResponse {
   timestamp: string;
   /** 请求 ID */
   request_id?: string;
+  /** 可恢复操作 */
+  recoverable_actions?: RecoverableAction[];
 }
 
 // ============================================================================
@@ -492,111 +506,21 @@ export function isRecoverableError(error: C4AError): boolean {
 // ============================================================================
 
 /**
- * MCP 工具调用结果状态
- */
-export type McpResultStatus = 'success' | 'error' | 'warning';
-
-/**
  * MCP 错误响应格式
- * 用于 MCP 工具返回错误时的标准格式
+ *
+ * MCP 层与 HTTP API 共用错误结构。
  */
-export interface McpErrorResponse {
-  /** 状态 */
-  status: 'error';
-  /** 错误码 */
-  code: ErrorCode;
-  /** 错误消息 */
-  message: string;
-  /** 详细信息 */
-  details?: ErrorDetails;
-  /** 可恢复操作建议 */
-  recoverable_actions?: string[];
-}
-
-/**
- * MCP 警告响应格式
- * 用于操作成功但有警告的情况
- */
-export interface McpWarningResponse<T = unknown> {
-  /** 状态 */
-  status: 'warning';
-  /** 警告码 */
-  code: ErrorCode;
-  /** 警告消息 */
-  message: string;
-  /** 实际返回数据 */
-  data?: T;
-  /** 详细信息 */
-  details?: ErrorDetails;
-}
-
-/**
- * MCP 成功响应格式
- */
-export interface McpSuccessResponse<T = unknown> {
-  /** 状态 */
-  status: 'success';
-  /** 返回数据 */
-  data: T;
-  /** 可选消息 */
-  message?: string;
-}
-
-/**
- * MCP 响应联合类型
- */
-export type McpResponse<T = unknown> =
-  | McpSuccessResponse<T>
-  | McpWarningResponse<T>
-  | McpErrorResponse;
+export type McpErrorResponse = ErrorResponse;
 
 /**
  * 将 C4AError 转换为 MCP 错误响应
  */
 export function toMcpErrorResponse(error: C4AError): McpErrorResponse {
-  const response: McpErrorResponse = {
-    status: 'error',
-    code: error.code,
-    message: error.message,
-  };
-
-  if (error.details) {
-    response.details = error.details;
-    if (error.details.recoverable_actions) {
-      response.recoverable_actions = error.details.recoverable_actions as string[];
-    }
+  const response = error.toResponse();
+  if (error.details?.recoverable_actions) {
+    response.recoverable_actions = error.details.recoverable_actions;
   }
-
   return response;
-}
-
-/**
- * 创建 MCP 成功响应
- */
-export function toMcpSuccessResponse<T>(data: T, message?: string): McpSuccessResponse<T> {
-  return {
-    status: 'success',
-    data,
-    message,
-  };
-}
-
-/**
- * 创建 MCP 警告响应
- */
-export function toMcpWarningResponse<T>(
-  code: ErrorCode,
-  message: string,
-  data?: T,
-  details?: ErrorDetails,
-): McpWarningResponse<T> {
-  return {
-    status: 'warning',
-    code,
-    message,
-    data,
-    details,
-  };
 }
 
 /**
@@ -610,8 +534,8 @@ export function errorToMcpResponse(error: unknown): McpErrorResponse {
   // 未知错误转换为系统错误
   const message = error instanceof Error ? error.message : String(error);
   return {
-    status: 'error',
     code: SYS_ERROR_CODES.INTERNAL_ERROR,
     message: `内部错误: ${message}`,
+    timestamp: new Date().toISOString(),
   };
 }

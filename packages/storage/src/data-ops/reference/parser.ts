@@ -1,3 +1,4 @@
+import { isReferenceScope } from './types.js';
 import type { ParsedReference } from './types.js';
 
 /**
@@ -52,10 +53,13 @@ export function parseReference(ref: string): ParsedReference {
   // Scope reference: scope:{scope}/{id}
   const scopeMatch = value.match(/^scope:([^\/]+)\/(.+)$/);
   if (scopeMatch) {
+    if (!isReferenceScope(scopeMatch[1])) {
+      throw new Error(`Invalid scope: ${scopeMatch[1]}`);
+    }
     return {
       original: ref,
       format: 'scope',
-      scope: scopeMatch[1] as ParsedReference['scope'],
+      scope: scopeMatch[1],
       id: scopeMatch[2]
     };
   }

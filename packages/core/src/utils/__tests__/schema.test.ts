@@ -22,18 +22,22 @@ describe('validateEntity', () => {
 
   test('validates checklist entity', () => {
     const checklist = {
-      id: 'checklist-001',
-      feat_id: 'feat-a001-test',
-      title: 'Release Checklist',
+      version: '1.0',
+      metadata: {
+        feat_id: 'feat-a001-test',
+        generated_at: new Date().toISOString(),
+        source: 'technical_spec',
+      },
+      updated_at: new Date().toISOString(),
+      updated_by: 'tester',
       items: [
         {
-          id: 'item-1',
-          content: 'Run tests',
-          type: 'task',
+          id: 'task-1',
+          title: 'Run tests',
+          type: 'test',
           status: 'pending',
         },
       ],
-      created_at: new Date().toISOString(),
     };
 
     const result = validateEntity(checklist, 'checklist');

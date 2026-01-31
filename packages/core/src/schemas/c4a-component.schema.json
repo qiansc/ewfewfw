@@ -64,6 +64,11 @@
           "type": "array",
           "items": { "type": "string" },
           "description": "实现的契约 ID 列表"
+        },
+        "references": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "引用其他实体（跨层级/跨项目）"
         }
       }
     },

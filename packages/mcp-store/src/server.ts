@@ -69,7 +69,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `STORE_SAVE_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -99,7 +99,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `STORE_READ_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -129,7 +129,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `STORE_LIST_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -159,7 +159,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `STORE_DELETE_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -189,7 +189,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `STORE_SYNC_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -219,7 +219,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `STORE_PLAN_SYNC_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -249,7 +249,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `STORE_FEAT_LIFECYCLE_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -279,7 +279,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `STORE_FEAT_MERGE_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -309,7 +309,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `STORE_FEAT_CHECKLIST_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -339,7 +339,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `STORE_UPDATE_WORKFLOW_STEP_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -369,7 +369,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `STORE_READ_HISTORY_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -399,7 +399,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `STORE_BACKUP_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -429,7 +429,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `STORE_RESTORE_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -459,7 +459,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `STORE_REPAIR_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -489,7 +489,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `STORE_VALIDATE_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -499,4 +499,31 @@ export function createServer(): McpServer {
   );
 
   return server;
+}
+
+interface ErrorResponse {
+  code: string;
+  message: string;
+  details?: {
+    field?: string;
+    expected?: string;
+    actual?: string;
+    suggestion?: string;
+  };
+  timestamp: string;
+  request_id?: string;
+  recoverable_actions?: Array<{
+    action: string;
+    label: string;
+    params?: object;
+  }>;
+}
+
+function buildErrorResponse(error: unknown): ErrorResponse {
+  const message = error instanceof Error ? error.message : String(error);
+  return {
+    code: "C4A-STORE-001",
+    message,
+    timestamp: new Date().toISOString(),
+  };
 }

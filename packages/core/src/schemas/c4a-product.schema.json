@@ -48,6 +48,11 @@
         "tags": {
           "$ref": "c4a-common.schema.json#/$defs/tags"
         },
+        "references": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "引用其他实体（跨层级/跨项目）"
+        },
         "based_on": {
           "type": "string",
           "description": "基于哪个上层 Product"

@@ -59,15 +59,24 @@ function createStorageOperationsWithDb(db: Database, inTransaction: boolean): St
 
     getFeat(featId: string): FeatRecord | null {
       const feat = db.prepare(`
-        SELECT id, status, workflow_steps, updated_at
+        SELECT id, status, checklist, checklist_version, workflow_steps, updated_at
         FROM feats WHERE id = ?
       `).get(featId) as
-        | { id: string; status: FeatStatus; workflow_steps: string | null; updated_at: string }
+        | {
+            id: string;
+            status: FeatStatus;
+            checklist: string | null;
+            checklist_version: string | null;
+            workflow_steps: string | null;
+            updated_at: string;
+          }
         | undefined;
       if (!feat) return null;
       return {
         id: feat.id,
         status: feat.status,
+        checklist: feat.checklist,
+        checklist_version: feat.checklist_version,
         workflow_steps: feat.workflow_steps,
         updated_at: feat.updated_at,
       };
@@ -104,10 +113,27 @@ function createStorageOperationsWithDb(db: Database, inTransaction: boolean): St
       return { affectedRows: result.changes ?? 0 };
     },
 
+    updateFeatChecklist(params): UpdateResult {
+      const result = db.prepare(`
+        UPDATE feats
+        SET checklist = ?, checklist_version = ?, updated_at = ?
+        WHERE id = ? AND checklist_version IS ? AND updated_at = ?
+      `).run(
+        params.checklist,
+        params.checklistVersion,
+        params.updatedAt,
+        params.featId,
+        params.expectedVersion,
+        params.expectedUpdatedAt
+      );
+      return { affectedRows: result.changes ?? 0 };
+    },
+
     clearFeatChecklist(featId: string): void {
+      const now = new Date().toISOString();
       db.prepare(`
-        UPDATE feats SET checklist = NULL WHERE id = ?
-      `).run(featId);
+        UPDATE feats SET checklist = NULL, checklist_version = NULL, updated_at = ? WHERE id = ?
+      `).run(now, featId);
     },
 
     deleteFeat(featId: string): void {
@@ -127,7 +153,7 @@ function createStorageOperationsWithDb(db: Database, inTransaction: boolean): St
 
     listFeatEntitiesForConflict(featId: string): FeatEntityConflictRow[] {
       return db.prepare(`
-        SELECT e.id, e.source_project, e.data, m.content_hash
+        SELECT e.id, e.source_project, e.type, e.kind, e.data, m.content_hash
         FROM entities e
         JOIN metadata m ON e.source_project = m.source_project
           AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
@@ -140,7 +166,7 @@ function createStorageOperationsWithDb(db: Database, inTransaction: boolean): St
       sourceProject: string
     ): MainEntityConflictRow | null {
       const row = db.prepare(`
-        SELECT e.data, m.content_hash
+        SELECT e.type, e.kind, e.data, m.content_hash
         FROM entities e
         JOIN metadata m ON e.source_project = m.source_project
           AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
@@ -474,6 +500,185 @@ function createStorageOperationsWithDb(db: Database, inTransaction: boolean): St
         data: string;
         content_hash: string;
       }>;
+    },
+
+    getEntityInFeat(params: { entityId: string; featId: string }): Entity | null {
+      const row = db.prepare(`
+        SELECT e.id, e.source_project, e.proposal_id, e.type, e.kind, e.scope, e.perspective, e.data,
+               m.status, m.content_hash, m.created_at, m.updated_at, m.source_repo, m.external_url,
+               m.created_by, m.updated_by
+        FROM entities e
+        JOIN metadata m ON e.source_project = m.source_project
+          AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+        WHERE e.id = ? AND e.proposal_id = ?
+      `).get(params.entityId, params.featId) as EntityRow | undefined;
+      return row ? rowToEntity(row) : null;
+    },
+
+    listMainEntities(entityId: string): Entity[] {
+      const rows = db.prepare(`
+        SELECT e.id, e.source_project, e.proposal_id, e.type, e.kind, e.scope, e.perspective, e.data,
+               m.status, m.content_hash, m.created_at, m.updated_at, m.source_repo, m.external_url,
+               m.created_by, m.updated_by
+        FROM entities e
+        JOIN metadata m ON e.source_project = m.source_project
+          AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+        WHERE e.id = ? AND (e.proposal_id IS NULL OR e.proposal_id = '')
+      `).all(entityId) as EntityRow[];
+      return rows.map(rowToEntity);
+    },
+
+    insertEntityWithMetadata(params): void {
+      const proposalId = params.proposalId;
+      const entity = params.entity;
+      const metadata = entity.metadata;
+
+      db.prepare(`
+        INSERT INTO entities (id, source_project, proposal_id, type, kind, scope, perspective, data)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        entity.id,
+        metadata.source_project,
+        proposalId,
+        entity.type,
+        entity.kind ?? null,
+        entity.scope ?? null,
+        entity.perspective ?? null,
+        JSON.stringify(entity.data)
+      );
+
+      db.prepare(`
+        INSERT INTO metadata (
+          entity_id,
+          source_project,
+          proposal_id,
+          source_repo,
+          external_url,
+          status,
+          content_hash,
+          created_at,
+          updated_at,
+          created_by,
+          updated_by
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        entity.id,
+        metadata.source_project,
+        proposalId,
+        metadata.source_repo ?? null,
+        metadata.external_url ?? null,
+        params.status,
+        metadata.content_hash,
+        params.createdAt,
+        params.updatedAt,
+        metadata.created_by ?? null,
+        metadata.updated_by ?? null
+      );
+    },
+
+    getWorkflowStateRecord(workflowId: string) {
+      const row = db.prepare(`
+        SELECT id, workflow_type, current_step, total_steps, state, context_json, created_at, updated_at
+        FROM workflow_states WHERE id = ?
+      `).get(workflowId) as
+        | {
+            id: string;
+            workflow_type: string;
+            current_step: number;
+            total_steps: number;
+            state: string;
+            context_json: string | null;
+            created_at: string;
+            updated_at: string;
+          }
+        | undefined;
+      if (!row) return null;
+      return {
+        id: row.id,
+        workflow_type: row.workflow_type,
+        current_step: row.current_step,
+        total_steps: row.total_steps,
+        state: row.state as 'pending' | 'running' | 'paused' | 'completed' | 'failed',
+        context_json: row.context_json,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      };
+    },
+
+    upsertWorkflowState(record): void {
+      db.prepare(
+        `
+          INSERT INTO workflow_states (
+            id, workflow_type, current_step, total_steps, state, context_json, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            workflow_type = excluded.workflow_type,
+            current_step = excluded.current_step,
+            total_steps = excluded.total_steps,
+            state = excluded.state,
+            context_json = excluded.context_json,
+            updated_at = excluded.updated_at
+        `
+      ).run(
+        record.id,
+        record.workflow_type,
+        record.current_step,
+        record.total_steps,
+        record.state,
+        record.context_json ?? null,
+        record.created_at,
+        record.updated_at
+      );
+    },
+
+    markEntitiesOrphaned(proposalId: string, timestamp: string): void {
+      db.prepare(
+        `
+          UPDATE entities
+          SET orphaned = 1, orphaned_at = ?
+          WHERE proposal_id = ? AND orphaned = 0
+        `
+      ).run(timestamp, proposalId);
+    },
+
+    cleanupOrphanedEntities(cutoff: string) {
+      const orphanedRows = db
+        .prepare(
+          `
+            SELECT id, source_project, proposal_id
+            FROM entities
+            WHERE orphaned = 1 AND orphaned_at IS NOT NULL AND orphaned_at <= ?
+          `
+        )
+        .all(cutoff) as Array<{ id: string; source_project: string; proposal_id: string }>;
+
+      for (const row of orphanedRows) {
+        db.prepare(
+          `
+            DELETE FROM metadata
+            WHERE entity_id = ? AND source_project = ? AND proposal_id = ?
+          `
+        ).run(row.id, row.source_project, row.proposal_id);
+
+        db.prepare(
+          `
+            DELETE FROM relations
+            WHERE proposal_id = ? AND (from_id = ? OR to_id = ?)
+          `
+        ).run(row.proposal_id, row.id, row.id);
+      }
+
+      if (orphanedRows.length > 0) {
+        db.prepare(
+          `
+            DELETE FROM entities
+            WHERE orphaned = 1 AND orphaned_at IS NOT NULL AND orphaned_at <= ?
+          `
+        ).run(cutoff);
+      }
+
+      return orphanedRows;
     },
   };
 }

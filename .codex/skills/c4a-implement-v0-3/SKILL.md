@@ -1,6 +1,6 @@
 ---
 name: c4a-implement-v0-3
-description: "在 c4a 仓库执行 v0.3.0 计划实现任务的专用流程：按 .claude/commands/v3/implement.md 进行会话初始化、单任务循环、批量验证与会话结束；按需读取设计文档、更新计划勾选与 TodoWrite、记录变更。用于实施 v0.3.0-plan-opus 任务时触发。"
+description: "在 c4a 仓库执行 v0.3.0 计划实现任务的专用流程：按 .claude/commands/v3/implement.md 进行会话初始化、单任务循环、批量验证与会话结束；按需读取设计文档、更新计划勾选与 TodoWrite（如有）、记录变更。用于实施 v0.3.0-plan-opus 任务时触发。"
 ---
 
 # C4A v0.3.0 实现流程
@@ -20,7 +20,7 @@ description: "在 c4a 仓库执行 v0.3.0 计划实现任务的专用流程：�
 ### Phase 1: 会话初始化（必须完成）
 
 - 读取 `v0.3.0-plan-opus/summary.md` 与对应 Part 详细计划
-- 使用 `TodoWrite` 仅创建 **下一个任务** 的 todo
+- 使用 `TodoWrite` 仅创建 **下一个任务** 的 todo，如无 TodoWrite 则用文本来表达
 - 输出当前位置与任务信息，并在进入 Phase 2 前等待用户确认
 
 ### Phase 2: 单任务执行（循环）
@@ -28,7 +28,7 @@ description: "在 c4a 仓库执行 v0.3.0 计划实现任务的专用流程：�
 - **按需读取设计文档**：仅用 `Read` 的 offset + limit 读取任务引用的行号范围，禁止整文件读取
 - 在计划表中勾选“已读”与“已实现”
 - 按设计实现：写代码、按需修改；发现设计问题 → 记录到 `v0.3.0-plan-opus/change/`
-- `TodoWrite` 完成当前任务并添加下一个任务
+- `TodoWrite` 完成当前任务并添加下一个任务，如无 TodoWrite 则用文本来表达
 - 判断验证断点：满足条件则进入 Phase 3，否则继续下一任务
 
 ### Phase 3: 批量验证

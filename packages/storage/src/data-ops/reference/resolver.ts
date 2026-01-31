@@ -1,9 +1,8 @@
 import { parseReference } from './parser.js';
+import { normalizeReferenceScope } from './types.js';
 import type { ReferenceCandidate, ResolvedReference, ResolveContext } from './types.js';
 import type { Entity } from '../../adapter.js';
-import type { EntityRow } from '../../lite-adapter/types.js';
-import { rowToEntity } from '../../lite-adapter/helpers.js';
-import { SQLiteStore } from '../../sqlite-store.js';
+import type { StorageOperations } from '../types.js';
 
 type ResolutionBucket =
   | 'current_project'
@@ -31,8 +30,7 @@ function normalizeProjectId(value?: string | null): string | null {
 }
 
 function normalizeScope(value?: string | null): ResolvedReference['scope'] | null {
-  if (!value) return null;
-  return value;
+  return normalizeReferenceScope(value);
 }
 
 function hasLookupContext(context: ResolveContext): boolean {
@@ -85,7 +83,9 @@ function bucketizeCandidates(
     }
 
     if (candidateProject && currentProject && candidateProject === currentProject) {
-      buckets.get('current_project')?.push(candidate);
+      if (!candidateRepo || !currentRepo || candidateRepo === currentRepo) {
+        buckets.get('current_project')?.push(candidate);
+      }
     }
   }
 
@@ -286,7 +286,12 @@ export function resolveReference(ref: string, context: ResolveContext): Resolved
 /**
  * Copy-on-Write: 从主分支复制实体到目标 feat 分支
  */
-export function copyOnWrite(entityId: string, targetFeatId: string): Entity {
+export function copyOnWrite(
+  storage: StorageOperations,
+  entityId: string,
+  targetFeatId: string,
+  sourceProject?: string | null
+): Entity {
   if (!entityId) {
     throw new Error('entityId is required');
   }
@@ -294,96 +299,46 @@ export function copyOnWrite(entityId: string, targetFeatId: string): Entity {
     throw new Error('targetFeatId is required');
   }
 
-  const store = SQLiteStore.getInstance();
-  const db = store.getDatabase();
-
-  const selectSql = `
-    SELECT e.id, e.source_project, e.proposal_id, e.type, e.kind, e.scope, e.perspective, e.data,
-           m.status, m.content_hash, m.created_at, m.updated_at, m.source_repo, m.external_url,
-           m.created_by, m.updated_by
-    FROM entities e
-    JOIN metadata m ON e.source_project = m.source_project
-      AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
-    WHERE e.id = ? AND e.proposal_id = ?
-  `;
-
-  const existing = db.prepare(selectSql).get(entityId, targetFeatId) as EntityRow | undefined;
+  const existing = storage.getEntityInFeat({ entityId, featId: targetFeatId });
   if (existing) {
-    return rowToEntity(existing);
+    return existing;
   }
 
-  const mainRows = db.prepare(`
-    SELECT e.id, e.source_project, e.proposal_id, e.type, e.kind, e.scope, e.perspective, e.data,
-           m.status, m.content_hash, m.created_at, m.updated_at, m.source_repo, m.external_url,
-           m.created_by, m.updated_by
-    FROM entities e
-    JOIN metadata m ON e.source_project = m.source_project
-      AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
-    WHERE e.id = ? AND (e.proposal_id IS NULL OR e.proposal_id = '')
-  `).all(entityId) as EntityRow[];
+  const mainRows = storage.listMainEntities(entityId);
+  const scopedProject = sourceProject ?? null;
+  const scopedRows = scopedProject === null
+    ? mainRows
+    : mainRows.filter((row) => row.metadata.source_project === scopedProject);
 
-  if (mainRows.length === 0) {
+  if (scopedRows.length === 0) {
+    if (scopedProject) {
+      throw new Error(`Entity '${entityId}' not found in main branch for project '${scopedProject}'`);
+    }
     throw new Error(`Entity '${entityId}' not found in main branch`);
   }
-  if (mainRows.length > 1) {
+  if (scopedRows.length > 1) {
     throw new Error(`Ambiguous entity '${entityId}' across multiple projects`);
   }
 
-  const main = mainRows[0];
+  const main = scopedRows[0];
   const now = new Date().toISOString();
 
-  const insertEntity = db.prepare(`
-    INSERT INTO entities (id, source_project, proposal_id, type, kind, scope, perspective, data)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  const insertMetadata = db.prepare(`
-    INSERT INTO metadata (
-      entity_id,
-      source_project,
-      proposal_id,
-      source_repo,
-      external_url,
-      status,
-      content_hash,
-      created_at,
-      updated_at,
-      created_by,
-      updated_by
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
+  storage.insertEntityWithMetadata({
+    entity: main,
+    proposalId: targetFeatId,
+    status: 'draft',
+    createdAt: now,
+    updatedAt: now,
+  });
 
-  db.transaction(() => {
-    insertEntity.run(
-      main.id,
-      main.source_project,
-      targetFeatId,
-      main.type,
-      main.kind,
-      main.scope,
-      main.perspective,
-      main.data
-    );
-    insertMetadata.run(
-      main.id,
-      main.source_project,
-      targetFeatId,
-      main.source_repo,
-      main.external_url,
-      'draft',
-      main.content_hash,
-      now,
-      now,
-      main.created_by,
-      main.updated_by
-    );
-  })();
-
-  return rowToEntity({
+  return {
     ...main,
     proposal_id: targetFeatId,
-    status: 'draft',
-    created_at: now,
-    updated_at: now,
-  });
+    metadata: {
+      ...main.metadata,
+      status: 'draft',
+      created_at: now,
+      updated_at: now,
+    },
+  };
 }

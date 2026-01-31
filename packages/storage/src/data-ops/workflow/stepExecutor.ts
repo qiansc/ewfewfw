@@ -36,6 +36,20 @@ export async function executeStep(step: WorkflowStep): Promise<StepResult> {
     return { ...cached, cached: true };
   }
 
+  if (step.checkCompleted) {
+    const completed = await step.checkCompleted();
+    if (completed) {
+      step.status = 'completed';
+      const result: StepResult = {
+        success: true,
+        skipped: true,
+        message: 'step_already_completed',
+      };
+      stepResultCache.set(idempotencyKey, result);
+      return result;
+    }
+  }
+
   if (!step.execute) {
     return { success: false, error: 'missing_step_executor' };
   }

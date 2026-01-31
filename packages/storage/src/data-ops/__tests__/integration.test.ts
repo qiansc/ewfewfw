@@ -1,11 +1,12 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { SQLiteStore } from '../../sqlite-store.js';
 import { InMemoryGraph } from '../../in-memory-graph.js';
 import { GraphQueryCache } from '../../graph-query-cache.js';
-import { createDataOpsContext } from '../../lite-adapter/dataOpsContext.js';
+import { createDataOpsContext, createStorageOperationsFromDatabase } from '../../lite-adapter/dataOpsContext.js';
+import { computeContentHash } from '../../utils/contentHash.js';
 import type { AdapterContext } from '../../lite-adapter/types.js';
 import {
   beginFeatTransaction,
@@ -65,8 +66,7 @@ function resetDb(): void {
 }
 
 function computeHash(data: Record<string, unknown>): string {
-  const content = JSON.stringify(data, Object.keys(data).sort());
-  return createHash('sha256').update(content).digest('hex').slice(0, 16);
+  return computeContentHash(data);
 }
 
 describe('Data Ops integration', () => {
@@ -272,8 +272,9 @@ describe('Data Ops integration', () => {
   test('workflow recovery resumes from checkpoint and cleans orphaned entities', async () => {
     const workflowId = `wf-${randomUUID()}`;
     const executed: string[] = [];
+    const storage = createStorageOperationsFromDatabase(store.getDatabase());
 
-    createWorkflow(workflowId, [
+    createWorkflow(storage, workflowId, [
       {
         id: 'step-1',
         title: 'step-1',
@@ -298,7 +299,7 @@ describe('Data Ops integration', () => {
       },
     ]);
 
-    saveCheckpoint(workflowId, {
+    saveCheckpoint(storage, workflowId, {
       workflow_id: workflowId,
       step_id: 'step-1',
       step_index: 0,
@@ -307,9 +308,9 @@ describe('Data Ops integration', () => {
       created_at: new Date().toISOString(),
     });
 
-    await resumeFromCheckpoint(workflowId);
+    await resumeFromCheckpoint(storage, workflowId);
     expect(executed).toEqual(['step-2', 'step-3']);
-    expect(getWorkflowState(workflowId)).toBe('completed');
+    expect(getWorkflowState(storage, workflowId)).toBe('completed');
 
     const db = store.getDatabase();
     const oldTime = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
@@ -353,7 +354,7 @@ describe('Data Ops integration', () => {
       null
     );
 
-    await cleanupOrphanedEntities(workflowId);
+    await cleanupOrphanedEntities(storage, workflowId);
 
     const orphan = db
       .prepare(`SELECT id FROM entities WHERE id = ? AND proposal_id = ?`)

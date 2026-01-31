@@ -39,163 +39,27 @@
 ### YAML 格式
 
 ```yaml
-# 实现清单元信息
+version: "1.0"
 metadata:
   feat_id: feat-a001-user-login
-  feat_title: 用户登录功能
-  created_at: "2026-01-22T10:00:00Z"
-  updated_at: "2026-01-22T15:30:00Z"
-  created_by: alice
-  status: in_progress  # draft / in_progress / completed
-
-# 进度统计（自动计算）
-progress:
-  total: 10
-  completed: 5
-  in_progress: 2
-  blocked: 1
-  pending: 2
-  completion_rate: 50  # 百分比
-
-# 实现任务列表
-tasks:
+  generated_at: "2026-01-22T10:00:00Z"
+  source: technical_spec
+updated_at: "2026-01-22T15:30:00Z"
+updated_by: alice
+items:
   - id: task-001
     title: 创建 auth-service Container
-    description: 在 Technical Spec 中定义 auth-service 容器
-    type: dsl  # dsl / code / test / doc / contract
-    status: completed  # pending / in_progress / completed / blocked
-    priority: high  # high / medium / low
-    estimated_hours: 2
-    actual_hours: 1.5
+    type: dsl
+    status: completed
+    entity_id: auth-service
     assignee: alice
-    related_entities:
-      - auth-service
-    dependencies: []
     completed_at: "2026-01-22T11:00:00Z"
-    notes: "已创建并保存到数据库"
-
   - id: task-002
     title: 实现 JWT 认证组件
-    description: 实现 jwt-validator Component
-    type: code
-    status: completed
-    priority: high
-    estimated_hours: 4
-    actual_hours: 5
-    assignee: alice
-    related_entities:
-      - jwt-validator
-    dependencies:
-      - task-001
-    completed_at: "2026-01-22T14:00:00Z"
-    notes: "使用 jsonwebtoken 库实现"
-
-  - id: task-003
-    title: 创建登录接口 /api/auth/login
-    description: 实现登录 API 端点
     type: code
     status: in_progress
-    priority: high
-    estimated_hours: 3
-    actual_hours: 1.5
+    entity_id: jwt-validator
     assignee: alice
-    related_entities:
-      - auth-service
-    dependencies:
-      - task-002
-    started_at: "2026-01-22T14:30:00Z"
-    notes: "正在实现参数验证"
-
-  - id: task-004
-    title: 创建 OpenAPI 契约
-    description: 为登录接口创建 OpenAPI 规格
-    type: contract
-    status: in_progress
-    priority: medium
-    estimated_hours: 2
-    actual_hours: 0.5
-    assignee: bob
-    related_entities:
-      - api-auth-login
-    dependencies:
-      - task-003
-    started_at: "2026-01-22T15:00:00Z"
-    notes: "参考现有契约格式"
-
-  - id: task-005
-    title: 编写单元测试
-    description: 为 JWT 认证组件编写单元测试
-    type: test
-    status: blocked
-    priority: high
-    estimated_hours: 3
-    actual_hours: 0
-    assignee: alice
-    related_entities:
-      - jwt-validator
-    dependencies:
-      - task-002
-    blocked_at: "2026-01-22T15:00:00Z"
-    blocked_reason: "等待测试环境配置完成"
-    blocked_by: "DevOps 团队"
-    notes: "需要 Redis 测试实例"
-
-  - id: task-006
-    title: 集成测试
-    description: 端到端测试登录流程
-    type: test
-    status: pending
-    priority: medium
-    estimated_hours: 4
-    assignee: bob
-    related_entities:
-      - auth-service
-    dependencies:
-      - task-003
-      - task-005
-
-  - id: task-007
-    title: 更新 API 文档
-    description: 更新用户文档，说明登录接口使用方法
-    type: doc
-    status: pending
-    priority: low
-    estimated_hours: 1
-    assignee: bob
-    related_entities:
-      - auth-service
-    dependencies:
-      - task-004
-
-# 风险和问题
-risks:
-  - id: risk-001
-    title: 测试环境延迟
-    description: 测试环境配置延迟可能影响进度
-    severity: high  # high / medium / low
-    probability: medium
-    impact: "可能延迟 2-3 天"
-    mitigation: "与 DevOps 团队协调，优先配置测试环境"
-    status: open  # open / mitigated / closed
-
-# 变更记录
-changes:
-  - timestamp: "2026-01-22T10:00:00Z"
-    user: alice
-    action: created
-    description: "创建实现清单"
-
-  - timestamp: "2026-01-22T11:00:00Z"
-    user: alice
-    action: task_completed
-    task_id: task-001
-    description: "完成 auth-service Container 创建"
-
-  - timestamp: "2026-01-22T15:00:00Z"
-    user: alice
-    action: task_blocked
-    task_id: task-005
-    description: "单元测试被阻塞，等待测试环境"
 ```
 
 ### 字段说明
@@ -212,11 +76,7 @@ changes:
 - `in_progress`: 进行中
 - `completed`: 已完成
 - `blocked`: 已阻塞
-
-**优先级（priority）**：
-- `high`: 高优先级（阻塞其他任务）
-- `medium`: 中优先级
-- `low`: 低优先级（可延后）
+- `skipped`: 已跳过
 
 ### 使用方式
 
@@ -275,4 +135,3 @@ c4a_store_feat_checklist({
 > **映射关系**：Skill 层的 `/c4a:implement --complete task-003` 等命令由 Agent 内部转换为对应的 MCP 工具调用。
 
 ---
-

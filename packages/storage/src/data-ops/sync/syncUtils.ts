@@ -1,5 +1,4 @@
 export const EXCLUDED_TYPES = new Set<string>(['contract', 'checklist']);
-export const TIMESTAMP_EPSILON_MS = 1000;
 
 export function isExcludedType(type: string | null | undefined): boolean {
   if (!type) {
@@ -33,22 +32,4 @@ export function extractEntityMeta(data: Record<string, unknown>): {
     scope: pickString(data.scope),
     perspective: pickString(data.perspective),
   };
-}
-
-export function decideDirection(
-  dbUpdatedAt?: string,
-  fileMtime?: string
-): 'db' | 'file' | 'conflict' {
-  if (!dbUpdatedAt || !fileMtime) {
-    return 'conflict';
-  }
-  const dbTime = Date.parse(dbUpdatedAt);
-  const fileTime = Date.parse(fileMtime);
-  if (Number.isNaN(dbTime) || Number.isNaN(fileTime)) {
-    return 'conflict';
-  }
-  if (Math.abs(dbTime - fileTime) <= TIMESTAMP_EPSILON_MS) {
-    return 'conflict';
-  }
-  return dbTime > fileTime ? 'db' : 'file';
 }

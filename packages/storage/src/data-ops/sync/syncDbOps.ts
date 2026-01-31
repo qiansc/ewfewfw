@@ -9,14 +9,13 @@ import type {
   SyncDetail,
   SyncStats,
 } from './types.js';
-import { detectConflicts } from './conflictDetector.js';
 import {
   buildEntityFilePath,
   ensureDir,
   readFileEntityData,
   stringifyEntity,
 } from './syncFileOps.js';
-import { decideDirection, extractEntityMeta, isExcludedType, safeParseJson } from './syncUtils.js';
+import { extractEntityMeta, isExcludedType, safeParseJson } from './syncUtils.js';
 
 export function syncDbToFile(params: {
   ctx: DataOpsContext;
@@ -26,9 +25,11 @@ export function syncDbToFile(params: {
   mode: 'incremental' | 'full';
   format: ExportFormat;
   featId: string | null;
+  conflictPolicy: 'warn' | 'skip' | 'override' | 'prompt';
   stats: SyncStats;
   warnings: string[];
   details: SyncDetail[];
+  conflicts: ConflictInfo[];
 }): void {
   for (const entity of params.dbEntities) {
     if (isExcludedType(entity.type)) {
@@ -48,12 +49,37 @@ export function syncDbToFile(params: {
     }
 
     const fileInfo = params.fileMap.get(entity.id);
-    const decision = shouldWriteFile(entity, fileInfo, params.mode);
+    if (fileInfo && fileInfo.content_hash !== entity.content_hash) {
+      const conflict: ConflictInfo = {
+        entity_id: entity.id,
+        conflict_type: 'content',
+        db_hash: entity.content_hash,
+        file_hash: fileInfo.content_hash,
+        db_updated_at: entity.updated_at,
+        file_mtime: fileInfo.mtime,
+        file_path: fileInfo.path,
+        reason: '本地文件已修改',
+      };
+      params.conflicts.push(conflict);
+      params.stats.conflicted++;
 
-    if (decision === 'skip') {
-      params.stats.skipped++;
-      params.details.push({ entity_id: entity.id, action: 'skipped', path });
-      continue;
+      if (params.conflictPolicy === 'prompt' || params.conflictPolicy === 'skip') {
+        params.stats.skipped++;
+        params.details.push({ entity_id: entity.id, action: 'conflict', path });
+        continue;
+      }
+
+      if (params.conflictPolicy === 'warn') {
+        params.warnings.push(`检测到冲突文件 ${fileInfo.path}，已使用数据库版本覆盖`);
+      }
+      // override/warn: 继续写入数据库版本
+    } else {
+      const decision = shouldWriteFile(entity, fileInfo, params.mode);
+      if (decision === 'skip') {
+        params.stats.skipped++;
+        params.details.push({ entity_id: entity.id, action: 'skipped', path });
+        continue;
+      }
     }
 
     const content = stringifyEntity(entity.data ?? {}, params.format);
@@ -163,19 +189,12 @@ export function syncBidirectional(params: {
   contextRoot: string;
   format: ExportFormat;
   featId: string | null;
+  conflictPolicy: 'warn' | 'skip' | 'override' | 'prompt';
   stats: SyncStats;
   conflicts: ConflictInfo[];
   warnings: string[];
   details: SyncDetail[];
 }): void {
-  const dbEntities = Array.from(params.dbMap.values());
-  const fileEntities = Array.from(params.fileMap.values());
-  const detectedConflicts = detectConflicts(dbEntities, fileEntities);
-  const conflictMap = new Map<string, ConflictInfo>();
-  for (const conflict of detectedConflicts) {
-    conflictMap.set(conflict.entity_id, conflict);
-  }
-
   for (const entityId of params.allIds) {
     const dbEntity = params.dbMap.get(entityId);
     const fileEntity = params.fileMap.get(entityId);
@@ -271,87 +290,25 @@ export function syncBidirectional(params: {
       continue;
     }
 
-    const conflict = conflictMap.get(entityId);
-    if (conflict && conflict.conflict_type === 'type') {
-      params.conflicts.push(conflict);
+    const declaredType = fileEntity.declared_type ?? fileEntity.type;
+    const pathType = fileEntity.path_type ?? fileEntity.type;
+    const typeMismatch =
+      dbEntity.type !== fileEntity.type || declaredType !== dbEntity.type || pathType !== dbEntity.type;
+    if (typeMismatch) {
+      params.conflicts.push({
+        entity_id: entityId,
+        conflict_type: 'type',
+        db_type: dbEntity.type,
+        file_type: fileEntity.type,
+        file_path: fileEntity.path,
+        reason: '实体类型不一致',
+      });
       params.stats.conflicted++;
       continue;
     }
 
     if (dbEntity.content_hash === fileEntity.content_hash) {
       params.stats.skipped++;
-      continue;
-    }
-
-    const decision = decideDirection(dbEntity.updated_at, fileEntity.mtime);
-    if (decision === 'file') {
-      const data = readFileEntityData(fileEntity.path);
-      if (!data) {
-        params.stats.failed++;
-        params.details.push({
-          entity_id: fileEntity.id,
-          action: 'failed',
-          path: fileEntity.path,
-          error: '无法解析文件内容',
-        });
-        continue;
-      }
-
-      try {
-        params.ctx.storage.updateEntity({
-          entityId: fileEntity.id,
-          sourceProject: params.ctx.config.defaultProject,
-          proposalId: params.featId ?? null,
-          entityType: fileEntity.type,
-          data,
-          contentHash: fileEntity.content_hash,
-          updatedAt: fileEntity.mtime ?? new Date().toISOString(),
-        });
-        params.stats.updated++;
-        params.details.push({
-          entity_id: fileEntity.id,
-          action: 'updated',
-          path: fileEntity.path,
-        });
-      } catch (error) {
-        params.stats.failed++;
-        params.details.push({
-          entity_id: fileEntity.id,
-          action: 'failed',
-          path: fileEntity.path,
-          error: String(error),
-        });
-      }
-      continue;
-    }
-
-    if (decision === 'db') {
-      const path = buildEntityFilePath(dbEntity, params.contextRoot, params.format, params.featId);
-      if (!path) {
-        params.stats.failed++;
-        params.details.push({
-          entity_id: dbEntity.id,
-          action: 'failed',
-          error: '无法计算文件路径',
-        });
-        continue;
-      }
-
-      const content = stringifyEntity(dbEntity.data ?? {}, params.format);
-      try {
-        ensureDir(path);
-        writeFileSync(path, content, 'utf-8');
-        params.stats.updated++;
-        params.details.push({ entity_id: dbEntity.id, action: 'updated', path });
-      } catch (error) {
-        params.stats.failed++;
-        params.details.push({
-          entity_id: dbEntity.id,
-          action: 'failed',
-          path,
-          error: String(error),
-        });
-      }
       continue;
     }
 
@@ -363,7 +320,7 @@ export function syncBidirectional(params: {
       db_updated_at: dbEntity.updated_at,
       file_mtime: fileEntity.mtime,
       file_path: fileEntity.path,
-      reason: '双方均有修改，无法自动判断方向',
+      reason: '检测到内容差异，需人工处理',
     });
     params.stats.conflicted++;
   }
@@ -405,17 +362,6 @@ function shouldWriteFile(
     return 'write';
   }
   if (mode === 'full') {
-    return 'write';
-  }
-  if (!fileInfo.mtime || !entity.updated_at) {
-    return fileInfo.content_hash === entity.content_hash ? 'skip' : 'write';
-  }
-  const fileTime = Date.parse(fileInfo.mtime);
-  const dbTime = Date.parse(entity.updated_at);
-  if (Number.isNaN(fileTime) || Number.isNaN(dbTime)) {
-    return fileInfo.content_hash === entity.content_hash ? 'skip' : 'write';
-  }
-  if (fileTime <= dbTime) {
     return 'write';
   }
   return fileInfo.content_hash === entity.content_hash ? 'skip' : 'write';

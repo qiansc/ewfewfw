@@ -4,7 +4,8 @@
 
 import { randomUUID } from 'node:crypto';
 import type { EntityType } from '../adapter.js';
-import { parseReference } from '@c4a/core/types';
+import { resolveReference } from '../data-ops/reference/resolver.js';
+import type { ReferenceCandidate, ResolvedReference } from '../data-ops/reference/types.js';
 import type { AdapterContext, ParsedRelation } from './types.js';
 import { expandEntityCacheKeys } from './cache-keys.js';
 
@@ -27,6 +28,11 @@ function toDbValue(value: string | null | undefined): string {
   return value ?? '';
 }
 
+function toNullableProject(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return value;
+}
+
 function buildRelationKey(
   fromProject: string,
   fromId: string,
@@ -37,34 +43,77 @@ function buildRelationKey(
   return `${fromProject}|${fromId}|${toProject}|${toId}|${relType}`;
 }
 
-function resolveTarget(ref: string, sourceProject: string): {
+function buildReferenceLookup(
+  ctx: AdapterContext,
+  proposalId: string | null | undefined
+): (id: string) => ReferenceCandidate[] {
+  const db = ctx.store.getDatabase();
+  const dbProposalId = proposalId ?? '';
+
+  return (id: string): ReferenceCandidate[] => {
+    const rows = db.prepare(`
+      SELECT e.id, e.source_project, e.scope, m.source_repo
+      FROM entities e
+      JOIN metadata m ON e.source_project = m.source_project
+        AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+      WHERE e.id = ?
+        AND (e.proposal_id IS NULL OR e.proposal_id = '' OR e.proposal_id = ?)
+    `).all(id, dbProposalId) as Array<{
+      id: string;
+      source_project: string;
+      scope: string | null;
+      source_repo: string | null;
+    }>;
+
+    const unique = new Map<string, ReferenceCandidate>();
+    for (const row of rows) {
+      const sourceProject = toNullableProject(row.source_project);
+      const sourceRepo = row.source_repo ?? null;
+      const scope = (row.scope ?? null) as ReferenceCandidate['scope'];
+      const key = `${sourceProject ?? ''}|${sourceRepo ?? ''}|${scope ?? ''}`;
+      if (unique.has(key)) continue;
+      unique.set(key, {
+        id: row.id,
+        sourceProject,
+        sourceRepo,
+        scope,
+      });
+    }
+
+    return Array.from(unique.values());
+  };
+}
+
+function createReferenceResolver(
+  ctx: AdapterContext,
+  sourceProject: string,
+  proposalId: string | null | undefined
+): (ref: string) => ResolvedReference {
+  return (ref: string) =>
+    resolveReference(ref, {
+      projectId: sourceProject,
+      repoId: ctx.config.repoId ?? null,
+      lookup: buildReferenceLookup(ctx, proposalId),
+    });
+}
+
+function resolveTarget(ref: string, resolver: (ref: string) => ResolvedReference): {
   toProject: string;
   toId: string;
   properties?: Record<string, unknown>;
 } {
-  const resolved = parseReference(ref);
+  const resolved = resolver(ref);
   const properties: Record<string, unknown> = {};
-  let toProject = sourceProject;
-  let toId = resolved.entity_id;
+  const toId = resolved.id;
+  const toProject = resolved.targetProject ?? '';
 
-  if (resolved.type === 'project') {
-    toProject = resolved.project_id ?? sourceProject;
-    properties.target_project = resolved.project_id;
-  } else if (resolved.type === 'repo') {
-    properties.target_repo = resolved.repo_id;
-    toProject = '';
-    toId = resolved.entity_id;
-
-    if (resolved.entity_id.startsWith('project:')) {
-      const nested = parseReference(resolved.entity_id);
-      if (nested.type === 'project') {
-        toProject = nested.project_id ?? '';
-        toId = nested.entity_id;
-        properties.target_project = nested.project_id;
-      }
-    }
-  } else if (resolved.type === 'scope') {
-    toProject = '';
+  if (resolved.targetRepo) {
+    properties.target_repo = resolved.targetRepo;
+  }
+  if (resolved.targetProject) {
+    properties.target_project = resolved.targetProject;
+  }
+  if (resolved.scope) {
     properties.target_scope = resolved.scope;
   }
 
@@ -75,18 +124,66 @@ function resolveTarget(ref: string, sourceProject: string): {
   };
 }
 
+function extractReferenceList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const refs: string[] = [];
+  for (const item of value) {
+    if (typeof item === 'string') {
+      refs.push(item);
+      continue;
+    }
+    if (!isPlainObject(item)) continue;
+    const ref = item.ref ?? item.reference ?? item.id;
+    if (typeof ref === 'string' && ref.length > 0) {
+      refs.push(ref);
+    }
+  }
+  return refs;
+}
+
+function findReferences(data: Record<string, unknown>, entityType: EntityType): string[] {
+  const refs = new Set<string>();
+  for (const ref of extractReferenceList(data.references)) {
+    refs.add(ref);
+  }
+
+  const entityKey: Record<EntityType, string> = {
+    system: 'system',
+    container: 'container',
+    component: 'component',
+    product: 'product',
+    process: 'process',
+    sor: 'sor',
+    adr: 'adr',
+    contract: 'contract',
+  };
+
+  const block = data[entityKey[entityType]];
+  if (isPlainObject(block)) {
+    for (const ref of extractReferenceList(block.references)) {
+      refs.add(ref);
+    }
+  }
+
+  return Array.from(refs);
+}
+
 /**
  * 从 DSL data 中解析关系
  */
 export function parseRelations(
+  ctx: AdapterContext,
   data: Record<string, unknown>,
-  sourceProject: string,
+  sourceProject: string | null | undefined,
   entityId: string,
-  entityType: EntityType
+  entityType: EntityType,
+  proposalId?: string | null
 ): ParsedRelation[] {
   const relations: ParsedRelation[] = [];
   const relationKeys = new Set<string>();
   let handledRelationships = false;
+  const normalizedSourceProject = sourceProject ?? '';
+  const resolver = createReferenceResolver(ctx, normalizedSourceProject, proposalId);
 
   const pushRelation = (relation: ParsedRelation) => {
     const fromProject = relation.fromProject ?? sourceProject;
@@ -98,7 +195,7 @@ export function parseRelations(
   };
 
   const addOutgoing = (targetRef: string, relType: string, props?: Record<string, unknown>) => {
-    const resolved = resolveTarget(targetRef, sourceProject);
+    const resolved = resolveTarget(targetRef, resolver);
     pushRelation({
       toProject: resolved.toProject,
       toId: resolved.toId,
@@ -111,11 +208,11 @@ export function parseRelations(
   };
 
   const addIncoming = (sourceRef: string, relType: string, props?: Record<string, unknown>) => {
-    const resolved = resolveTarget(sourceRef, sourceProject);
+    const resolved = resolveTarget(sourceRef, resolver);
     pushRelation({
       fromProject: resolved.toProject,
       fromId: resolved.toId,
-      toProject: sourceProject,
+      toProject: normalizedSourceProject,
       toId: entityId,
       relType,
       properties: normalizeProperties({
@@ -226,6 +323,11 @@ export function parseRelations(
     }
   }
 
+  const referenceList = findReferences(data, entityType);
+  for (const ref of referenceList) {
+    addOutgoing(ref, 'REFERENCES');
+  }
+
   return relations;
 }
 
@@ -233,6 +335,58 @@ export interface RelationsChangeSet {
   added: Array<{ fromProject: string; fromId: string; toProject: string; toId: string; relType: string }>;
   removed: Array<{ fromProject: string; fromId: string; toProject: string; toId: string; relType: string }>;
   cacheKeys: string[];
+}
+
+function targetExistsInDatabase(
+  db: ReturnType<typeof import('../sqlite-store.js').SQLiteStore.prototype.getDatabase>,
+  toProject: string,
+  toId: string,
+  proposalId: string | null
+): boolean {
+  const dbProposalId = proposalId ?? '';
+  if (dbProposalId === '') {
+    return Boolean(
+      db.prepare(`
+        SELECT 1 FROM entities
+        WHERE source_project = ? AND id = ?
+          AND (proposal_id IS NULL OR proposal_id = '')
+        LIMIT 1
+      `).get(toProject, toId)
+    );
+  }
+
+  return Boolean(
+    db.prepare(`
+      SELECT 1 FROM entities
+      WHERE source_project = ? AND id = ?
+        AND (proposal_id IS NULL OR proposal_id = '' OR proposal_id = ?)
+      LIMIT 1
+    `).get(toProject, toId, dbProposalId)
+  );
+}
+
+function applyResolutionProperties(
+  rel: { toProject: string; properties?: Record<string, unknown> | undefined },
+  targetExists: boolean,
+  sourceProject: string
+): Record<string, unknown> | undefined {
+  const props = { ...(rel.properties ?? {}) } as Record<string, unknown>;
+
+  if (!targetExists) {
+    props.resolved = false;
+    if (rel.toProject !== sourceProject && props.resolve_status === undefined) {
+      props.resolve_status = 'pending';
+    }
+  } else {
+    if (props.resolved === false) {
+      delete props.resolved;
+    }
+    if (props.resolve_status === 'pending') {
+      delete props.resolve_status;
+    }
+  }
+
+  return normalizeProperties(props);
 }
 
 /**
@@ -267,8 +421,16 @@ export function persistRelations(
     };
   });
 
+  const preparedRelations = normalizedRelations.map((rel) => {
+    const exists = targetExistsInDatabase(db, rel.toProject, rel.toId, proposalId);
+    return {
+      ...rel,
+      properties: applyResolutionProperties(rel, exists, dbSourceProject),
+    };
+  });
+
   const desiredRelationKeys = new Set(
-    normalizedRelations.map((rel) =>
+    preparedRelations.map((rel) =>
       buildRelationKey(rel.fromProject, rel.fromId, rel.toProject, rel.toId, rel.relType)
     )
   );
@@ -443,7 +605,7 @@ export function persistRelations(
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
-  for (const rel of normalizedRelations) {
+  for (const rel of preparedRelations) {
     const fromProject = rel.fromProject;
     const fromId = rel.fromId;
     const relId = randomUUID();
@@ -508,7 +670,7 @@ export function persistRelations(
   const sourceProjectKey = toGraphProject(dbSourceProject);
   addCacheKeys(sourceProjectKey, entityId);
 
-  for (const rel of normalizedRelations) {
+  for (const rel of preparedRelations) {
     addCacheKeys(toGraphProject(rel.fromProject), rel.fromId);
     addCacheKeys(toGraphProject(rel.toProject), rel.toId);
   }

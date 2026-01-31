@@ -1,10 +1,10 @@
 # 可视化：`c4a_visual_*`（c4a-visual-mcp）
 
-> **v0.3.0 实现说明**：本期可视化工具**暂不实现**，保留设计文档供后续版本参考。
+> **v0.3.0 实现说明**：可视化工具实现**保留**，但默认不对 Agent 暴露。
 >
-> - 现有 `c4a_visual_*` 代码保持编译通过即可，不主动引用
+> - `c4a_visual_*` 在 MCP Server 中可用，但仅供 CLI/运维或内部流程使用
 > - 核心工作流（feat → specify → plan → implement）不依赖可视化工具
-> - 后续版本按需实现
+> - 对外暴露策略由配置控制（默认最小暴露）
 
 ## 5.1 `c4a_visual_generate`（AI 生成图片）
 
@@ -102,17 +102,17 @@ c4a_visual_render_c4({
 
 ---
 
-## 5.3 已移除的工具
+## 5.3 内部工具（不对 Agent 暴露）
 
-以下工具在 v0.3.0 中不作为独立 MCP 工具暴露，相关功能由 CLI 内部实现或后续版本按需添加：
+以下工具在 v0.3.0 中不对 Agent 暴露，相关功能由 CLI 内部实现或保留内部调用：
 
 | 原工具 | 处理方式 | 说明 |
 |--------|---------|------|
 | `c4a_visual_render` | CLI 内部 | Mermaid 渲染作为 `render_c4` 的内部实现 |
-| `c4a_visual_list_templates` | 移除 | 模板管理功能后续版本按需添加 |
-| `c4a_visual_render_template` | 移除 | 模板管理功能后续版本按需添加 |
+| `c4a_visual_list_templates` | 内部 | 模板管理功能，CLI/内部调用 |
+| `c4a_visual_render_template` | 内部 | 模板渲染，CLI/内部调用 |
 | `c4a_visual_save` | CLI 内部 | 图片保存作为 `generate`/`render_c4` 的内部实现 |
 | `c4a_visual_get_reference` | CLI 内部 | 引用路径生成作为内部实现 |
 | `c4a_visual_cleanup` | CLI 命令 | 通过 `c4a cache clean` 命令调用 |
 | `c4a_visual_storage_stats` | CLI 命令 | 通过 `c4a status` 命令展示 |
-| `c4a_visual_get_style` | 移除 | 风格配置功能后续版本按需添加 |
+| `c4a_visual_get_style` | 内部 | 风格配置功能，CLI/内部调用 |

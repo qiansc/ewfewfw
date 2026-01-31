@@ -112,13 +112,14 @@ CREATE INDEX idx_metadata_content_hash ON metadata(content_hash);
 
 | 操作 | 计算时机 | 说明 |
 |------|---------|------|
-| `c4a_store_save` | 保存时自动计算 | 对规范化 YAML 内容计算哈希（确保与导出文件一致） |
+| `c4a_store_save` | 保存时自动计算 | 对规范化对象计算哈希（确保与导出文件一致） |
 | `c4a_store_sync` (import) | 导入时计算 | 对文件内容计算哈希并存储 |
 | `c4a_store_sync` (export) | 导出前检测 | 对比文件哈希和数据库哈希 |
 
-> **哈希计算口径**：所有场景统一对**规范化 YAML 内容**计算 SHA-256 哈希。
-> - 规范化：字段按字母序排列、无多余空白、UTF-8 编码
-> - 这确保了 `c4a_store_save` 计算的哈希与 `c4a_store_sync` 导出文件的哈希一致
+> **哈希计算口径**：所有场景统一对**解析后的 DSL 对象**计算 SHA-256 哈希。
+> - 规范化：对象字段按字母序深度排序后 JSON 序列化
+> - 排除字段：`created_at`、`updated_at`、`content_hash`、`proposal_id`、`_id`、`__v`
+> - 与 YAML/JSON 文件格式无关，确保 `c4a_store_save` 与 `c4a_store_sync` 一致
 
 **性能优化**：
 
@@ -302,4 +303,3 @@ $ c4a sync
 ```
 
 ---
-

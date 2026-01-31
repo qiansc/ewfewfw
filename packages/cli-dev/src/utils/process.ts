@@ -5,6 +5,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, appendFileSync } from "node:fs";
 import { resolve as pathResolve } from "node:path";
 import { networkInterfaces } from "node:os";
+import { createCliError } from "./errorResponse.js";
 
 const PROJECT_ROOT = pathResolve(import.meta.dirname, "../../../..");
 const LOGS_DIR = pathResolve(PROJECT_ROOT, ".c4a/logs");
@@ -217,7 +218,11 @@ export async function startMcpStore(options?: {
 
     if (!portAvailable) {
       appendLog("mcp-store", `无法释放端口 ${port}`);
-      throw new Error(`端口 ${port} 被占用且无法自动释放，请手动检查: lsof -i :${port}`);
+      throw createCliError(
+        "C4A-CLI-PORT-001",
+        `端口 ${port} 被占用且无法自动释放，请手动检查: lsof -i :${port}`,
+        { field: "port", actual: String(port), suggestion: "手动释放端口或停止占用进程" }
+      );
     }
 
     console.log(`✅ 端口 ${port} 已释放`);
@@ -296,10 +301,13 @@ export async function startMcpStore(options?: {
     }
   }
 
-  const error = new Error(
+  const message =
     `mcp-store 启动失败，已重试 ${retries} 次。\n` +
-    `详细日志: ${logFile}`
-  );
+    `详细日志: ${logFile}`;
+  const error = createCliError("C4A-CLI-STORE-START-001", message, {
+    field: "mcp-store",
+    suggestion: "检查日志并确认端口 8051 可用",
+  });
   appendLog("mcp-store", error.message);
   throw error;
 }
@@ -395,7 +403,11 @@ export async function startMcpQuery(options?: {
 
     if (!portAvailable) {
       appendLog("mcp-query", `无法释放端口 ${port}`);
-      throw new Error(`端口 ${port} 被占用且无法自动释放，请手动检查: lsof -i :${port}`);
+      throw createCliError(
+        "C4A-CLI-PORT-002",
+        `端口 ${port} 被占用且无法自动释放，请手动检查: lsof -i :${port}`,
+        { field: "port", actual: String(port), suggestion: "手动释放端口或停止占用进程" }
+      );
     }
 
     console.log(`✅ 端口 ${port} 已释放`);
@@ -468,9 +480,12 @@ export async function startMcpQuery(options?: {
     }
   }
 
-  const error = new Error(
-    `mcp-query 启动失败，已重试 ${retries} 次。\n` + `详细日志: ${logFile}`
-  );
+  const message =
+    `mcp-query 启动失败，已重试 ${retries} 次。\n` + `详细日志: ${logFile}`;
+  const error = createCliError("C4A-CLI-QUERY-START-001", message, {
+    field: "mcp-query",
+    suggestion: "检查日志并确认端口 8054 可用",
+  });
   appendLog("mcp-query", error.message);
   throw error;
 }

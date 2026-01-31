@@ -67,6 +67,11 @@
           "type": "string",
           "format": "date",
           "description": "批准日期"
+        },
+        "references": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "引用其他实体（跨层级/跨项目）"
         }
       }
     },

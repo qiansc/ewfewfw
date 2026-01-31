@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:tes
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { SQLiteStore } from '../../../sqlite-store.js';
+import { createStorageOperationsFromDatabase } from '../../../lite-adapter/dataOpsContext.js';
 import { createWorkflow, getWorkflowState, updateWorkflowState } from '../workflowState.js';
 import type { WorkflowStep } from '../types.js';
 
@@ -37,7 +38,8 @@ describe('workflowState', () => {
       { id: 'step-2', status: 'pending' },
     ];
 
-    const workflow = createWorkflow('wf-1', steps);
+    const storage = createStorageOperationsFromDatabase(store.getDatabase());
+    const workflow = createWorkflow(storage, 'wf-1', steps);
     expect(workflow.state).toBe('pending');
     expect(workflow.total_steps).toBe(2);
 
@@ -57,14 +59,15 @@ describe('workflowState', () => {
     expect(record?.workflow_type).toBe('/c4a:know:learn');
     expect(record?.total_steps).toBe(2);
     expect(record?.state).toBe('pending');
-    expect(getWorkflowState('wf-1')).toBe('pending');
+    expect(getWorkflowState(storage, 'wf-1')).toBe('pending');
   });
 
   test('updateWorkflowState persists changes', () => {
     const steps: WorkflowStep[] = [{ id: 'step-1', status: 'pending' }];
-    createWorkflow('wf-2', steps);
+    const storage = createStorageOperationsFromDatabase(store.getDatabase());
+    createWorkflow(storage, 'wf-2', steps);
 
-    updateWorkflowState('wf-2', 'running');
+    updateWorkflowState(storage, 'wf-2', 'running');
 
     const db = store.getDatabase();
     const record = db
@@ -80,6 +83,7 @@ describe('workflowState', () => {
 
   test('updateWorkflowState marks entities orphaned on failure', () => {
     const db = store.getDatabase();
+    const storage = createStorageOperationsFromDatabase(db);
     db.prepare(
       `
         INSERT INTO entities (id, source_project, proposal_id, type, data, orphaned)
@@ -87,7 +91,7 @@ describe('workflowState', () => {
       `
     ).run('entity-1', 'alpha', 'wf-3', 'system', JSON.stringify({ id: 'entity-1' }), 0);
 
-    updateWorkflowState('wf-3', 'failed');
+    updateWorkflowState(storage, 'wf-3', 'failed');
 
     const entity = db
       .prepare(

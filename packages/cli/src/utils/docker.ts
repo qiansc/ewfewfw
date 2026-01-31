@@ -1,256 +1,178 @@
-/**
- * Docker 操作工具函数
- */
-import { spawn, spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { execFile } from "node:child_process";
 
-const PROJECT_ROOT = resolve(import.meta.dirname, "../../../..");
-const DOCKER_COMPOSE_FILE = resolve(PROJECT_ROOT, "docker/docker-compose.yml");
-
-function dockerCompose(...args: string[]) {
-  return ["docker", "compose", "-f", DOCKER_COMPOSE_FILE, ...args];
+export interface CommandResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
 }
 
-export function checkDocker(): boolean {
-  const result = spawnSync("docker", ["info"], { stdio: "pipe" });
-  return result.status === 0;
+export type CommandRunner = (command: string, args: string[]) => Promise<CommandResult>;
+
+export interface ContainerStatus {
+  name: string;
+  status: string;
+  state: "running" | "exited" | "paused" | "unknown" | "not_found";
+  health?: "healthy" | "unhealthy" | "starting";
+  ports?: string;
 }
 
-/**
- * 尝试启动 Docker Desktop (macOS)
- * @param timeout 超时时间（毫秒），默认 60 秒
- * @param interval 检查间隔（毫秒），默认 2 秒
- * @returns 是否成功启动
- */
-export async function startDockerDesktop(
-  timeout: number = 60000,
-  interval: number = 2000
+function createDefaultRunner(): CommandRunner {
+  return async (command: string, args: string[]) =>
+    new Promise<CommandResult>((resolve) => {
+      execFile(command, args, { encoding: "utf-8" }, (error, stdout, stderr) => {
+        if (error) {
+          const exitCode =
+            typeof (error as NodeJS.ErrnoException).code === "number"
+              ? (error as NodeJS.ErrnoException).code
+              : 1;
+          resolve({
+            stdout: stdout ?? "",
+            stderr: stderr ?? (error as Error).message,
+            exitCode,
+          });
+          return;
+        }
+        resolve({ stdout: stdout ?? "", stderr: stderr ?? "", exitCode: 0 });
+      });
+    });
+}
+
+const DEFAULT_CONTAINER_NAMES = ["c4a-mongodb", "c4a-neo4j", "c4a-milvus", "c4a-ollama"];
+
+function parseContainerStatusLine(line: string): ContainerStatus | null {
+  if (!line.trim()) return null;
+  const [name, status = "", ports = ""] = line.split("\t");
+  const healthMatch = status.match(/\((healthy|unhealthy|starting|health: starting)\)/);
+  let state: ContainerStatus["state"] = "unknown";
+  if (status.startsWith("Up")) {
+    state = "running";
+  } else if (status.startsWith("Exited")) {
+    state = "exited";
+  } else if (status.startsWith("Paused")) {
+    state = "paused";
+  }
+  return {
+    name,
+    status,
+    state,
+    health: healthMatch
+      ? (healthMatch[1] === "health: starting" ? "starting" : (healthMatch[1] as ContainerStatus["health"]))
+      : undefined,
+    ports: ports || undefined,
+  };
+}
+
+export async function checkDockerInstalled(
+  runner: CommandRunner = createDefaultRunner(),
 ): Promise<boolean> {
-  // 已经在运行，直接返回
-  if (checkDocker()) {
-    return true;
+  const result = await runner("docker", ["--version"]);
+  return result.exitCode === 0;
+}
+
+export async function getContainerStatus(
+  names?: string[],
+  runner: CommandRunner = createDefaultRunner(),
+): Promise<ContainerStatus[]> {
+  const result = await runner("docker", ["ps", "-a", "--format", "{{.Names}}\t{{.Status}}\t{{.Ports}}"]);
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderr || "无法获取 Docker 容器状态");
   }
 
-  // 仅支持 macOS
-  if (process.platform !== "darwin") {
-    return false;
+  const items = result.stdout
+    .split("\n")
+    .map((line) => parseContainerStatusLine(line))
+    .filter((item): item is ContainerStatus => Boolean(item));
+
+  const targetNames = names ?? DEFAULT_CONTAINER_NAMES;
+  if (targetNames.length === 0) {
+    return items;
   }
 
-  // 尝试启动 Docker Desktop
-  const result = spawnSync("open", ["-a", "Docker"], { stdio: "pipe" });
-  if (result.status !== 0) {
-    return false;
-  }
-
-  // 等待 Docker 启动就绪
-  const startTime = Date.now();
-  while (Date.now() - startTime < timeout) {
-    if (checkDocker()) {
-      return true;
+  const nameSet = new Set(targetNames);
+  const found = new Map(items.map((item) => [item.name, item]));
+  return targetNames.map((name) => {
+    const item = found.get(name);
+    if (item) {
+      return item;
     }
+    return {
+      name,
+      status: "not_found",
+      state: "not_found",
+      ports: undefined,
+    };
+  });
+}
 
-    const elapsed = Math.floor((Date.now() - startTime) / 1000);
-    process.stdout.write(`\r  等待 Docker 启动... ${elapsed}s`);
+export async function startContainers(
+  names?: string[],
+  runner: CommandRunner = createDefaultRunner(),
+): Promise<CommandResult> {
+  const targetNames = names ?? DEFAULT_CONTAINER_NAMES;
+  if (targetNames.length === 0) {
+    return { stdout: "", stderr: "", exitCode: 0 };
+  }
+  return runner("docker", ["start", ...targetNames]);
+}
 
-    await new Promise((r) => setTimeout(r, interval));
+export async function stopContainers(
+  names?: string[],
+  runner: CommandRunner = createDefaultRunner(),
+): Promise<CommandResult> {
+  const targetNames = names ?? DEFAULT_CONTAINER_NAMES;
+  if (targetNames.length === 0) {
+    return { stdout: "", stderr: "", exitCode: 0 };
+  }
+  return runner("docker", ["stop", ...targetNames]);
+}
+
+export async function restartContainers(
+  names?: string[],
+  runner: CommandRunner = createDefaultRunner(),
+): Promise<CommandResult> {
+  const targetNames = names ?? DEFAULT_CONTAINER_NAMES;
+  if (targetNames.length === 0) {
+    return { stdout: "", stderr: "", exitCode: 0 };
+  }
+  return runner("docker", ["restart", ...targetNames]);
+}
+
+export async function getContainerLogs(
+  name?: string,
+  options?: { tail?: number; since?: string; timestamps?: boolean },
+  runner: CommandRunner = createDefaultRunner(),
+): Promise<CommandResult> {
+  const args = ["logs"];
+  if (options?.timestamps) {
+    args.push("--timestamps");
+  }
+  if (options?.since) {
+    args.push("--since", options.since);
+  }
+  if (options?.tail) {
+    args.push("--tail", String(options.tail));
+  }
+  if (name) {
+    args.push(name);
+    return runner("docker", args);
   }
 
-  console.log(""); // 换行
-  return false;
-}
-
-/**
- * 清理可能残留的旧容器
- */
-function cleanupOldContainers(): void {
-  const containers = [
-    "c4a-mongodb",
-    "c4a-neo4j",
-    "c4a-milvus",
-    "c4a-ollama",
-    "c4a-ollama-init",
-  ];
-  for (const container of containers) {
-    // 尝试停止并删除旧容器（忽略错误）
-    spawnSync("docker", ["rm", "-f", container], { stdio: "pipe" });
-  }
-}
-
-export function startStorageServices(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    // 先清理可能残留的旧容器
-    cleanupOldContainers();
-
-    const [cmd, ...args] = dockerCompose(
-      "up",
-      "-d",
-      "mongodb",
-      "neo4j",
-      "milvus",
-      "ollama",
-      "ollama-init"
-    );
-    const proc = spawn(cmd, args, { stdio: "inherit" });
-    proc.on("close", (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`Docker compose failed with code ${code}`));
-    });
-  });
-}
-
-export function startAllServices(profile: string = "mcp"): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const [cmd, ...args] = dockerCompose("--profile", profile, "up", "-d");
-    const proc = spawn(cmd, args, { stdio: "inherit" });
-    proc.on("close", (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`Docker compose failed with code ${code}`));
-    });
-  });
-}
-
-export function stopServices(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const [cmd, ...args] = dockerCompose("down");
-    const proc = spawn(cmd, args, { stdio: "inherit" });
-    proc.on("close", (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`Docker compose failed with code ${code}`));
-    });
-  });
-}
-
-export function showStatus(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const [cmd, ...args] = dockerCompose("ps");
-    const proc = spawn(cmd, args, { stdio: "inherit" });
-    proc.on("close", (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`Docker compose failed with code ${code}`));
-    });
-  });
-}
-
-export function showLogs(service?: string): Promise<void> {
-  return new Promise((resolve) => {
-    const args = service
-      ? dockerCompose("logs", "-f", service)
-      : dockerCompose("logs", "-f");
-    const [cmd, ...rest] = args;
-    const proc = spawn(cmd, rest, { stdio: "inherit" });
-    // logs 是持续输出，用户 Ctrl+C 退出
-    proc.on("close", () => resolve());
-  });
-}
-
-export function cleanData(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const [cmd, ...args] = dockerCompose("down", "-v");
-    const proc = spawn(cmd, args, { stdio: "inherit" });
-    proc.on("close", (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`Docker compose failed with code ${code}`));
-    });
-  });
-}
-
-/**
- * 检查存储服务是否正在运行
- */
-export function areStorageServicesRunning(): boolean {
-  const containers = ["c4a-mongodb", "c4a-neo4j", "c4a-milvus", "c4a-ollama"];
-  for (const container of containers) {
-    const result = spawnSync("docker", ["ps", "-q", "-f", `name=${container}`], {
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    if (!result.stdout.trim()) {
-      return false;
+  const targetNames = DEFAULT_CONTAINER_NAMES;
+  const outputs: string[] = [];
+  let exitCode = 0;
+  let stderr = "";
+  for (const container of targetNames) {
+    const result = await runner("docker", [...args, container]);
+    if (result.exitCode !== 0) {
+      exitCode = result.exitCode;
+      stderr = stderr || result.stderr;
     }
+    const header = `==== ${container} ====`;
+    outputs.push([header, result.stdout].filter(Boolean).join("\n"));
   }
-  return true;
-}
-
-/**
- * 检查单个容器的健康状态
- */
-function checkContainerHealth(container: string): "healthy" | "unhealthy" | "starting" | "none" {
-  const result = spawnSync("docker", [
-    "inspect",
-    "--format",
-    "{{.State.Health.Status}}",
-    container,
-  ], { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] });
-
-  if (result.status !== 0) {
-    return "none";
-  }
-
-  const status = result.stdout.trim();
-  if (status === "healthy") return "healthy";
-  if (status === "unhealthy") return "unhealthy";
-  return "starting";
-}
-
-/**
- * 等待所有存储服务健康
- * @param timeout 超时时间（毫秒），默认 120 秒
- * @param interval 检查间隔（毫秒），默认 3 秒
- */
-export async function waitForServicesHealthy(
-  timeout: number = 120000,
-  interval: number = 3000
-): Promise<boolean> {
-  const services = [
-    { name: "MongoDB", container: "c4a-mongodb" },
-    { name: "Neo4j", container: "c4a-neo4j" },
-    { name: "Milvus", container: "c4a-milvus" },
-    { name: "Ollama", container: "c4a-ollama" },
-  ];
-
-  const startTime = Date.now();
-  let lastStatus = "";
-
-  while (Date.now() - startTime < timeout) {
-    const statuses = services.map((s) => ({
-      ...s,
-      status: checkContainerHealth(s.container),
-    }));
-
-    const allHealthy = statuses.every((s) => s.status === "healthy");
-    const anyUnhealthy = statuses.some((s) => s.status === "unhealthy");
-
-    // 构建状态字符串
-    const statusStr = statuses
-      .map((s) => {
-        const icon = s.status === "healthy" ? "✅" : s.status === "starting" ? "⏳" : "❌";
-        return `${s.name}: ${icon}`;
-      })
-      .join("  ");
-
-    // 只在状态变化时打印
-    if (statusStr !== lastStatus) {
-      console.log(`  ${statusStr}`);
-      lastStatus = statusStr;
-    }
-
-    if (allHealthy) {
-      return true;
-    }
-
-    if (anyUnhealthy) {
-      console.log("❌ 有服务启动失败，请检查 docker logs");
-      return false;
-    }
-
-    // 显示等待进度
-    const elapsed = Math.floor((Date.now() - startTime) / 1000);
-    process.stdout.write(`\r  等待中... ${elapsed}s`);
-
-    await new Promise((r) => setTimeout(r, interval));
-  }
-
-  console.log("\n❌ 等待超时，部分服务未能启动");
-  return false;
+  return {
+    stdout: outputs.join("\n"),
+    stderr,
+    exitCode,
+  };
 }

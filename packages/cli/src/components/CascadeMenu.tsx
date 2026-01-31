@@ -1,77 +1,40 @@
 import React from "react";
 import { Box, Text } from "ink";
-import type { MenuItem } from "../menuData.js";
 
-interface Props {
-  items: MenuItem[];
-  selectedIndex: number;
-  expandedId: string | null;
-  subSelectedIndex: number;
-  focusLevel: "main" | "sub";
+export interface CascadeMenuItem {
+  id: string;
+  label: string;
+  disabled?: boolean;
 }
 
-export function CascadeMenu({
-  items,
-  selectedIndex,
-  expandedId,
-  subSelectedIndex,
-  focusLevel,
-}: Props) {
-  // 找到展开项的位置，用于定位悬浮子菜单
-  const expandedIndex = items.findIndex((item) => item.id === expandedId);
-  const expandedItem = expandedIndex >= 0 ? items[expandedIndex] : null;
+export interface CascadeMenuProps {
+  items: CascadeMenuItem[];
+  selectedIndex?: number;
+}
+
+export const CascadeMenu: React.FC<CascadeMenuProps> = ({ items, selectedIndex = 0 }) => {
+  if (items.length === 0) {
+    return <Text color="gray">暂无可用命令</Text>;
+  }
 
   return (
-    <Box position="relative">
-      {/* 主菜单 */}
-      <Box flexDirection="column">
-        {items.map((item, index) => {
-          const isSelected = index === selectedIndex;
-          const hasChildren = item.children && item.children.length > 0;
-
+    <Box flexDirection="column">
+      {items.map((item, index) => {
+        const isSelected = index === selectedIndex;
+        const prefix = isSelected ? "▸" : " ";
+        if (item.disabled) {
           return (
-            <Box key={item.id} width={38}>
-              <Text
-                bold={isSelected && focusLevel === "main"}
-                color={isSelected ? "cyan" : undefined}
-              >
-                {isSelected && focusLevel === "main" ? "▶ " : "  "}
-                {item.label.padEnd(12)}
-                {item.description}
-                {hasChildren ? " →" : ""}
-              </Text>
-            </Box>
+            <Text key={item.id} color="gray">
+              {prefix} {item.label}
+            </Text>
           );
-        })}
-      </Box>
-
-      {/* 悬浮子菜单 */}
-      {expandedItem?.children && (
-        <Box
-          position="absolute"
-          marginLeft={39}
-          marginTop={Math.max(0, expandedIndex - 1)}
-          borderStyle="single"
-          borderColor="cyan"
-          flexDirection="column"
-          paddingX={1}
-        >
-          {expandedItem.children.map((child, childIndex) => {
-            const isChildSelected = childIndex === subSelectedIndex;
-            return (
-              <Text
-                key={child.id}
-                bold={isChildSelected && focusLevel === "sub"}
-                color={isChildSelected ? "cyan" : undefined}
-              >
-                {isChildSelected && focusLevel === "sub" ? "▶ " : "  "}
-                {child.label.padEnd(8)}
-                {child.description}
-              </Text>
-            );
-          })}
-        </Box>
-      )}
+        }
+        return (
+          <Text key={item.id} color={isSelected ? "cyan" : undefined} bold={isSelected}>
+            {prefix} {item.label}
+          </Text>
+        );
+      })}
     </Box>
   );
-}
+};

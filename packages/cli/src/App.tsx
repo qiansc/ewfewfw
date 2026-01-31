@@ -1,103 +1,255 @@
-import React, { useState } from "react";
-import { Box, Text, useApp, useInput } from "ink";
-import { Header, CascadeMenu, HelpPanel } from "./components/index.js";
-import { menuTree } from "./menuData.js";
-import { runCommand } from "./commands/index.js";
+import React from "react";
+import { Box, Text, useInput } from "ink";
+import { CascadeMenu } from "./components/CascadeMenu.js";
+import { loadGlobalConfig, loadProjectConfig, getInstalledModes } from "./core/config.js";
+import {
+  buildFirstRunMenu,
+  buildMainMenu,
+  type MenuAction,
+  type MenuItem,
+  type MenuContext,
+} from "./menuData.js";
 
-export function App() {
-  const { exit } = useApp();
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [subSelectedIndex, setSubSelectedIndex] = useState(0);
-  const [focusLevel, setFocusLevel] = useState<"main" | "sub">("main");
+export type AppSelection =
+  | { kind: "command"; command: string[] }
+  | { kind: "action"; action: MenuAction }
+  | { kind: "exit" };
 
-  const currentItem = menuTree[selectedIndex];
+interface AppProps {
+  onSelect: (selection: AppSelection) => void;
+}
 
-  // 选中项有子菜单时自动展开
-  const expandedId = currentItem?.children ? currentItem.id : null;
+type ViewState = "loading" | "first-run" | "menu" | "error";
 
-  const currentSubItem =
-    expandedId && currentItem?.children
-      ? currentItem.children[subSelectedIndex]
-      : null;
+export const App: React.FC<AppProps> = ({ onSelect }) => {
+  const [context, setContext] = React.useState<MenuContext | null>(null);
+  const [view, setView] = React.useState<ViewState>("loading");
+  const [error, setError] = React.useState<string | null>(null);
+  const [skipGuide, setSkipGuide] = React.useState(false);
+  const [menuStack, setMenuStack] = React.useState<Array<{ title: string; items: MenuItem[] }>>([
+    { title: "C4A CLI", items: [] },
+  ]);
+  const [indexStack, setIndexStack] = React.useState<number[]>([0]);
 
-  // 获取当前高亮项的 ID（用于 HelpPanel）
-  const hoveredId =
-    focusLevel === "sub" && currentSubItem
-      ? currentSubItem.id
-      : currentItem?.id || "";
+  const firstRunItems = React.useMemo(() => buildFirstRunMenu(), []);
+  const mainMenuItems = React.useMemo(
+    () => (context ? buildMainMenu(context) : []),
+    [context],
+  );
 
-  useInput((input, key) => {
-    if (input === "q") {
-      exit();
+  React.useEffect(() => {
+    let active = true;
+    const loadContext = async () => {
+      const globalConfig = await loadGlobalConfig();
+      const projectConfig = await loadProjectConfig();
+      const installedModes = getInstalledModes(globalConfig);
+      const nextContext: MenuContext = {
+        installedModes,
+        projectMode: projectConfig?.mode,
+        remoteUrl: projectConfig?.remote?.url,
+      };
+
+      if (!active) return;
+      setContext(nextContext);
+      if (installedModes.length === 0 && !skipGuide) {
+        setView("first-run");
+      } else {
+        setView("menu");
+      }
+    };
+
+    loadContext().catch((err) => {
+      if (!active) return;
+      setError(String(err));
+      setView("error");
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [skipGuide]);
+
+  React.useEffect(() => {
+    if (view === "first-run") {
+      setMenuStack([{ title: "首次运行引导", items: firstRunItems }]);
+      setIndexStack([0]);
+      return;
+    }
+    if (view === "menu") {
+      setMenuStack([{ title: "C4A CLI", items: mainMenuItems }]);
+      setIndexStack([0]);
+    }
+  }, [view, firstRunItems, mainMenuItems]);
+
+  const currentLevel = menuStack[menuStack.length - 1];
+  const selectedIndex = indexStack[indexStack.length - 1] ?? 0;
+  const currentItem = currentLevel?.items[selectedIndex];
+
+  // 查找下一个可选中的项（跳过禁用项）
+  const findNextEnabledIndex = (startIndex: number, direction: 1 | -1): number => {
+    const items = currentLevel?.items ?? [];
+    if (items.length === 0) return 0;
+
+    let index = startIndex;
+    let attempts = 0;
+    while (attempts < items.length) {
+      if (!items[index]?.disabled) {
+        return index;
+      }
+      index = (index + direction + items.length) % items.length;
+      attempts++;
+    }
+    return startIndex; // 全部禁用时保持原位
+  };
+
+  const updateSelectedIndex = (nextIndex: number) => {
+    setIndexStack((prev) => {
+      const next = [...prev];
+      next[next.length - 1] = nextIndex;
+      return next;
+    });
+  };
+
+  const popMenu = () => {
+    if (menuStack.length <= 1) return;
+    setMenuStack((prev) => prev.slice(0, -1));
+    setIndexStack((prev) => prev.slice(0, -1));
+  };
+
+  const pushMenu = (title: string, items: MenuItem[]) => {
+    setMenuStack((prev) => [...prev, { title, items }]);
+    setIndexStack((prev) => [...prev, 0]);
+  };
+
+  const handleSelect = React.useCallback((item?: MenuItem) => {
+    if (!item || item.disabled) return;
+
+    if (view === "first-run") {
+      if (item.id === "first-skip") {
+        setSkipGuide(true);
+        setView("menu");
+        return;
+      }
+      if (item.command) {
+        onSelect({ kind: "command", command: item.command });
+      }
       return;
     }
 
-    if (focusLevel === "main") {
-      // 主菜单导航
-      if (key.upArrow) {
-        setSelectedIndex((i) => (i > 0 ? i - 1 : menuTree.length - 1));
-        setSubSelectedIndex(0);
-      } else if (key.downArrow) {
-        setSelectedIndex((i) => (i < menuTree.length - 1 ? i + 1 : 0));
-        setSubSelectedIndex(0);
-      } else if (key.rightArrow && currentItem?.children) {
-        // 移动焦点到子菜单
-        setFocusLevel("sub");
-      } else if (key.return || input === " ") {
-        // 执行命令（仅叶子节点）
-        if (!currentItem?.children) {
-          exit();
-          runCommand(currentItem.id);
-        } else {
-          // 有子菜单则移动焦点进去
-          setFocusLevel("sub");
-        }
-      }
-    } else {
-      // 子菜单导航
-      const children = currentItem?.children || [];
-      if (key.upArrow) {
-        setSubSelectedIndex((i) => (i > 0 ? i - 1 : children.length - 1));
-      } else if (key.downArrow) {
-        setSubSelectedIndex((i) => (i < children.length - 1 ? i + 1 : 0));
-      } else if (key.leftArrow) {
-        // 返回主菜单
-        setFocusLevel("main");
-      } else if (key.return || input === " ") {
-        // 执行子命令
-        if (currentSubItem) {
-          exit();
-          runCommand(currentSubItem.id);
-        }
-      }
+    if (item.children && item.children.length > 0) {
+      pushMenu(item.label, item.children);
+      return;
     }
-  });
 
-  // 计算菜单区域需要的最小高度（主菜单项数 + 可能的子菜单高度）
-  const maxSubMenuHeight = Math.max(
-    ...menuTree.map((item) => (item.children?.length || 0) + 2) // +2 for border
+    if (item.command) {
+      onSelect({ kind: "command", command: item.command });
+      return;
+    }
+
+    if (item.action) {
+      onSelect({ kind: "action", action: item.action });
+    }
+  }, [onSelect, view]);
+
+
+  useInput(
+    (input, key) => {
+      if (view === "loading" || view === "error") return;
+      if (input === "q") {
+        onSelect({ kind: "exit" });
+        return;
+      }
+
+      const itemCount = currentLevel?.items.length ?? 0;
+      if (itemCount === 0) return;
+
+      if (key.upArrow) {
+        const nextIndex = (selectedIndex - 1 + itemCount) % itemCount;
+        updateSelectedIndex(findNextEnabledIndex(nextIndex, -1));
+        return;
+      }
+      if (key.downArrow) {
+        const nextIndex = (selectedIndex + 1) % itemCount;
+        updateSelectedIndex(findNextEnabledIndex(nextIndex, 1));
+        return;
+      }
+      if (key.leftArrow || key.backspace) {
+        popMenu();
+        return;
+      }
+      if (key.return || key.rightArrow) {
+        handleSelect(currentItem);
+      }
+    },
   );
-  const menuHeight = Math.max(menuTree.length, menuTree.length + maxSubMenuHeight - 3);
+
+  const helperText =
+    currentItem?.disabled && currentItem.disabledReason
+      ? currentItem.disabledReason
+      : currentItem?.description;
+
+  const hasInstalled = (context?.installedModes.length ?? 0) > 0;
+  const remoteHint =
+    context?.projectMode === "remote" && context.remoteUrl
+      ? `远程服务: ${context.remoteUrl}`
+      : null;
+
+  // 面包屑导航
+  const breadcrumb = menuStack.map((level) => level.title).join(" > ");
+  const isInSubmenu = menuStack.length > 1;
 
   return (
     <Box flexDirection="column" padding={1}>
-      <Header title="C4A v2 - 开发者 CLI" />
-
-      <Box marginY={1} height={menuHeight}>
+      <Box borderStyle="round" borderColor="gray" paddingX={1}>
+        <Text bold color="cyan">{breadcrumb}</Text>
+        {view === "first-run" ? <Text color="gray"> - 首次运行引导</Text> : null}
+      </Box>
+      {view === "loading" ? (
+        <Box marginTop={1}>
+          <Text color="gray">正在加载配置...</Text>
+        </Box>
+      ) : null}
+      {view === "error" ? (
+        <Box marginTop={1}>
+          <Text color="red">加载失败: {error}</Text>
+        </Box>
+      ) : null}
+      {view === "first-run" ? (
+        <Box marginTop={1}>
+          <Text>检测到尚未安装存储模式，请选择:</Text>
+        </Box>
+      ) : null}
+      {view === "menu" ? (
+        <Box marginTop={1} flexDirection="column">
+          {!hasInstalled ? (
+            <Text color="yellow">⚠ 尚未安装任何存储模式</Text>
+          ) : null}
+          {remoteHint ? <Text color="gray">{remoteHint}</Text> : null}
+        </Box>
+      ) : null}
+      <Box marginTop={1} flexDirection="column">
         <CascadeMenu
-          items={menuTree}
+          items={(currentLevel?.items ?? []).map((item) => ({
+            id: item.id,
+            label: item.children?.length ? `${item.label} ▶` : item.label,
+            disabled: item.disabled,
+          }))}
           selectedIndex={selectedIndex}
-          expandedId={expandedId}
-          subSelectedIndex={subSelectedIndex}
-          focusLevel={focusLevel}
         />
       </Box>
-
-      <HelpPanel command={hoveredId} />
-
       <Box marginTop={1}>
-        <Text dimColor>↑↓ 选择  →← 展开/收起  ␣/↵ 确认  q 退出</Text>
+        <Text color="gray">─────────────────────────────────</Text>
+      </Box>
+      {helperText ? (
+        <Box>
+          <Text color="gray">{helperText}</Text>
+        </Box>
+      ) : null}
+      <Box marginTop={helperText ? 0 : 1}>
+        <Text color="gray" dimColor>
+          ↑/↓ 选择  Enter 确认  {isInSubmenu ? "← 返回  " : ""}q 退出
+        </Text>
       </Box>
     </Box>
   );
-}
+};

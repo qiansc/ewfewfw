@@ -1,28 +1,26 @@
 {
   "name": "@c4a/cli",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "type": "module",
-  "main": "./src/index.tsx",
   "bin": {
-    "c4a": "./src/index.tsx"
+    "c4a": "./dist/index.js"
   },
   "scripts": {
-    "dev": "bun --watch src/index.tsx",
-    "start": "bun run src/index.tsx",
-    "lint": "tsc --noEmit",
+    "dev": "bun run src/index.tsx",
+    "build": "bun build src/index.tsx --outdir dist --target node",
+    "typecheck": "tsc --noEmit",
     "test": "bun test"
   },
   "dependencies": {
     "@c4a/core": "workspace:*",
     "@c4a/storage": "workspace:*",
-    "@modelcontextprotocol/sdk": "^1.0.0",
-    "ink": "^5.0.1",
-    "react": "^18.3.1",
-    "zod": "^3.23.0"
+    "ink": "^4.4.1",
+    "react": "^18.2.0",
+    "commander": "^11.1.0",
+    "yaml": "^2.3.4"
   },
   "devDependencies": {
-    "@types/react": "^18.3.0",
-    "typescript": "^5.4.0",
-    "@types/bun": "latest"
+    "@types/react": "^18.2.0",
+    "typescript": "^5.3.0"
   }
 }
