@@ -13,3 +13,4 @@ export * from './feat.js';
 export * from './checklist.js';
 export * from './errors.js';
 export * from './spec.js';
+export * from './dataOps.js';

@@ -212,6 +212,7 @@ cp .env.example .env    # 复制环境变量模板
 - **项目使用 Bun**：一律使用 `bun run`/`bunx` 执行脚本与工具。
 - **禁止使用 pnpm/npm/yarn** 执行 `tsc`、`test`、`build` 等命令。
 - 类型检查/测试/构建应参考 `package.json` 中的 `scripts`（如 `bun run test`、`bun run build`）。
+- **单包测试**：不要用 `bun run test --filter <name>`（会把过滤器传给所有包导致无匹配报错）；请使用 `bun run --filter @c4a/<package> test`，或在根 `package.json` 中添加对应的 `test:<package>` 脚本。
 
 ## 启动模式
 

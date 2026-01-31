@@ -409,37 +409,41 @@ packages/
 ## Part 07: 数据操作
 
 > 详细计划见: [07-data-ops.md](07-data-ops.md)
+> 备注: Agent-R lite-adapter 业务逻辑重构已完成。
+> 备注: Agent-0 前置准备 + Schema 已完成。
+> 备注: transaction/workflow/reference/sync 占位文件已创建，其中冲突回滚模块已实现并补齐测试（2026-01-30）。
+> 备注: Agent-6 集成收尾已完成（2026-01-30），补齐 data-ops 统一导出、集成测试、README。
 
 | # | 功能 | 完成 | 描述 |
 |---|------|:----:|------|
-| 7.1 | 引用格式规范 | [ ] | 简单ID/project:/repo:/scope: 四种格式 |
-| 7.2 | 引用解析优先级 | [ ] | 本项目→基建→其他→Enterprise→Domain |
-| 7.3 | 悬空引用处理 | [ ] | 状态感知 + 修复建议 |
-| 7.4 | CoW 机制实现 | [ ] | 复制实体到 feat 分支 |
-| 7.5 | 同步引擎 | [ ] | 双向同步 DB ↔ .context/ |
-| 7.6 | 增量同步算法 | [ ] | content_hash + updated_at |
-| 7.7 | 冲突检测 | [ ] | 内容/删除/类型冲突 |
-| 7.8 | 导出引擎 | [ ] | yaml/json 格式导出 |
-| 7.9 | Feat 冲突检测 | [ ] | 并发修改/删除冲突 |
-| 7.10 | 冲突解决策略 | [ ] | ours/theirs/manual/abort |
-| 7.11 | 回滚机制 | [ ] | 创建回滚 Feat |
-| 7.12 | Feat 事务 | [ ] | begin/commit/rollback |
-| 7.13 | 补偿机制 | [ ] | 补偿日志 + 执行 |
-| 7.14 | 跨项目 Feat | [ ] | 多项目实体原子发布 |
-| 7.15 | Workflow 状态管理 | [ ] | pending/running/paused/completed/failed |
-| 7.16 | 断点续传 | [ ] | checkpoint 保存/恢复 |
-| 7.17 | 步骤幂等性 | [ ] | step_id + input_hash |
-| 7.18 | 实体清理机制 | [ ] | orphaned 实体清理 |
+| 7.1 | 引用格式规范 | [x] | 简单ID/project:/repo:/scope: 四种格式 |
+| 7.2 | 引用解析优先级 | [x] | 本项目→基建→其他→Enterprise→Domain |
+| 7.3 | 悬空引用处理 | [x] | 状态感知 + 修复建议 |
+| 7.4 | CoW 机制实现 | [x] | 复制实体到 feat 分支 |
+| 7.5 | 同步引擎 | [x] | 双向同步 DB ↔ .context/ |
+| 7.6 | 增量同步算法 | [x] | content_hash + updated_at |
+| 7.7 | 冲突检测 | [x] | 内容/删除/类型冲突 |
+| 7.8 | 导出引擎 | [x] | yaml/json 格式导出 |
+| 7.9 | Feat 冲突检测 | [x] | 并发修改/删除冲突 |
+| 7.10 | 冲突解决策略 | [x] | ours/theirs/manual/abort |
+| 7.11 | 回滚机制 | [x] | 创建回滚 Feat |
+| 7.12 | Feat 事务 | [x] | begin/commit/rollback |
+| 7.13 | 补偿机制 | [x] | 补偿日志 + 执行 |
+| 7.14 | 跨项目 Feat | [x] | 多项目实体原子发布 |
+| 7.15 | Workflow 状态管理 | [x] | pending/running/paused/completed/failed |
+| 7.16 | 断点续传 | [x] | checkpoint 保存/恢复 |
+| 7.17 | 步骤幂等性 | [x] | step_id + input_hash |
+| 7.18 | 实体清理机制 | [x] | orphaned 实体清理 |
 
 **相关设计文档：**
 
 | 功能 | 文件 | 章节 | 行号 | 已读 | 已实现 |
 |------|------|------|------|:----:|:------:|
-| 7.1-7.4 | `data-ops/cross-reference.md` | 引用解析 + CoW | L1-450 | [ ] | [ ] |
-| 7.5-7.8 | `data-ops/sync-export.md` | 同步导出 | L1-300 | [ ] | [ ] |
-| 7.9-7.11 | `data-ops/conflict-rollback.md` | 冲突回滚 | L1-190 | [ ] | [ ] |
-| 7.12-7.14 | `data-ops/cross-project-transaction.md` | 跨项目事务 | L1-338 | [ ] | [ ] |
-| 7.15-7.18 | `data-ops/workflow-recovery.md` | Workflow 恢复 | L1-574 | [ ] | [ ] |
+| 7.1-7.4 | `data-ops/cross-reference.md` | 引用解析 + CoW | L1-450 | [x] | [x] |
+| 7.5-7.8 | `data-ops/sync-export.md` | 同步导出 | L1-300 | [x] | [x] |
+| 7.9-7.11 | `data-ops/conflict-rollback.md` | 冲突回滚 | L1-190 | [x] | [x] |
+| 7.12-7.14 | `data-ops/cross-project-transaction.md` | 跨项目事务 | L1-338 | [x] | [x] |
+| 7.15-7.18 | `data-ops/workflow-recovery.md` | Workflow 恢复 | L1-574 | [x] | [x] |
 
 ---
 
@@ -885,13 +889,13 @@ Part 06 不仅实现 SQLite 存储，还需要提供 **StorageAdapter 接口**�
 **验证方法：**
 ```bash
 # 类型检查
-pnpm typecheck
+bun run typecheck
 
 # 单元测试
-pnpm test
+bun run test
 
 # 构建验证
-pnpm build
+bun run build
 ```
 
 **详细验证规则见：** [implement.md](implement.md) §2.1 实现验证规则
