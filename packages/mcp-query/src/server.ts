@@ -41,7 +41,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `QUERY_SEARCH_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -70,7 +70,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `QUERY_DEPS_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -99,7 +99,7 @@ export function createServer(): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `QUERY_IMPACT_ERROR: ${(error as Error).message}`,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
             },
           ],
           isError: true,
@@ -109,4 +109,31 @@ export function createServer(): McpServer {
   );
 
   return server;
+}
+
+interface ErrorResponse {
+  code: string;
+  message: string;
+  details?: {
+    field?: string;
+    expected?: string;
+    actual?: string;
+    suggestion?: string;
+  };
+  timestamp: string;
+  request_id?: string;
+  recoverable_actions?: Array<{
+    action: string;
+    label: string;
+    params?: object;
+  }>;
+}
+
+function buildErrorResponse(error: unknown): ErrorResponse {
+  const message = error instanceof Error ? error.message : String(error);
+  return {
+    code: "C4A-QUERY-001",
+    message,
+    timestamp: new Date().toISOString(),
+  };
 }

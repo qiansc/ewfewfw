@@ -596,8 +596,13 @@ export const StoreUpdateWorkflowStepResultSchema = z.object({
   success: z.boolean().describe("是否成功"),
   feat_id: z.string().describe("Feat ID"),
   step_id: z.string().describe("步骤 ID"),
+  status: WorkflowStepStatusSchema.optional().describe("步骤状态"),
+  updated_at: z.string().optional().describe("更新时间（ISO 8601）"),
   updated_fields: z.array(z.string()).optional().describe("已更新的字段"),
-  error: z.enum(["feat_not_found", "step_not_found"]).optional().describe("错误码"),
+  error: z
+    .enum(["feat_not_found", "step_not_found", "concurrent_update"])
+    .optional()
+    .describe("错误码"),
   message: z.string().optional().describe("错误消息"),
 });
 
@@ -845,7 +850,7 @@ export type StoreValidateResult = z.infer<typeof StoreValidateResultSchema>;
 export const ChecklistActionSchema = z.enum([
   "generate",
   "get",
-  "update",
+  "patch",
   "clear",
 ]);
 
@@ -853,9 +858,18 @@ export const ChecklistActionSchema = z.enum([
  * Checklist 补丁
  */
 export const ChecklistPatchSchema = z.object({
-  item_id: z.string().describe("检查项 ID"),
-  status: z.enum(["pending", "in_progress", "completed", "skipped"]).optional().describe("状态"),
-  notes: z.string().optional().describe("备注"),
+  task_id: z.string().describe("任务 ID"),
+  updates: z
+    .object({
+      title: z.string().optional().describe("任务标题"),
+      status: z.enum(["pending", "in_progress", "completed", "blocked", "skipped"]).optional().describe("状态"),
+      type: z.enum(["dsl", "code", "test", "doc", "contract"]).optional().describe("任务类型"),
+      entity_id: z.string().optional().describe("关联实体 ID"),
+      assignee: z.string().optional().describe("负责人"),
+      completed_at: z.string().optional().describe("完成时间"),
+      blocked_reason: z.string().optional().describe("阻塞原因"),
+    })
+    .describe("更新字段"),
 });
 
 /**
@@ -865,7 +879,7 @@ export const StoreFeatChecklistInputSchema = z.object({
   action: ChecklistActionSchema.describe("操作类型"),
   feat_id: z.string().describe("Feat ID"),
   source: z.literal("technical_spec").optional().describe("Checklist 来源（generate 用）"),
-  patches: z.array(ChecklistPatchSchema).optional().describe("更新补丁（update 用）"),
+  patches: z.array(ChecklistPatchSchema).optional().describe("更新补丁（patch 用）"),
   validate: z.boolean().optional().default(true).describe("是否验证"),
 });
 
@@ -873,12 +887,32 @@ export const StoreFeatChecklistInputSchema = z.object({
  * Checklist 项
  */
 export const ChecklistItemSchema = z.object({
-  id: z.string().describe("检查项 ID"),
-  title: z.string().describe("标题"),
-  description: z.string().optional().describe("描述"),
-  status: z.enum(["pending", "in_progress", "completed", "skipped"]).describe("状态"),
-  notes: z.string().optional().describe("备注"),
+  id: z.string().describe("任务 ID"),
+  title: z.string().describe("任务标题"),
+  status: z.enum(["pending", "in_progress", "completed", "blocked", "skipped"]).describe("状态"),
+  type: z.enum(["dsl", "code", "test", "doc", "contract"]).optional().describe("任务类型"),
+  entity_id: z.string().optional().describe("关联实体 ID"),
+  assignee: z.string().optional().describe("负责人"),
+  completed_at: z.string().optional().describe("完成时间"),
+  blocked_reason: z.string().optional().describe("阻塞原因"),
+});
+
+/**
+ * Checklist 内容
+ */
+export const ChecklistSchema = z.object({
+  version: z.string().describe("版本"),
+  metadata: z
+    .object({
+      feat_id: z.string().describe("Feat ID"),
+      generated_at: z.string().optional().describe("生成时间"),
+      source: z.string().optional().describe("生成来源"),
+    })
+    .optional()
+    .describe("元信息"),
   updated_at: z.string().optional().describe("更新时间"),
+  updated_by: z.string().optional().describe("更新人"),
+  items: z.array(ChecklistItemSchema).describe("任务列表"),
 });
 
 /**
@@ -887,22 +921,37 @@ export const ChecklistItemSchema = z.object({
 export const StoreFeatChecklistResultSchema = z.object({
   success: z.boolean().describe("是否成功"),
   feat_id: z.string().describe("Feat ID"),
-  checklist: z.object({
-    items: z.array(ChecklistItemSchema).describe("检查项列表"),
-    progress: z.object({
-      completed: z.number().describe("已完成数"),
-      total: z.number().describe("总数"),
-      percentage: z.number().describe("完成百分比"),
-    }).optional().describe("进度"),
-  }).optional().describe("Checklist 内容"),
-  updated_items: z.array(z.string()).optional().describe("已更新的项 ID（update 用）"),
+  checklist: ChecklistSchema.optional().describe("Checklist 内容"),
+  updated_checklist: ChecklistSchema.optional().describe("更新后的 Checklist"),
+  patched_at: z.string().optional().describe("补丁更新时间"),
+  patched_tasks: z
+    .array(
+      z.object({
+        task_id: z.string().describe("任务 ID"),
+        fields_updated: z.array(z.string()).describe("更新字段列表"),
+      }),
+    )
+    .optional()
+    .describe("已更新的任务"),
   cleared: z.boolean().optional().describe("是否已清除（clear 用）"),
   error: z.string().optional().describe("错误码"),
   message: z.string().optional().describe("错误消息"),
+  missing_tasks: z.array(z.string()).optional().describe("缺失的任务 ID 列表"),
+  validation_errors: z
+    .array(
+      z.object({
+        code: z.string().describe("错误码"),
+        message: z.string().describe("错误信息"),
+        task_id: z.string().optional().describe("任务 ID"),
+      }),
+    )
+    .optional()
+    .describe("结构校验错误"),
 });
 
 export type ChecklistAction = z.infer<typeof ChecklistActionSchema>;
 export type ChecklistPatch = z.infer<typeof ChecklistPatchSchema>;
 export type ChecklistItem = z.infer<typeof ChecklistItemSchema>;
+export type Checklist = z.infer<typeof ChecklistSchema>;
 export type StoreFeatChecklistInput = z.infer<typeof StoreFeatChecklistInputSchema>;
 export type StoreFeatChecklistResult = z.infer<typeof StoreFeatChecklistResultSchema>;

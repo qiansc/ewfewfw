@@ -365,7 +365,7 @@ remote: {url: https://c4a.example.com}  # Remote 模式配置
 - `id`：实体 ID
 - `proposal_id`：Feat 版本（主分支为 `null`，数据库存储为 `''`）
 
-> **注意**：`source_repo` 是元数据字段，不参与唯一性约束。同一 `source_project` 下的实体可能来自不同 repo。
+> **注意**：存储层唯一性仍以 `(source_project, id, proposal_id)` 为准；引用解析时会纳入 `source_repo` 作为逻辑唯一性维度，用于区分同名实体（详见 data-ops/cross-reference.md）。
 >
 > **存储约定**：应用层使用 `null` 表示全局实体/主分支，数据库层使用空字符串 `''` 存储（SQLite 主键不支持 NULL）。详见 [sqlite-schema.md §2.1](./detailed-design/local-mode/sqlite-schema.md#21-核心表) 的空字符串哨兵值约定。
 
@@ -382,11 +382,11 @@ remote: {url: https://c4a.example.com}  # Remote 模式配置
 - `(project-a, auth-utils, '')` — 项目 A 的实体
 - `('', auth-utils, '')` — 全局实体（DB 层用 `''` 表示 `null`）
 
-当使用简单 ID `auth-utils` 引用时，系统按优先级查找（本项目 → 全局实体 → 其他项目）。如发现多个匹配，**返回歧义警告，要求用户使用明确引用格式**：
+当使用简单 ID `auth-utils` 引用时，系统按优先级查找（本项目 → 同 repo 基建 → 同 repo 其他项目 → Enterprise → Domain）。如发现多个匹配，**返回歧义警告，要求用户使用明确引用格式**：
 
 ```
 project:project-a/auth-utils    # 明确引用项目实体
-global:auth-utils               # 明确引用全局实体
+scope:enterprise/auth-utils     # 明确引用企业级实体
 ```
 
 > 详细的引用解析规则和歧义处理见 [data-operations.md 1.5-1.8 节](./detailed-design/data-operations.md#15-引用解析优先级)
@@ -717,7 +717,7 @@ C4A 采用"双视角三构建块"模型：
 - DSL 保持简洁，用户编写时只需写实体 ID
 - 数据库存储完整信息（source_repo、source_project 等）
 - CLI 自动解析和智能提示
-- 实体唯一性：`(source_project, id, proposal_id)` 三元组唯一
+- 实体唯一性：存储层为 `(source_project, id, proposal_id)`，引用解析的逻辑唯一性为 `(source_repo, source_project, id)`
 
 **实体归属**：
 
@@ -734,10 +734,10 @@ C4A 采用"双视角三构建块"模型：
 | `{id}` | 简单 ID，按优先级自动解析 | `payment-service` | ✅ 已支持 |
 | `project:{project_id}/{id}` | 同 repo 跨项目 | `project:frontend-app/auth` | ✅ 已支持 |
 | `repo:{repo_id}/{id}` | 跨 repo 基建 | `repo:company/shared-lib/jwt-utils` | ✅ 已支持 |
-| `repo:{repo_id}/project:{project_id}/{id}` | 跨 repo 跨项目 | `repo:other/repo/project:app/svc` | 🔜 未来支持 |
+| `repo:{repo_id}/project:{project_id}/{id}` | 跨 repo 跨项目 | `repo:other/repo/project:app/svc` | ✅ 已支持 |
 | `scope:{scope}/{id}` | 指定层级 | `scope:domain/order-fsm` | ✅ 已支持 |
 
-> **注意**：`repo:*/project:*` 组合格式为高级场景，v0.3.0 暂不支持，将在后续版本实现。
+> **注意**：`repo:*/project:*` 组合格式属于高级场景，v0.3.0 已支持，建议在跨 repo 协作时显式使用。
 
 **解析优先级**（简单 ID）：本项目 → 同 repo 基建 → 同 repo 其他项目 → Enterprise → Domain → 悬空引用
 

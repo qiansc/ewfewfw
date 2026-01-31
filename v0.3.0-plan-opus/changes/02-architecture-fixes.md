@@ -118,61 +118,48 @@ if (!perspective && (type === 'process' || type === 'sor')) {
 
 ---
 
-## 未修复（属于后续 Part）
+## 已修复（2026-01-31）
 
-### High: c4a_store_save 未调用 DSL → 内部结构转换
+### 9. c4a_store_save 已接入 DSL → 内部结构转换 (High)
 
-**问题**：当前保存逻辑直接把 `data`/`content` 解析后的对象写入 `entities.data`，并且 `kind`/`scope`/`perspective` 仍从 `data.*` 取值。若传入的是 DSL（`type: software-system` + `system:{...}` 结构），这些字段都不会被提升/推导，导致数据库字段长期为空。
+**修复说明**：保存流程在写入前调用 `toInternalEntity`，并用转换结果填充 `kind/scope/perspective`，避免 DSL 结构下字段为空的问题。
 
-**位置**：`packages/storage/src/lite-adapter/crud-operations.ts` L93-171
-
-```typescript
-// 当前逻辑：直接从 data 取值，未调用 converter
-db.prepare(`...`).run(
-  ...
-  (data.kind as string) || null,      // DSL 中没有这个字段
-  (data.scope as string) || null,     // DSL 中在 system.scope 里
-  (data.perspective as string) || null, // DSL 中没有这个字段
-  JSON.stringify(data)
-);
-```
-
-**影响**：虽然 `converter.ts` 已补充 `kind`/`perspective` 推导，但当前保存流程并未调用它，所以优化未生效。
-
-**归属**：Part 03 (MCP Store) + Part 06 (Local 模式)
+**位置**：
+- `packages/storage/src/lite-adapter/crud-save.ts`
 
 ---
 
-### High: 关系解析不符合 DSL Schema + 跨项目引用设计
+### 10. 关系解析与跨项目引用集成 (High)
 
-**问题**：`parseRelations` 只识别 `data.relationships` 的字符串数组或 `{target, type}`，与 DSL 结构不匹配：
+**修复说明**：
+- `parseRelations` 接入 `data-ops/reference/resolver.ts` 的优先级解析
+- 支持 `project:`/`repo:`/`scope:` 格式解析
+- 新增 `references` 字段解析（`references → REFERENCES` 关系）
+- 保留并兼容 System/Container/Component 的 `relationships` 结构
 
-| DSL 类型 | 实际结构 | 当前解析 |
-|---------|---------|---------|
-| System | `relationships.consumers[].id`, `relationships.dependencies[].id` | ❌ 不识别 |
-| Container | `relationships[].to` | ❌ 使用 `target` 字段 |
-| System/SoR | `system.corresponds_to` / `sor.corresponds_to` | ❌ 在嵌套字段里 |
-
-**位置**：`packages/storage/src/lite-adapter/crud-operations.ts` L815-875
-
-**其他问题**：
-- 跨项目引用格式（`project:`/`repo:`/`scope:`）未解析
-- 悬空引用 `resolved=false` 设计未实现
-- `saveRelations` 固定 `toProject = sourceProject`，无法表达跨项目目标
-
-**归属**：Part 03 (MCP Store) + Part 07 (数据操作)
+**位置**：
+- `packages/storage/src/lite-adapter/relations.ts`
+- `packages/storage/src/data-ops/reference/resolver.ts`
+- `packages/core/src/types/dsl.ts`
+- `packages/core/src/schemas/c4a-*.schema.json`
 
 ---
 
-### 汇总表
+### 11. 悬空引用 resolved 标记 (Medium)
 
-| 问题 | 严重度 | 归属 Part | 说明 |
-|------|--------|-----------|------|
-| 保存流程未调用 converter | High | Part 03 + 06 | DSL → 内部结构转换未集成到保存流程 |
-| 关系解析不符合 DSL Schema | High | Part 03 + 07 | System/Container 的 relationships 结构不匹配 |
-| 跨项目引用格式未解析 | High | Part 07 | `project:`/`repo:`/`scope:` 格式 |
-| 悬空引用处理 | Medium | Part 07 | `resolved=false` 状态感知 |
-| corresponds_to 解析 | Medium | Part 03 | 需要从嵌套字段提取 |
+**修复说明**：保存关系时检查目标实体是否存在，写入 `properties.resolved=false`，跨项目未解析的引用写入 `resolve_status=pending`。
+
+**位置**：
+- `packages/storage/src/lite-adapter/relations.ts`
+
+---
+
+### 12. Copy-on-Write 支持 source_project (Medium)
+
+**修复说明**：`copyOnWrite` 增加可选 `sourceProject` 参数，避免多项目同 ID 报歧义错误。
+
+**位置**：
+- `packages/storage/src/data-ops/reference/resolver.ts`
 
 ---
 

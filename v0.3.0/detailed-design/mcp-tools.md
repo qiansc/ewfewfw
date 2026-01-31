@@ -76,5 +76,4 @@ Store 工具因内容较多，进一步拆分为：
 | `c4a_visual_generate` | AI 生成图片 | [visual.md](mcp/visual.md) |
 | `c4a_visual_render_c4` | C4 架构图生成 | [visual.md](mcp/visual.md) |
 
-> 其他可视化辅助功能（模板管理、存储统计、缓存清理）由 CLI 内部实现，不作为独立 MCP 工具暴露。详见 [visual.md](mcp/visual.md#53-已移除的工具)。
-
+> 其他可视化辅助功能（模板管理、存储统计、缓存清理）由 CLI 内部实现，MCP Server 可能保留实现但**默认不对 Agent 暴露**。详见 [visual.md](mcp/visual.md#53-内部工具不对-agent-暴露)。

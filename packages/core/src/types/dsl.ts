@@ -87,6 +87,8 @@ export interface ProductDSL {
     scope: Scope;
     owner?: Owner;
     tags?: string[];
+    /** 引用其他实体（跨层级/跨项目） */
+    references?: string[];
     /** 基于哪个上层 Product（Domain → Enterprise → Project 继承链） */
     based_on?: string;
     /** 引用来源（project 层引用 enterprise 时使用） */
@@ -117,6 +119,8 @@ export interface SystemDSL {
     scope: 'project';
     owner?: Owner;
     tags?: string[];
+    /** 引用其他实体（跨层级/跨项目） */
+    references?: string[];
     /** 对应的 Product ID（1:1 对应） */
     corresponds_to?: string;
     /** 是否外部系统 */
@@ -191,6 +195,8 @@ export interface ContainerDSL {
       ref: string;
       version?: string;
     }>;
+    /** 引用其他实体（跨层级/跨项目） */
+    references?: string[];
   };
   relationships?: Array<{
     to: string;
@@ -224,6 +230,8 @@ export interface ComponentDSL {
     code_path?: string;
     /** 实现的 Contract ID 列表 */
     implements_contracts?: string[];
+    /** 引用其他实体（跨层级/跨项目） */
+    references?: string[];
   };
   relationships?: Array<{
     to: string;
@@ -263,6 +271,8 @@ export interface ProcessDSL {
     process_type: ProcessType;
     owner?: Owner;
     tags?: string[];
+    /** 引用其他实体（跨层级/跨项目） */
+    references?: string[];
     /** 基于哪个上层 Process */
     based_on?: string;
     /** 父流程 ID（形成流程树） */
@@ -347,6 +357,8 @@ export interface SoRDSL {
     process_id?: string;
     owner?: Owner;
     tags?: string[];
+    /** 引用其他实体（跨层级/跨项目） */
+    references?: string[];
     /** 基于哪个上层 SoR */
     based_on?: string;
     /** 对应的 SoR ID（Business SoR ↔ Technical SoR 对应） */
@@ -375,6 +387,8 @@ export interface ADRDSL {
     reviewers?: string[];
     approved_by?: string;
     approved_at?: string;
+    /** 引用其他实体（跨层级/跨项目） */
+    references?: string[];
   };
   context: string;
   decision: string;
@@ -422,6 +436,8 @@ export interface ContractDSL {
     version?: string;
     /** 此 Contract 实现的 SoR ID 列表 */
     implements_sor?: string[];
+    /** 引用其他实体（跨层级/跨项目） */
+    references?: string[];
   };
   /** 内联存储规格内容（小型契约） */
   spec?: unknown;

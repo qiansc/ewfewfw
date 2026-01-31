@@ -2,7 +2,7 @@
  * Sync 模块类型定义（Data Ops）
  */
 
-import type { EntityType } from '../../adapter.js';
+import type { ConflictPolicy, EntityType } from '../../adapter.js';
 import type { Perspective } from '@c4a/core';
 
 // ============================================================
@@ -20,6 +20,7 @@ export interface SyncOptions {
   format?: ExportFormat;
   status_filter?: 'published' | 'approved' | 'all';
   feat_id?: string | null;
+  conflict_policy?: ConflictPolicy;
 }
 
 export interface SyncStats {
@@ -74,6 +75,7 @@ export interface ExportOptions {
   mode?: SyncMode;
   status_filter?: 'published' | 'approved' | 'all';
   feat_id?: string | null;
+  conflict_policy?: ConflictPolicy;
 }
 
 export interface ExportResult {

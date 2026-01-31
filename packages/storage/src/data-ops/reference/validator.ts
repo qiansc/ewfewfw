@@ -1,6 +1,7 @@
 import { DATA_ERROR_CODES, INPUT_ERROR_CODES } from '@c4a/core/types';
 import { resolveReference } from './resolver.js';
 import type { Entity, EntityStatus } from '../../adapter.js';
+import { normalizeReferenceScope } from './types.js';
 import type {
   ReferenceCandidate,
   ReferenceError,
@@ -115,19 +116,22 @@ function parseCandidates(data: UnknownRecord): {
       id,
       sourceProject: (item.sourceProject ?? item.source_project) as string | null | undefined,
       sourceRepo: (item.sourceRepo ?? item.source_repo) as string | null | undefined,
-      scope: item.scope as ReferenceCandidate['scope'],
+      scope: typeof item.scope === 'string' ? normalizeReferenceScope(item.scope) : null,
     });
   }
 
   return { candidates, hasCandidateField: true };
 }
 
-function parseContextOverride(data: UnknownRecord): { projectId?: string; repoId?: string; scope?: string } {
+function parseContextOverride(
+  data: UnknownRecord
+): { projectId?: string; repoId?: string; scope?: ResolveContext['scope'] } {
   const raw = data.reference_context ?? data.referenceContext;
   if (!isPlainObject(raw)) return {};
   const projectId = typeof raw.projectId === 'string' ? raw.projectId : undefined;
   const repoId = typeof raw.repoId === 'string' ? raw.repoId : undefined;
-  const scope = typeof raw.scope === 'string' ? raw.scope : undefined;
+  const scope =
+    typeof raw.scope === 'string' ? normalizeReferenceScope(raw.scope) ?? undefined : undefined;
   return { projectId, repoId, scope };
 }
 

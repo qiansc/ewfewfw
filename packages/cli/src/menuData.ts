@@ -1,72 +1,206 @@
-/**
- * 菜单数据结构
- */
+import type { CliMode } from "./core/config.js";
+
+export type MenuAction = "template" | "schema" | "feat-render";
+
 export interface MenuItem {
   id: string;
   label: string;
-  description: string;
+  description?: string;
+  command?: string[];
+  action?: MenuAction;
   children?: MenuItem[];
-  separator?: boolean;
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
-export const menuTree: MenuItem[] = [
-  { id: "dev", label: "dev", description: "本地开发" },
-  { id: "restart", label: "restart", description: "重启服务" },
-  { id: "docker", label: "docker", description: "全 Docker 模式" },
-  { id: "prod", label: "prod", description: "生产部署" },
+export interface MenuContext {
+  installedModes: Array<"local" | "server">;
+  projectMode?: CliMode;
+  remoteUrl?: string;
+}
+
+const INSTALL_MENU: MenuItem[] = [
   {
-    id: "debug",
-    label: "debug",
-    description: "调试 MCP",
-    children: [
-      { id: "debug:dsl", label: "store", description: "Store MCP" },
-      { id: "debug:code", label: "extract", description: "Extract MCP" },
-      { id: "debug:data", label: "query", description: "Query MCP" },
-    ],
+    id: "install-local",
+    label: "local  - 本地模式",
+    description: "使用 SQLite 单文件数据库，适合个人使用",
+    command: ["install", "local"],
   },
   {
-    id: "server",
-    label: "server",
-    description: "服务管理",
-    children: [
-      { id: "status", label: "status", description: "查看状态" },
-      { id: "stop", label: "stop", description: "停止服务" },
-      { id: "logs", label: "logs", description: "查看日志" },
-    ],
+    id: "install-server",
+    label: "server - 服务模式",
+    description: "使用 Docker 启动 MongoDB/Neo4j/Milvus，适合团队协作",
+    command: ["install", "server"],
   },
-  { id: "install", label: "install", description: "安装依赖" },
   {
-    id: "clean",
-    label: "clean",
-    description: "清理数据",
-    children: [
-      { id: "clean:storage", label: "storage", description: "清理远程存储" },
-      { id: "clean:local", label: "local", description: "清理本地文件" },
-      { id: "clean", label: "all", description: "清理全部数据" },
-    ],
+    id: "install-remote",
+    label: "remote - 远程模式",
+    description: "仅记录 Remote 选择，需要在项目中配置 remote.url",
+    command: ["install", "remote"],
   },
-  { id: "test", label: "test", description: "运行测试" },
+  {
+    id: "install-skip",
+    label: "skip   - 稍后决定",
+    description: "跳过安装，稍后通过 c4a install 选择模式",
+    command: ["install", "skip"],
+  },
 ];
 
-/**
- * 命令帮助说明（单行格式，句号结尾）
- */
-export const helpDescriptions: Record<string, string> = {
-  dev: "启动存储服务(Docker) + mcp-store/mcp-query，带健康检查和自动重试。使用 ./start.sh dev --force 强制重启。",
-  restart: "重启所有服务，包括 mcp-store/mcp-query 和 ttyd。适用于服务异常时恢复。",
-  docker: "所有 MCP 服务容器化运行，暴露 HTTP 端口供远程 Agent 调用。适合团队共享和 CI/CD。",
-  prod: "生产级部署，启用健康检查和自动重启，支持 TLS/认证。适合正式环境。",
-  debug: "按 → 展开子菜单，选择要调试的 MCP 服务，前台运行可直接看日志。",
-  "debug:dsl": "前台运行 mcp-store (stdio 模式)，可直接看到输入输出日志，Ctrl+C 退出。",
-  "debug:code": "前台运行 mcp-extract (stdio 模式)，可直接看到输入输出日志，Ctrl+C 退出。",
-  "debug:data": "前台运行 mcp-query (stdio 模式)，可直接看到输入输出日志，Ctrl+C 退出。",
-  server: "按 → 展开子菜单，管理服务状态、日志和数据清理。",
-  status: "显示所有服务运行状态，包括 HTTP 健康检查和日志文件位置。",
-  stop: "停止所有运行中的服务，包括 Docker 容器和本地进程。",
-  logs: "查看 Docker 容器日志，可指定服务名如 logs mongodb。",
-  install: "安装项目依赖：bun install。",
-  test: "运行项目测试：bun test。",
-  clean: "按 → 展开子菜单，选择清理范围：远程存储、本地文件或全部。",
-  "clean:storage": "清理远程存储（MongoDB/Neo4j/Milvus/Ollama volumes）。本地 .context/ 文件不受影响。",
-  "clean:local": "清理本地知识文件（.context/ 下的 business、technical、feat、assets、.schemas）。远程存储和日志不受影响。",
-};
+const SERVER_MENU: MenuItem[] = [
+  { id: "server-status", label: "status   查看状态", command: ["server", "status"] },
+  { id: "server-restart", label: "restart  重启服务", command: ["server", "restart"] },
+  { id: "server-stop", label: "stop     停止服务", command: ["server", "stop"] },
+  { id: "server-logs", label: "logs     查看日志", command: ["server", "logs"] },
+  { id: "server-backup", label: "backup   备份数据", command: ["server", "backup"] },
+  { id: "server-restore", label: "restore  恢复数据", command: ["server", "restore"] },
+  { id: "server-clean", label: "clean    清理数据", command: ["server", "clean"] },
+  {
+    id: "server-check",
+    label: "check-permissions 权限检查",
+    command: ["server", "check-permissions"],
+  },
+];
+
+const LOCAL_MENU: MenuItem[] = [
+  { id: "local-status", label: "status   数据库状态", command: ["local", "status"] },
+  { id: "local-validate", label: "validate 完整性校验", command: ["local", "validate"] },
+  { id: "local-repair", label: "repair   修复数据", command: ["local", "repair"] },
+  { id: "local-backup", label: "backup   备份数据", command: ["local", "backup"] },
+  { id: "local-restore", label: "restore  恢复数据", command: ["local", "restore"] },
+  { id: "local-clean", label: "clean    清理数据库", command: ["local", "clean"] },
+  { id: "local-vacuum", label: "vacuum   压缩数据库", command: ["local", "vacuum"] },
+];
+
+export function buildFirstRunMenu(): MenuItem[] {
+  return [
+    {
+      id: "first-local",
+      label: "local  - 本地模式",
+      description: "SQLite 单文件数据库，无需 Docker，适合个人使用",
+      command: ["install", "local"],
+    },
+    {
+      id: "first-server",
+      label: "server - 服务模式",
+      description: "MongoDB + Neo4j + Milvus，需要 Docker，适合团队协作",
+      command: ["install", "server"],
+    },
+    {
+      id: "first-remote",
+      label: "remote - 远程模式",
+      description: "不安装本地存储，使用远程 MCP 服务",
+      command: ["install", "remote"],
+    },
+    {
+      id: "first-skip",
+      label: "skip   - 稍后决定",
+      description: "跳过安装，稍后通过 c4a install 选择模式",
+    },
+  ];
+}
+
+function withDisabled(item: MenuItem, disabled: boolean, reason?: string): MenuItem {
+  if (!disabled) return item;
+  return {
+    ...item,
+    disabled: true,
+    disabledReason: reason ?? "需要先安装 local/server 或配置 remote 模式",
+  };
+}
+
+export function buildMainMenu(context: MenuContext): MenuItem[] {
+  const hasLocal = context.installedModes.includes("local");
+  const hasServer = context.installedModes.includes("server");
+  const hasInstalled = hasLocal || hasServer;
+  const isRemoteProject = context.projectMode === "remote";
+
+  const allowSync = hasInstalled || isRemoteProject;
+  const allowStatus = hasInstalled || isRemoteProject;
+  const allowFeat = hasInstalled || isRemoteProject;
+
+  const items: MenuItem[] = [
+    {
+      id: "init",
+      label: "init 初始化项目",
+      description: "创建 .context/ 目录和项目配置",
+      command: ["init"],
+    },
+    withDisabled(
+      {
+        id: "sync",
+        label: "sync 同步知识",
+        description: "同步本地与数据库的架构知识",
+        command: ["sync"],
+      },
+      !allowSync,
+    ),
+    withDisabled(
+      {
+        id: "status",
+        label: "status 状态查看",
+        description: "查看项目配置和数据库统计",
+        command: ["status"],
+      },
+      !allowStatus,
+    ),
+    {
+      id: "validate",
+      label: "validate 验证 DSL",
+      description: "离线校验 DSL 文件",
+      command: ["validate"],
+    },
+    withDisabled(
+      {
+        id: "feat",
+        label: "feat Feat 管理",
+        description: "渲染 Checklist 到本地",
+        action: "feat-render",
+      },
+      !allowFeat,
+    ),
+    {
+      id: "template",
+      label: "template 生成模板",
+      description: "生成 DSL 模板文件",
+      action: "template",
+    },
+    {
+      id: "schema",
+      label: "schema 查看 Schema",
+      description: "输出 DSL JSON Schema",
+      action: "schema",
+    },
+    {
+      id: "install",
+      label: "install 安装模式",
+      description: "安装 local/server 或记录 remote 选择",
+      children: INSTALL_MENU,
+    },
+  ];
+
+  if (hasServer) {
+    items.push({
+      id: "server",
+      label: "server 服务管理",
+      description: "管理 Docker 服务",
+      children: SERVER_MENU,
+    });
+  }
+  if (hasLocal) {
+    items.push({
+      id: "local",
+      label: "local 本地管理",
+      description: "管理本地数据库",
+      children: LOCAL_MENU,
+    });
+  }
+
+  items.push({
+    id: "help",
+    label: "help 帮助信息",
+    description: "查看命令帮助",
+    command: ["help"],
+  });
+
+  return items;
+}

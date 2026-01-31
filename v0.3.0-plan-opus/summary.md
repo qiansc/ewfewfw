@@ -186,6 +186,8 @@
 | 3.23 | c4a_store_validate | [x] | 架构一致性检查 |
 | 3.24 | 移除 legacy MCP 接口 | [x] | 删除旧接口与别名 |
 
+> 备注: feat checklist 并发更新冲突校验已补齐（2026-01-31）。
+
 **相关设计文档：**
 
 | 功能 | 文件 | 章节 | 行号 | 已读 | 已实现 |
@@ -413,6 +415,8 @@ packages/
 > 备注: Agent-0 前置准备 + Schema 已完成。
 > 备注: transaction/workflow/reference/sync 占位文件已创建，其中冲突回滚模块已实现并补齐测试（2026-01-30）。
 > 备注: Agent-6 集成收尾已完成（2026-01-30），补齐 data-ops 统一导出、集成测试、README。
+> 备注: 引用解析已完成 LiteAdapter 集成，支持 references 字段与 resolved 标记（2026-01-31）。
+> 备注: DSL references schema 验证用例已补齐（2026-01-31）。
 
 | # | 功能 | 完成 | 描述 |
 |---|------|:----:|------|
@@ -451,37 +455,39 @@ packages/
 
 | # | 功能 | 完成 | 描述 |
 |---|------|:----:|------|
-| 8.1 | CLI 架构设计 | [ ] | User CLI vs Dev CLI |
-| 8.2 | 首次运行引导 | [ ] | 模式选择 (local/server/remote/skip) |
-| 8.3 | 动态菜单显示 | [ ] | 根据模式显示不同菜单项 |
-| 8.4 | c4a init | [ ] | 项目初始化 |
-| 8.5 | c4a status | [ ] | 查看项目状态 |
-| 8.6 | c4a install | [ ] | Local/Server 模式安装 |
-| 8.7 | c4a sync | [ ] | 双向同步 |
-| 8.8 | c4a validate | [ ] | 离线 DSL 验证 |
-| 8.9 | c4a feat render | [ ] | Checklist 渲染 |
-| 8.10 | c4a template/schema | [ ] | 模板/Schema 生成 |
-| 8.11 | c4a server 子菜单 | [ ] | backup/restore/status |
-| 8.12 | c4a local 子菜单 | [ ] | backup/restore/repair |
+| 8.1 | CLI 架构设计 | [x] | User CLI vs Dev CLI |
+| 8.2 | 首次运行引导 | [x] | 模式选择 (local/server/remote/skip) |
+| 8.3 | 动态菜单显示 | [x] | 根据模式显示不同菜单项 |
+| 8.4 | c4a init | [x] | 项目初始化 |
+| 8.5 | c4a status | [x] | 查看项目状态 |
+| 8.6 | c4a install | [x] | Local/Server 模式安装 |
+| 8.7 | c4a sync | [x] | 双向同步 |
+| 8.8 | c4a validate | [x] | 离线 DSL 验证 |
+| 8.9 | c4a feat render | [x] | Checklist 渲染 |
+| 8.10 | c4a template/schema | [x] | 模板/Schema 生成 |
+| 8.11 | c4a server 子菜单 | [x] | backup/restore/status |
+| 8.12 | c4a local 子菜单 | [x] | backup/restore/repair |
 | 8.13 | c4a rollback (v0.4.0) | [ ] | 紧急回滚命令 |
-| 8.14 | 多模式支持 | [ ] | 同时安装 Local/Server |
-| 8.15 | 全局/项目配置 | [ ] | ~/.c4a/config.yaml + .c4a.yaml |
-| 8.16 | Remote 模式设计 | [ ] | 选择流程 + 命令可用性 |
-| 8.17 | CLI-MCP 映射 | [ ] | 命令到工具映射 |
-| 8.18 | sync 实现细节 | [ ] | Local/Server/Remote 差异 |
-| 8.19 | 冲突检测算法 | [ ] | 哈希 + 时间戳 |
-| 8.20 | Commands vs Skills | [ ] | 职责划分 |
-| 8.21 | CLI 目录迁移 | [ ] | packages/cli 新结构 |
+| 8.14 | 多模式支持 | [x] | 同时安装 Local/Server |
+| 8.15 | 全局/项目配置 | [x] | ~/.c4a/config.yaml + .c4a.yaml |
+| 8.16 | Remote 模式设计 | [x] | 选择流程 + 命令可用性 |
+| 8.17 | CLI-MCP 映射 | [x] | 命令到工具映射 |
+| 8.18 | sync 实现细节 | [x] | Local/Server/Remote 差异 |
+| 8.19 | 冲突检测算法 | [x] | 哈希 + 时间戳 |
+| 8.20 | Commands vs Skills | [x] | 职责划分 |
+| 8.21 | CLI 目录迁移 | [x] | packages/cli 新结构 |
+
+> 备注（2026-01-31）：8.13 为 v0.4.0 计划项，Part 08 其余完成；补齐 sync 双向变更确认与冲突处理递归参数修复。
 
 **相关设计文档：**
 
 | 功能 | 文件 | 章节 | 行号 | 已读 | 已实现 |
 |------|------|------|------|:----:|:------:|
-| 8.1 | `cli/overview.md` | 全文 | L1-32 | [ ] | [ ] |
-| 8.2-8.16 | `cli/user-cli.md` | 全文 | L1-1739 | [ ] | [ ] |
-| 8.17-8.19 | `cli/mcp-mapping.md` | 全文 | L1-760 | [ ] | [ ] |
-| 8.20 | `cli/commands-vs-skills.md` | 全文 | L1-80 | [ ] | [ ] |
-| 8.21 | `cli/structure-migration.md` | 全文 | L1-172 | [ ] | [ ] |
+| 8.1 | `cli/overview.md` | 全文 | L1-32 | [x] | [x] |
+| 8.2-8.16 | `cli/user-cli.md` | 全文 | L1-1739 | [x] | [x] |
+| 8.17-8.19 | `cli/mcp-mapping.md` | 全文 | L1-760 | [x] | [x] |
+| 8.20 | `cli/commands-vs-skills.md` | 全文 | L1-80 | [x] | [x] |
+| 8.21 | `cli/structure-migration.md` | 全文 | L1-172 | [x] | [x] |
 
 ---
 

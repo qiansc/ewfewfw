@@ -29,6 +29,14 @@
 | published 报错 | L234-235 | packages/storage/src/data-ops/reference/validator.ts L53-72 | ✅ |
 | 修复建议生成 | L229-327 | packages/storage/src/data-ops/reference/validator.ts L183-195 | ✅ |
 
+### 集成落地（LiteAdapter）
+
+| 设计项 | 行号 | 实现文件 | 状态 |
+|--------|------|----------|:----:|
+| LiteAdapter 调用引用解析优先级 | L70-79 | packages/storage/src/lite-adapter/relations.ts L40-206 | ✅ |
+| references 字段解析为 REFERENCES | L42-58 | packages/storage/src/lite-adapter/relations.ts L140-225 | ✅ |
+| 保存时写入 resolved/resolve_status | L229-327 | packages/storage/src/lite-adapter/relations.ts L234-468 | ✅ |
+
 ### cross-reference.md §1.12 Copy-on-Write (L332-520)
 
 | 设计项 | 行号 | 实现文件 | 状态 |
@@ -57,4 +65,3 @@
 | `packages/storage/src/data-ops/reference/__tests__/resolver.test.ts` | 优先级/歧义测试 |
 | `packages/storage/src/data-ops/reference/__tests__/validator.test.ts` | 悬空引用测试 |
 | `packages/storage/src/data-ops/reference/__tests__/copyOnWrite.test.ts` | CoW 测试 |
-

@@ -2,12 +2,13 @@
  * LiteAdapter 辅助方法
  */
 
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import YAML from 'yaml';
 import type { SQLiteStore } from '../sqlite-store.js';
 import type { InMemoryGraph } from '../in-memory-graph.js';
 import type { EntityType, EntityStatus, Entity, Relation } from '../adapter.js';
 import type { EntityRow, ParsedRelation } from './types.js';
+import { computeContentHash } from '../utils/contentHash.js';
 
 // ============================================================
 // 内容解析与格式化
@@ -43,8 +44,7 @@ export function formatContent(data: Record<string, unknown>, format: 'yaml' | 'j
  * 计算内容哈希
  */
 export function computeHash(data: Record<string, unknown>): string {
-  const content = JSON.stringify(data, Object.keys(data).sort());
-  return createHash('sha256').update(content).digest('hex').slice(0, 16);
+  return computeContentHash(data);
 }
 
 // ============================================================

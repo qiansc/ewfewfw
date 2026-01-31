@@ -1,2 +1,10 @@
-export * from "./docker.js";
-export * from "./process.js";
+export { detectGitRemote } from "./git.js";
+export {
+  checkDockerInstalled,
+  getContainerStatus,
+  startContainers,
+  stopContainers,
+  restartContainers,
+  getContainerLogs,
+} from "./docker.js";
+export { calculateHash, hashString } from "./hash.js";

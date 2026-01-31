@@ -274,15 +274,31 @@ export function parseReference(ref: string): ResolvedReference {
   }
 
   // repo:org/repo/entity-id
+  // repo:org/repo/project:project-id/entity-id
   if (ref.startsWith('repo:')) {
     const rest = ref.slice('repo:'.length);
     const parts = rest.split('/');
     if (parts.length >= 3) {
+      const repoId = `${parts[0]}/${parts[1]}`;
+      const remainder = parts.slice(2).join('/');
+      let projectId: string | undefined;
+      let entityId = remainder;
+
+      if (remainder.startsWith('project:')) {
+        const nested = remainder.slice('project:'.length);
+        const slashIndex = nested.indexOf('/');
+        if (slashIndex > 0) {
+          projectId = nested.slice(0, slashIndex);
+          entityId = nested.slice(slashIndex + 1);
+        }
+      }
+
       return {
         raw: ref,
         type: 'repo',
-        repo_id: `${parts[0]}/${parts[1]}`,
-        entity_id: parts.slice(2).join('/'),
+        repo_id: repoId,
+        project_id: projectId,
+        entity_id: entityId,
       };
     }
   }
@@ -318,6 +334,9 @@ export function buildReference(resolved: ResolvedReference): string {
     case 'project':
       return `project:${resolved.project_id}/${resolved.entity_id}`;
     case 'repo':
+      if (resolved.project_id) {
+        return `repo:${resolved.repo_id}/project:${resolved.project_id}/${resolved.entity_id}`;
+      }
       return `repo:${resolved.repo_id}/${resolved.entity_id}`;
     case 'scope':
       return `scope:${resolved.scope}/${resolved.entity_id}`;

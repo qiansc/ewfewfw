@@ -19,23 +19,13 @@
       "mcp__c4a-store-mcp__c4a_store_feat_checklist",
       "mcp__c4a-store-mcp__c4a_store_update_workflow_step",
       "mcp__c4a-store-mcp__c4a_store_read_history",
-      "mcp__c4a-store-mcp__c4a_store_backup",
-      "mcp__c4a-store-mcp__c4a_store_restore",
       "mcp__c4a-store-mcp__c4a_store_repair",
       "mcp__c4a-store-mcp__c4a_store_validate",
       "mcp__c4a-query-mcp__c4a_query_search",
       "mcp__c4a-query-mcp__c4a_query_deps",
       "mcp__c4a-query-mcp__c4a_query_impact",
-      "mcp__c4a_visual_cleanup",
-      "mcp__c4a_visual_generate",
-      "mcp__c4a_visual_get_reference",
-      "mcp__c4a_visual_get_style",
-      "mcp__c4a_visual_list_templates",
-      "mcp__c4a_visual_render",
-      "mcp__c4a_visual_render_c4",
-      "mcp__c4a_visual_render_template",
-      "mcp__c4a_visual_save",
-      "mcp__c4a_visual_storage_stats"
+      "mcp__c4a-visual-mcp__c4a_visual_generate",
+      "mcp__c4a-visual-mcp__c4a_visual_render_c4"
     ],
     "deny": []
   }

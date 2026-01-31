@@ -9,3 +9,4 @@ export {
   mergeFeatToMain,
   collectFeatEntitiesForVector,
 } from './merge.js';
+export { featChecklist } from './checklist.js';

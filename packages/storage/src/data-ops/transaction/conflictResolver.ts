@@ -16,6 +16,8 @@ function buildConflictSuggestion(conflict: FeatConflict): string {
   switch (conflict.conflict_type) {
     case 'deleted':
       return '建议优先恢复实体并核查依赖关系后再发布';
+    case 'type':
+      return '类型或 kind 变更需要确认业务意图，建议人工选择保留版本';
     case 'content':
     case 'both_modified':
       return '对比 main/feat 字段差异，选择保留版本或拆分修改';

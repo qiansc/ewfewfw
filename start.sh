@@ -206,4 +206,4 @@ fi
 # 启动 CLI
 # ============================================================
 
-exec bun "$SCRIPT_DIR/packages/cli/src/index.tsx" "$@"
+exec bun "$SCRIPT_DIR/packages/cli-dev/src/index.tsx" "$@"

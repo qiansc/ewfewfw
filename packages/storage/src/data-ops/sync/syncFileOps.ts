@@ -7,7 +7,6 @@ import {
   rmSync,
 } from 'node:fs';
 import { join, dirname, extname } from 'node:path';
-import { createHash } from 'node:crypto';
 import {
   CONFIG_FILENAME,
   CONTEXT_ROOT_DIR,
@@ -21,6 +20,7 @@ import {
 import type { EntityType } from '../../adapter.js';
 import type { DbEntityInfo, ExportFormat, FileEntityInfo, SyncDetail } from './types.js';
 import { isExcludedType, pickString } from './syncUtils.js';
+import { computeContentHash } from '../../utils/contentHash.js';
 
 const DSL_EXTENSIONS = ['.c4a.yaml', '.c4a.yml', '.c4a.json', '.yaml', '.yml', '.json'];
 const JSON_EXTENSIONS = new Set(['.json', '.c4a.json']);
@@ -358,6 +358,5 @@ function getFileFormat(path: string): ExportFormat {
 }
 
 function computeEntityHash(data: Record<string, unknown>): string {
-  const content = JSON.stringify(data, Object.keys(data).sort());
-  return createHash('sha256').update(content).digest('hex').slice(0, 16);
+  return computeContentHash(data);
 }

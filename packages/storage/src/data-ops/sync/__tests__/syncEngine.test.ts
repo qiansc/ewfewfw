@@ -1,11 +1,11 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
 import { mkdirSync, rmSync, writeFileSync, utimesSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { createHash } from 'node:crypto';
 import { SQLiteStore } from '../../../sqlite-store.js';
 import { InMemoryGraph } from '../../../in-memory-graph.js';
 import { GraphQueryCache } from '../../../graph-query-cache.js';
 import { createDataOpsContext } from '../../../lite-adapter/dataOpsContext.js';
+import { computeContentHash } from '../../../utils/contentHash.js';
 import { sync } from '../syncEngine.js';
 import type { AdapterContext } from '../../../lite-adapter/types.js';
 
@@ -49,8 +49,7 @@ function resetDb(): void {
 }
 
 function computeHash(data: Record<string, unknown>): string {
-  const content = JSON.stringify(data, Object.keys(data).sort());
-  return createHash('sha256').update(content).digest('hex').slice(0, 16);
+  return computeContentHash(data);
 }
 
 function insertMainEntity(params: {
@@ -93,7 +92,7 @@ describe('Data Ops sync engine (new)', () => {
     mkdirSync(FILES_ROOT, { recursive: true });
   });
 
-  test('bidirectional sync uses newer file when timestamps indicate local change', async () => {
+  test('bidirectional sync reports conflict when db/file content diverge', async () => {
     const ctx = createContext();
     const dataOpsCtx = createDataOpsContext(ctx);
 
@@ -134,8 +133,8 @@ describe('Data Ops sync engine (new)', () => {
       format: 'yaml',
     });
 
-    expect(result.success).toBe(true);
-    expect(result.stats.updated).toBe(1);
+    expect(result.success).toBe(false);
+    expect(result.stats.conflicted).toBe(1);
 
     const row = store
       .getDatabase()
@@ -144,7 +143,7 @@ describe('Data Ops sync engine (new)', () => {
       )
       .get('sys-bidir') as { data: string } | undefined;
     const parsed = row ? (JSON.parse(row.data) as { name?: string }) : {};
-    expect(parsed.name).toBe('from-file');
+    expect(parsed.name).toBe('from-db');
   });
 
   test('incremental db-to-file skips when hashes match', async () => {

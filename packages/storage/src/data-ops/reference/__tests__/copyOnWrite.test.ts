@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:tes
 import { mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { SQLiteStore } from '../../../sqlite-store.js';
+import { createStorageOperationsFromDatabase } from '../../../lite-adapter/dataOpsContext.js';
 import { copyOnWrite } from '../resolver.js';
 
 const TMP_ROOT = join(process.cwd(), '.tmp', 'data-ops-reference-tests');
@@ -41,6 +42,7 @@ describe('copyOnWrite', () => {
 
   test('copies main entity to feat branch', () => {
     const db = store.getDatabase();
+    const storage = createStorageOperationsFromDatabase(db);
     const now = new Date().toISOString();
 
     db.prepare(`
@@ -68,7 +70,7 @@ describe('copyOnWrite', () => {
       'alice'
     );
 
-    const copied = copyOnWrite('svc', 'feat-1');
+    const copied = copyOnWrite(storage, 'svc', 'feat-1');
 
     expect(copied.proposal_id).toBe('feat-1');
     expect(copied.metadata.source_project).toBe('alpha');
@@ -85,6 +87,7 @@ describe('copyOnWrite', () => {
 
   test('returns existing feat copy when already present', () => {
     const db = store.getDatabase();
+    const storage = createStorageOperationsFromDatabase(db);
     const now = new Date().toISOString();
 
     db.prepare(`
@@ -112,7 +115,7 @@ describe('copyOnWrite', () => {
       'alice'
     );
 
-    const copied = copyOnWrite('svc', 'feat-1');
+    const copied = copyOnWrite(storage, 'svc', 'feat-1');
     expect(copied.proposal_id).toBe('feat-1');
 
     const rows = db

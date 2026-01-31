@@ -39,15 +39,27 @@ function createContext(): AdapterContext {
 function insertFeat(params: { id: string; checklist?: string | null }): void {
   const db = store.getDatabase();
   const now = new Date().toISOString();
+  const checklistVersion = params.checklist ? now : null;
   db.prepare(`
-    INSERT INTO feats (id, status, title, description, created_by, checklist, created_at, updated_at)
-    VALUES (?, 'draft', ?, ?, ?, ?, ?, ?)
+    INSERT INTO feats (
+      id,
+      status,
+      title,
+      description,
+      created_by,
+      checklist,
+      checklist_version,
+      created_at,
+      updated_at
+    )
+    VALUES (?, 'draft', ?, ?, ?, ?, ?, ?, ?)
   `).run(
     params.id,
     params.id,
     '',
     'tester',
     params.checklist ?? null,
+    checklistVersion,
     now,
     now
   );
@@ -115,15 +127,14 @@ describe('featChecklist', () => {
     const originalPrepare = db.prepare.bind(db);
     db.prepare = ((sql: string) => {
       const stmt = originalPrepare(sql);
-      if (sql.includes('UPDATE feats SET checklist')) {
+      if (sql.includes('UPDATE feats') && sql.includes('checklist')) {
         return {
           ...stmt,
           run: (...args: unknown[]) => {
             const newUpdatedAt = new Date(Date.now() + 1000).toISOString();
-            originalPrepare('UPDATE feats SET updated_at = ? WHERE id = ?').run(
-              newUpdatedAt,
-              featId
-            );
+            originalPrepare(
+              'UPDATE feats SET updated_at = ?, checklist_version = ? WHERE id = ?'
+            ).run(newUpdatedAt, newUpdatedAt, featId);
             return (stmt as { run: (...runArgs: unknown[]) => unknown }).run(...args);
           },
         } as typeof stmt;

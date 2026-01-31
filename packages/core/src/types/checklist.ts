@@ -27,56 +27,39 @@ export type ChecklistItemStatus =
  * Checklist 项目类型
  */
 export type ChecklistItemType =
-  | 'task' // 普通任务
-  | 'milestone' // 里程碑
-  | 'review' // 审核点
-  | 'validation'; // 验证点
+  | 'dsl' // DSL 定义
+  | 'code' // 代码实现
+  | 'test' // 测试
+  | 'doc' // 文档
+  | 'contract'; // 契约
 
 /**
  * Checklist 项目
  */
 export interface ChecklistItem {
-  /** 项目 ID */
+  /** 任务 ID */
   id: string;
 
-  /** 项目内容 */
-  content: string;
-
-  /** 项目类型 */
-  type: ChecklistItemType;
+  /** 任务标题 */
+  title: string;
 
   /** 状态 */
   status: ChecklistItemStatus;
 
+  /** 任务类型 */
+  type?: ChecklistItemType;
+
+  /** 关联实体 ID */
+  entity_id?: string;
+
   /** 负责人 */
   assignee?: string;
 
-  /** 预计完成时间 */
-  due_date?: string;
-
-  /** 实际完成时间 */
+  /** 完成时间 */
   completed_at?: string;
 
-  /** 完成者 */
-  completed_by?: string;
-
-  /** 关联的实体 ID */
-  related_entity_id?: string;
-
-  /** 关联的实体类型 */
-  related_entity_type?: string;
-
-  /** 前置任务 ID 列表 */
-  depends_on?: string[];
-
-  /** 备注 */
-  notes?: string;
-
-  /** 顺序（用于排序） */
-  order?: number;
-
-  /** 扩展数据 */
-  metadata?: Record<string, unknown>;
+  /** 阻塞原因 */
+  blocked_reason?: string;
 }
 
 // ============================================================================
@@ -84,68 +67,29 @@ export interface ChecklistItem {
 // ============================================================================
 
 /**
- * Checklist 分组
- */
-export interface ChecklistGroup {
-  /** 分组 ID */
-  id: string;
-
-  /** 分组名称 */
-  name: string;
-
-  /** 分组描述 */
-  description?: string;
-
-  /** 分组内的项目 ID 列表 */
-  item_ids: string[];
-
-  /** 顺序 */
-  order?: number;
-}
-
-/**
  * Checklist
+ *
+ * 对应数据库中的 checklist 字段（详见 store-feat-checklist.md）。
  */
 export interface Checklist {
-  /** Checklist ID */
-  id: string;
+  /** 版本 */
+  version: string;
 
-  /** 关联的 Feat ID */
-  feat_id: string;
-
-  /** 标题 */
-  title: string;
-
-  /** 描述 */
-  description?: string;
-
-  /** 所有项目 */
-  items: ChecklistItem[];
-
-  /** 分组（可选） */
-  groups?: ChecklistGroup[];
-
-  /** 创建时间 */
-  created_at: string;
+  /** 生成元信息 */
+  metadata?: {
+    feat_id: string;
+    generated_at?: string;
+    source?: string;
+  };
 
   /** 更新时间 */
   updated_at?: string;
 
-  /** 创建者 */
-  created_by?: string;
+  /** 更新人 */
+  updated_by?: string;
 
-  /** 进度统计 */
-  progress?: {
-    total: number;
-    completed: number;
-    in_progress: number;
-    pending: number;
-    skipped: number;
-    blocked: number;
-  };
-
-  /** 扩展元数据 */
-  metadata?: Record<string, unknown>;
+  /** 任务列表 */
+  items: ChecklistItem[];
 }
 
 // ============================================================================
@@ -158,12 +102,12 @@ export interface Checklist {
 export interface CreateChecklistParams {
   /** 关联的 Feat ID */
   feat_id: string;
-  /** 标题 */
-  title: string;
-  /** 描述 */
-  description?: string;
+  /** 来源 */
+  source?: string;
   /** 初始项目列表 */
-  items?: Array<Omit<ChecklistItem, 'id' | 'status'> & { status?: ChecklistItemStatus }>;
+  items?: Array<
+    Omit<ChecklistItem, 'id' | 'status'> & { id?: string; status?: ChecklistItemStatus }
+  >;
   /** 创建者 */
   created_by?: string;
 }
@@ -176,12 +120,10 @@ export interface UpdateChecklistItemParams {
   checklist_id: string;
   /** Item ID */
   item_id: string;
-  /** 目标状态 */
-  status: ChecklistItemStatus;
+  /** 更新字段 */
+  updates: Partial<Omit<ChecklistItem, 'id'>>;
   /** 操作者 */
   operator?: string;
-  /** 备注 */
-  notes?: string;
 }
 
 /**
@@ -190,24 +132,20 @@ export interface UpdateChecklistItemParams {
 export interface AddChecklistItemParams {
   /** Checklist ID */
   checklist_id: string;
-  /** 项目内容 */
-  content: string;
-  /** 项目类型 */
+  /** 任务标题 */
+  title: string;
+  /** 任务类型 */
   type?: ChecklistItemType;
+  /** 状态 */
+  status?: ChecklistItemStatus;
+  /** 关联实体 ID */
+  entity_id?: string;
   /** 负责人 */
   assignee?: string;
-  /** 预计完成时间 */
-  due_date?: string;
-  /** 关联的实体 ID */
-  related_entity_id?: string;
-  /** 关联的实体类型 */
-  related_entity_type?: string;
-  /** 前置任务 ID 列表 */
-  depends_on?: string[];
-  /** 插入位置（分组 ID） */
-  group_id?: string;
-  /** 顺序 */
-  order?: number;
+  /** 完成时间 */
+  completed_at?: string;
+  /** 阻塞原因 */
+  blocked_reason?: string;
 }
 
 // ============================================================================
@@ -252,9 +190,21 @@ export interface ChecklistRenderResult {
 // ============================================================================
 
 /**
+ * Checklist 进度统计
+ */
+export interface ChecklistProgress {
+  total: number;
+  completed: number;
+  in_progress: number;
+  pending: number;
+  skipped: number;
+  blocked: number;
+}
+
+/**
  * 计算 Checklist 进度
  */
-export function calculateChecklistProgress(checklist: Checklist): Checklist['progress'] {
+export function calculateChecklistProgress(checklist: Checklist): ChecklistProgress {
   const items = checklist.items;
   const total = items.length;
 
@@ -279,13 +229,5 @@ export function isChecklistCompleted(checklist: Checklist): boolean {
  * 获取阻塞的项目
  */
 export function getBlockedItems(checklist: Checklist): ChecklistItem[] {
-  const completedIds = new Set(
-    checklist.items.filter((i) => i.status === 'completed').map((i) => i.id),
-  );
-
-  return checklist.items.filter((item) => {
-    if (item.status !== 'pending') return false;
-    if (!item.depends_on || item.depends_on.length === 0) return false;
-    return item.depends_on.some((depId) => !completedIds.has(depId));
-  });
+  return checklist.items.filter((item) => item.status === 'blocked');
 }

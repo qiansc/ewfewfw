@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:tes
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { SQLiteStore } from '../../../sqlite-store.js';
+import { createStorageOperationsFromDatabase } from '../../../lite-adapter/dataOpsContext.js';
 import { createWorkflow, getWorkflowState } from '../workflowState.js';
 import { cleanupOrphanedEntities, resumeFromCheckpoint, saveCheckpoint } from '../recovery.js';
 import { resetStepResultCache } from '../stepExecutor.js';
@@ -84,6 +85,7 @@ describe('workflow recovery', () => {
   });
 
   test('resumeFromCheckpoint continues from last completed step', async () => {
+    const storage = createStorageOperationsFromDatabase(store.getDatabase());
     const executed: string[] = [];
     const steps: WorkflowStep[] = [
       {
@@ -109,8 +111,8 @@ describe('workflow recovery', () => {
       },
     ];
 
-    createWorkflow('wf-resume', steps);
-    saveCheckpoint('wf-resume', {
+    createWorkflow(storage, 'wf-resume', steps);
+    saveCheckpoint(storage, 'wf-resume', {
       workflow_id: 'wf-resume',
       step_id: 'step-1',
       step_index: 0,
@@ -118,19 +120,20 @@ describe('workflow recovery', () => {
       created_at: new Date().toISOString(),
     });
 
-    await resumeFromCheckpoint('wf-resume');
+    await resumeFromCheckpoint(storage, 'wf-resume');
 
     expect(executed).toEqual(['step-2', 'step-3']);
-    expect(getWorkflowState('wf-resume')).toBe('completed');
+    expect(getWorkflowState(storage, 'wf-resume')).toBe('completed');
   });
 
   test('cleanupOrphanedEntities marks workflow entities and deletes stale orphans', async () => {
+    const storage = createStorageOperationsFromDatabase(store.getDatabase());
     insertEntity({ id: 'entity-active', proposalId: 'wf-clean' });
 
     const oldTimestamp = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
     insertEntity({ id: 'entity-old', proposalId: 'wf-old', orphaned: 1, orphanedAt: oldTimestamp });
 
-    await cleanupOrphanedEntities('wf-clean');
+    await cleanupOrphanedEntities(storage, 'wf-clean');
 
     const db = store.getDatabase();
     const marked = db

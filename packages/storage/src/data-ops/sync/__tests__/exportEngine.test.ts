@@ -1,11 +1,11 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
 import { mkdirSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createHash } from 'node:crypto';
 import { SQLiteStore } from '../../../sqlite-store.js';
 import { InMemoryGraph } from '../../../in-memory-graph.js';
 import { GraphQueryCache } from '../../../graph-query-cache.js';
 import { createDataOpsContext } from '../../../lite-adapter/dataOpsContext.js';
+import { computeContentHash } from '../../../utils/contentHash.js';
 import { exportToFiles } from '../exportEngine.js';
 import type { AdapterContext } from '../../../lite-adapter/types.js';
 
@@ -49,8 +49,7 @@ function resetDb(): void {
 }
 
 function computeHash(data: Record<string, unknown>): string {
-  const content = JSON.stringify(data, Object.keys(data).sort());
-  return createHash('sha256').update(content).digest('hex').slice(0, 16);
+  return computeContentHash(data);
 }
 
 function insertEntity(params: {

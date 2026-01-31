@@ -117,8 +117,11 @@ function handleMcpError(error: McpError) {
 | C4A-MIGRATE-001 | 422 | 缺少 source_project 字段 | 指定实体归属的项目 |
 | C4A-MIGRATE-002 | 422 | 缺少 source_repo 字段 | 指定实体归属的代码仓库 |
 | C4A-MIGRATE-003 | 422 | source_project 格式不正确 | 只能包含小写字母、数字和连字符 |
-| C4A-MIGRATE-004 | 422 | scope 与 source_project 不匹配 | domain 层级实体不应有 source_project |
-| C4A-MIGRATE-005 | 422 | external 实体缺少 external_url | 添加外部系统的 URL |
+| C4A-MIGRATE-004 | 422 | source_repo 格式建议改进 | 建议格式为 owner/repo |
+| C4A-MIGRATE-005 | 422 | Domain/Enterprise 层级不应有 source_project | 删除 source_project 字段 |
+| C4A-MIGRATE-006 | 422 | Domain/Enterprise 层级不应有 source_repo | 删除 source_repo 字段 |
+| C4A-MIGRATE-007 | 422 | external 实体不应有 source_project | 删除 source_project 字段 |
+| C4A-MIGRATE-008 | 422 | external 实体缺少 external_url | 添加外部系统的 URL |
 
 ### 3.3 错误响应格式
 
@@ -134,6 +137,13 @@ interface ErrorResponse {
   };
   timestamp: string;      // 错误发生时间
   request_id?: string;    // 请求 ID（用于追踪）
+  recoverable_actions?: RecoverableAction[];
+}
+
+interface RecoverableAction {
+  action: string;         // 操作标识，如 "retry", "force", "skip"
+  label: string;          // 操作描述
+  params?: object;        // 重试时需要的参数
 }
 ```
 

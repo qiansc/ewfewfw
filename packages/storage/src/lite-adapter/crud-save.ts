@@ -354,7 +354,7 @@ async function doSave(ctx: AdapterContext, params: SaveParams): Promise<SaveResu
   const perspective = pickString(converted?.perspective ?? storedData.perspective);
 
   // 使用事务保存
-  const relations = parseRelations(rawData, sourceProject, id, params.type);
+  const relations = parseRelations(ctx, rawData, sourceProject, id, params.type, proposalId);
   let relationChangeset: RelationsChangeSet | null = null;
 
   const transaction = db.transaction(() => {

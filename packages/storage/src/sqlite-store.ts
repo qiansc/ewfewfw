@@ -413,6 +413,7 @@ export class SQLiteStore {
         description TEXT,
         created_by TEXT,
         checklist TEXT,
+        checklist_version TEXT,
         workflow_steps TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
@@ -423,6 +424,11 @@ export class SQLiteStore {
 
     try {
       this.db.exec(`ALTER TABLE feats ADD COLUMN workflow_steps TEXT;`);
+    } catch {
+      // column already exists
+    }
+    try {
+      this.db.exec(`ALTER TABLE feats ADD COLUMN checklist_version TEXT;`);
     } catch {
       // column already exists
     }

@@ -170,6 +170,7 @@ User CLI 模块实现用户交互的命令行工具，包括：
      - 选择模式（local/server/remote）
      - 选择是否自动导出到 .context/
      - 选择 AI IDE（Cursor/Claude Code/OpenCode/全部）
+     - 配置 ADR 策略（可选，默认 enforce=false）
    - 创建目录结构：
      ```
      .context/
@@ -207,6 +208,12 @@ User CLI 模块实现用户交互的命令行工具，包括：
    - 写入全局配置
    - 记录 server.installed_at
 
+   **Remote 模式下的 install 行为（模式切换）**：
+   - 检测当前是否处于 Remote 模式
+   - 如果是，显示警告："切换到本地存储模式将需要重新同步数据"
+   - 询问用户确认后再执行安装
+   - 参考 user-cli.md §2.4 c4a install 的"Remote 模式下的行为"
+
 4. 实现 InstallWizard 组件：
    - packages/cli/src/components/InstallWizard.tsx
    - 模式选择界面（local/server/remote/skip）
@@ -230,6 +237,12 @@ User CLI 模块实现用户交互的命令行工具，包括：
    - init.test.ts：初始化流程测试
    - install.test.ts：安装流程测试
    - config.test.ts：配置管理测试
+   - 测试覆盖率要求：核心逻辑 ≥ 80%
+
+8. 错误处理规范：
+   - 所有用户可见错误必须使用 ErrorResponse 格式
+   - 包含 code、message、details、recoverable_actions
+   - 参考 CLAUDE.md 中的 MCP 错误响应规范
 ```
 
 ---
@@ -273,6 +286,12 @@ User CLI 模块实现用户交互的命令行工具，包括：
    - 处理下载/冲突/删除操作
    - 保存新的同步快照
 
+   **同步忽略规则**（不参与同步的文件）：
+   - checklist.md：只读视图，数据库是唯一数据源
+   - feat.yaml：Feat 元数据通过专用 MCP 工具管理
+   - .sync-state.json：同步状态快照，仅本地使用
+   - .c4a.yaml：项目配置文件，不同步到数据库
+
    **冲突处理**：
    - 实现 handleConflict() 函数
    - 支持选项：使用本地/使用远程/查看差异/跳过
@@ -309,6 +328,12 @@ User CLI 模块实现用户交互的命令行工具，包括：
    - status.test.ts：状态查询测试
    - sync.test.ts：同步流程测试（含冲突处理）
    - validate.test.ts：验证规则测试
+   - hash.test.ts：跨平台哈希规范化测试
+   - 测试覆盖率要求：核心逻辑 ≥ 80%
+
+8. 错误处理规范：
+   - 同步失败时提供 recoverable_actions（重试、跳过、强制覆盖）
+   - 冲突时显示清晰的差异信息和解决选项
 ```
 
 ---
@@ -373,6 +398,7 @@ User CLI 模块实现用户交互的命令行工具，包括：
    - feat.test.ts：Checklist 渲染测试
    - template.test.ts：模板生成测试
    - schema.test.ts：Schema 输出测试
+   - 测试覆盖率要求：核心逻辑 ≥ 80%
 ```
 
 ---
@@ -416,6 +442,12 @@ User CLI 模块实现用户交互的命令行工具，包括：
 
    **c4a server clean**：
    - 清理数据（需确认）
+
+   **c4a server check-permissions**：
+   - 检查备份文件中实体的权限兼容性
+   - 参数：--backup <file>、--user <email>、--format=json
+   - 用于迁移前的权限预检查
+   - 显示可导入/无权限的实体统计
 
 3. 任务 8.12 - c4a local 子菜单：
    - 实现 packages/cli/src/commands/local.ts
@@ -469,6 +501,7 @@ User CLI 模块实现用户交互的命令行工具，包括：
    - server.test.ts：Server 子命令测试
    - local.test.ts：Local 子命令测试
    - docker.test.ts：Docker 工具测试
+   - 测试覆盖率要求：核心逻辑 ≥ 80%
 ```
 
 ---
@@ -525,19 +558,20 @@ User CLI 模块实现用户交互的命令行工具，包括：
    - 添加使用示例
 
 7. 验证清单：
-   - [ ] c4a init：正确创建目录和配置
-   - [ ] c4a install local：正确初始化 SQLite
-   - [ ] c4a install server：正确启动 Docker 容器
-   - [ ] c4a sync：Local/Server 模式同步正常
-   - [ ] c4a status：正确显示状态信息
-   - [ ] c4a validate：正确验证 DSL 文件
-   - [ ] c4a feat render：正确渲染 Checklist
-   - [ ] c4a template：正确生成模板
-   - [ ] c4a schema：正确输出 Schema
-   - [ ] c4a server/*：Server 子命令正常
-   - [ ] c4a local/*：Local 子命令正常
-   - [ ] 动态菜单：根据模式正确显示
-   - [ ] 首次引导：未安装时正确引导
+   - [x] c4a init：正确创建目录和配置
+   - [x] c4a install local：正确初始化 SQLite
+   - [x] c4a install server：正确启动 Docker 容器
+     - 验证命令：`bun packages/cli/src/index.tsx install server`
+   - [x] c4a sync：Local/Server 模式同步正常
+   - [x] c4a status：正确显示状态信息
+   - [x] c4a validate：正确验证 DSL 文件
+   - [x] c4a feat render：正确渲染 Checklist
+   - [x] c4a template：正确生成模板
+   - [x] c4a schema：正确输出 Schema
+   - [x] c4a server/*：Server 子命令正常
+   - [x] c4a local/*：Local 子命令正常
+   - [x] 动态菜单：根据模式正确显示
+   - [x] 首次引导：未安装时正确引导
 
 8. 产物：
    - packages/cli/ 完整实现
@@ -551,12 +585,12 @@ User CLI 模块实现用户交互的命令行工具，包括：
 
 | 步骤 | Agent | 任务编号 | 状态 | 完成时间 |
 |------|-------|---------|:----:|---------|
-| 0 | Agent-0 | 前置准备 + 目录迁移 | [ ] | |
-| 1 | Agent-1 | 8.4, 8.6 (init/install) | [ ] | |
-| 1 | Agent-2 | 8.5, 8.7, 8.8 (status/sync/validate) | [ ] | |
-| 1 | Agent-3 | 8.9, 8.10 (feat/template/schema) | [ ] | |
-| 1 | Agent-4 | 8.11, 8.12 (server/local) | [ ] | |
-| 2 | Agent-5 | 集成收尾 | [ ] | |
+| 0 | Agent-0 | 前置准备 + 目录迁移 | [x] | 2026-01-31 |
+| 1 | Agent-1 | 8.4, 8.6 (init/install) | [x] | 2026-01-31 |
+| 1 | Agent-2 | 8.5, 8.7, 8.8 (status/sync/validate) | [x] | 2026-01-31 |
+| 1 | Agent-3 | 8.9, 8.10 (feat/template/schema) | [x] | 2026-01-31 |
+| 1 | Agent-4 | 8.11, 8.12 (server/local) | [x] | 2026-01-31 |
+| 2 | Agent-5 | 集成收尾 | [x] | 2026-01-31 |
 
 ---
 
@@ -670,4 +704,3 @@ adr_policy: {enforce: true, scope: [system, container], on_missing: warning}
 |------|----------|----------|
 | 8.13 c4a rollback | v0.4.0 计划 | v0.4.0 版本 |
 | Remote 模式完整实现 | 依赖 Part 13 Server 模式 | Part 13 完成 |
-

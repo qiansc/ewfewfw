@@ -75,7 +75,7 @@ export interface FeatMergeParams {
  */
 export interface FeatConflict {
   entity_id: string;
-  conflict_type: 'content' | 'deleted' | 'both_modified';
+  conflict_type: 'content' | 'deleted' | 'both_modified' | 'type';
   main_branch?: Record<string, unknown>;
   feat_branch?: Record<string, unknown>;
   suggested_resolution?: 'keep_main' | 'keep_feat';
@@ -102,7 +102,7 @@ export type ChecklistAction = 'generate' | 'get' | 'patch' | 'clear';
 /**
  * Checklist 任务状态
  */
-export type ChecklistTaskStatus = 'pending' | 'in_progress' | 'completed' | 'blocked';
+export type ChecklistTaskStatus = 'pending' | 'in_progress' | 'completed' | 'blocked' | 'skipped';
 
 /**
  * Checklist 任务类型
@@ -213,7 +213,9 @@ export interface UpdateWorkflowStepResult {
   success: boolean;
   feat_id: string;
   step_id: string;
+  status?: WorkflowStepStatus;
+  updated_at?: string;
   updated_fields?: string[];
-  error?: 'feat_not_found' | 'step_not_found';
+  error?: 'feat_not_found' | 'step_not_found' | 'concurrent_update';
   message?: string;
 }

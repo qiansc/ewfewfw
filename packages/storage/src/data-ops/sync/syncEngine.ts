@@ -57,6 +57,7 @@ async function syncContext(ctx: DataOpsContext, options: SyncOptions): Promise<S
   const format = options.format ?? 'yaml';
   const statusFilter = options.status_filter ?? 'published';
   const featId = options.feat_id ?? null;
+  const conflictPolicy = options.conflict_policy ?? 'skip';
   const contextRoot = resolveContextRoot(options.path);
 
   const stats: SyncStats = {
@@ -92,9 +93,11 @@ async function syncContext(ctx: DataOpsContext, options: SyncOptions): Promise<S
       mode,
       format,
       featId,
+      conflictPolicy,
       stats,
       warnings,
       details,
+      conflicts,
     });
     const removed = removeOrphanFiles(fileEntities, dbMap);
     stats.deleted += removed.length;
@@ -122,6 +125,7 @@ async function syncContext(ctx: DataOpsContext, options: SyncOptions): Promise<S
       contextRoot,
       format,
       featId,
+      conflictPolicy,
       stats,
       conflicts,
       warnings,
@@ -130,7 +134,9 @@ async function syncContext(ctx: DataOpsContext, options: SyncOptions): Promise<S
   }
 
   const success =
-    stats.failed === 0 && (direction !== 'bidirectional' || stats.conflicted === 0);
+    stats.failed === 0 &&
+    (direction !== 'bidirectional' || stats.conflicted === 0) &&
+    (direction !== 'db-to-file' || conflictPolicy !== 'prompt' || stats.conflicted === 0);
 
   return {
     success,

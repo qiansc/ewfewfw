@@ -15,6 +15,7 @@ export interface WorkflowStep {
   metadata?: Record<string, unknown>;
   input?: Record<string, unknown>;
   input_hash?: string;
+  checkCompleted?: () => Promise<boolean> | boolean;
   execute?: () => Promise<StepResult>;
 }
 

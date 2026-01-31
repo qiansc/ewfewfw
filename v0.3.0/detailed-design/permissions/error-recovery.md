@@ -32,16 +32,12 @@
 
 ```typescript
 interface McpErrorResponse {
-  success: false;
-  error: {
-    code: string;           // 错误码，如 "C4A-BIZ-001"
-    message: string;        // 错误消息
-    details?: object;       // 详细信息
-    suggestion?: string;    // 修复建议
-
-    // 可恢复操作（由上层决定如何呈现）
-    recoverable_actions?: RecoverableAction[];
-  };
+  code: string;           // 错误码，如 "C4A-BIZ-001"
+  message: string;        // 错误消息
+  details?: object;       // 详细信息
+  timestamp: string;      // 错误发生时间（ISO 8601）
+  request_id?: string;    // 请求 ID（用于追踪）
+  recoverable_actions?: RecoverableAction[];  // 可恢复操作（由上层决定如何呈现）
 }
 
 interface RecoverableAction {
@@ -56,16 +52,16 @@ interface RecoverableAction {
 ```typescript
 // MCP 工具返回（不包含交互逻辑）
 {
-  success: false,
-  error: {
-    code: "C4A-BIZ-002",
-    message: "feat 状态为 draft，无法开始实现",
-    suggestion: "先执行状态流转到 approved",
-    recoverable_actions: [
-      { action: "approve_first", label: "先批准方案再继续", params: { auto_approve: true } },
-      { action: "cancel", label: "取消操作" }
-    ]
-  }
+  code: "C4A-BIZ-002",
+  message: "feat 状态为 draft，无法开始实现",
+  details: {
+    suggestion: "先执行状态流转到 approved"
+  },
+  timestamp: "2026-01-22T10:30:00Z",
+  recoverable_actions: [
+    { action: "approve_first", label: "先批准方案再继续", params: { auto_approve: true } },
+    { action: "cancel", label: "取消操作" }
+  ]
 }
 ```
 
@@ -657,4 +653,3 @@ async function performBackup(config: BackupConfig) {
 ```
 
 ---
-

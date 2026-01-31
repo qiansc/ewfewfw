@@ -6,6 +6,21 @@ export type ReferenceFormat = 'simple' | 'project' | 'repo' | 'scope';
 
 export type ReferenceScope = 'domain' | 'enterprise' | 'project';
 
+export const REFERENCE_SCOPES: ReadonlyArray<ReferenceScope> = [
+  'domain',
+  'enterprise',
+  'project',
+];
+
+export function isReferenceScope(value: string): value is ReferenceScope {
+  return REFERENCE_SCOPES.includes(value as ReferenceScope);
+}
+
+export function normalizeReferenceScope(value?: string | null): ReferenceScope | null {
+  if (!value) return null;
+  return isReferenceScope(value) ? value : null;
+}
+
 export interface ReferenceCandidate {
   id: string;
   sourceProject?: string | null;

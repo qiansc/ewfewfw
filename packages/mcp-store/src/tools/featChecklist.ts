@@ -1,7 +1,7 @@
 /**
  * c4a_store_feat_checklist 工具实现
  *
- * Checklist 管理：生成/获取/更新/清除
+ * Checklist 管理：生成/获取/patch/清除
  * 基于设计文档：v0.3.0/detailed-design/mcp/store-feat-checklist.md §3.8
  */
 import { getAdapter, isLocalMode } from "@c4a/storage";

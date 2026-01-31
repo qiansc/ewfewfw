@@ -2,8 +2,9 @@
  * Data Ops 共享类型与存储抽象接口
  */
 
-import type { Entity, EntityType, FeatStatus } from '../adapter.js';
+import type { Entity, EntityStatus, EntityType, FeatStatus } from '../adapter.js';
 import type { CompensationLog } from './transaction/types.js';
+import type { WorkflowState, WorkflowStateRecord } from './workflow/types.js';
 
 // ============================================================
 // 通用结果类型
@@ -42,6 +43,8 @@ export interface DataOpsContext {
 export interface FeatRecord {
   id: string;
   status: FeatStatus;
+  checklist?: string | null;
+  checklist_version?: string | null;
   workflow_steps?: string | null;
   updated_at?: string;
 }
@@ -54,11 +57,15 @@ export interface FeatEntityContentHash {
 export interface FeatEntityConflictRow {
   id: string;
   source_project: string;
+  type: string;
+  kind: string | null;
   data: string;
   content_hash: string;
 }
 
 export interface MainEntityConflictRow {
+  type: string;
+  kind: string | null;
   data: string;
   content_hash: string;
 }
@@ -111,6 +118,14 @@ export interface StorageOperations {
   updateFeatWorkflowSteps(params: {
     featId: string;
     workflowSteps: string;
+    updatedAt: string;
+    expectedUpdatedAt: string;
+  }): UpdateResult;
+  updateFeatChecklist(params: {
+    featId: string;
+    checklist: string | null;
+    checklistVersion: string | null;
+    expectedVersion: string | null;
     updatedAt: string;
     expectedUpdatedAt: string;
   }): UpdateResult;
@@ -213,5 +228,22 @@ export interface StorageOperations {
     data: string;
     content_hash: string;
   }>;
+
+  // Reference / Copy-on-Write
+  getEntityInFeat(params: { entityId: string; featId: string }): Entity | null;
+  listMainEntities(entityId: string): Entity[];
+  insertEntityWithMetadata(params: {
+    entity: Entity;
+    proposalId: string;
+    status: EntityStatus;
+    createdAt: string;
+    updatedAt: string;
+  }): void;
+
+  // Workflow 状态管理
+  getWorkflowStateRecord(workflowId: string): WorkflowStateRecord | null;
+  upsertWorkflowState(record: WorkflowStateRecord): void;
+  markEntitiesOrphaned(proposalId: string, timestamp: string): void;
+  cleanupOrphanedEntities(cutoff: string): Array<{ id: string; source_project: string; proposal_id: string }>;
 
 }
