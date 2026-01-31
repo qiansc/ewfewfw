@@ -8,6 +8,7 @@
     "dev": "bun run --filter '*' dev",
     "build": "bun run --filter '*' build",
     "test": "bun run --filter '*' test",
+    "test:storage": "bun run --filter @c4a/storage test",
     "lint": "bun run --filter '*' lint",
     "config:generate": "bun run ./packages/config-generator/src/index.ts generate",
     "config:validate": "bun run ./packages/config-generator/src/index.ts validate"

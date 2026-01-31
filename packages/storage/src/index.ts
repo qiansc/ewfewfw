@@ -10,6 +10,13 @@ export { ServerAdapter } from './server-adapter.js';
 export type { LiteAdapterConfig } from './lite-adapter.js';
 export type * from './adapter.js';
 
+// Data Ops
+export * from './data-ops/index.js';
+export {
+  createDataOpsContext,
+  createStorageOperationsFromDatabase,
+} from './lite-adapter/dataOpsContext.js';
+
 // Adapter 工厂
 export {
   getAdapter,

@@ -6,6 +6,7 @@
 
 // 内部业务类型（用于业务逻辑）
 export * from "./types/index.js";
+export type { WorkflowState, WorkflowStateRecord, CompensationLog } from "./types/dataOps.js";
 
 // DSL 文件类型（与 Schema 一致）
 export * as DSL from "./types/dsl.js";

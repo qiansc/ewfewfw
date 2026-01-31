@@ -258,6 +258,8 @@ export class SQLiteStore {
         scope TEXT,
         perspective TEXT,
         data TEXT NOT NULL,
+        orphaned INTEGER DEFAULT 0,
+        orphaned_at TEXT,
         PRIMARY KEY (source_project, id, proposal_id)
       );
 
@@ -266,6 +268,24 @@ export class SQLiteStore {
       CREATE INDEX IF NOT EXISTS idx_entities_source_project ON entities(source_project);
       CREATE INDEX IF NOT EXISTS idx_entities_id ON entities(id);
       CREATE INDEX IF NOT EXISTS idx_entities_composite ON entities(source_project, id, proposal_id);
+    `);
+
+    try {
+      this.db.exec(`ALTER TABLE entities ADD COLUMN orphaned INTEGER DEFAULT 0;`);
+    } catch {
+      // column already exists
+    }
+
+    try {
+      this.db.exec(`ALTER TABLE entities ADD COLUMN orphaned_at TEXT;`);
+    } catch {
+      // column already exists
+    }
+
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_entities_orphaned
+      ON entities(orphaned)
+      WHERE orphaned = 1;
     `);
 
     // 实体元数据表
@@ -289,6 +309,37 @@ export class SQLiteStore {
       );
 
       CREATE INDEX IF NOT EXISTS idx_metadata_content_hash ON metadata(content_hash);
+    `);
+
+    // Workflow 状态表
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS workflow_states (
+        id TEXT PRIMARY KEY,
+        workflow_type TEXT NOT NULL,
+        current_step INTEGER DEFAULT 0,
+        total_steps INTEGER NOT NULL,
+        state TEXT DEFAULT 'pending',
+        context_json TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_workflow_states_state ON workflow_states(state);
+    `);
+
+    // 补偿日志表
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS compensation_logs (
+        id TEXT PRIMARY KEY,
+        transaction_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        rollback_action TEXT NOT NULL,
+        params_json TEXT,
+        executed INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_compensation_logs_tx ON compensation_logs(transaction_id);
     `);
 
     // 实体关系表 (无外键约束，支持跨项目引用)

@@ -18,6 +18,11 @@ import type {
   StoredEntityMetadata,
 } from './base.js';
 
+export interface Entity extends BaseEntityMetadata {
+  orphaned?: boolean;
+  orphaned_at?: string;
+}
+
 // ============================================================================
 // Entity 构件
 // ============================================================================
@@ -28,7 +33,7 @@ import type {
  * 业务产品分类，在 Domain/Enterprise 层定义
  * Project 层通过 REFERENCES 关系引用
  */
-export interface Product extends BaseEntityMetadata {
+export interface Product extends Entity {
   type: 'product';
   data: {
     /** 基于哪个上层 Product（Domain → Enterprise → Project 继承链） */
@@ -48,7 +53,7 @@ export interface Product extends BaseEntityMetadata {
  * 软件系统，与 Product 1:1 对应
  * 只在 Project 层存在
  */
-export interface System extends BaseEntityMetadata {
+export interface System extends Entity {
   type: 'system';
   data: {
     /** 对应的 Product ID（1:1 对应） */
@@ -69,7 +74,7 @@ export interface System extends BaseEntityMetadata {
  *
  * System 的组成部分，可独立部署的单元
  */
-export interface Container extends BaseEntityMetadata {
+export interface Container extends Entity {
   type: 'container';
   data: {
     /** 所属 System ID */
@@ -116,7 +121,7 @@ export interface Container extends BaseEntityMetadata {
  *
  * Container 的组成部分，代码级别的模块
  */
-export interface Component extends BaseEntityMetadata {
+export interface Component extends Entity {
   type: 'component';
   data: {
     /** 所属 Container ID */
@@ -160,7 +165,7 @@ export interface FlowInfo {
  *
  * 业务或技术流程，描述"怎么运作"
  */
-export interface Process extends BaseEntityMetadata {
+export interface Process extends Entity {
   type: 'process';
   data: {
     /** 流程类型：业务流程或技术流程 */
@@ -225,7 +230,7 @@ export type { SoREntityType };
  * Statement of Requirements，描述"要满足什么"
  * 由 Entity × Process 交叉产生
  */
-export interface SoR extends BaseEntityMetadata {
+export interface SoR extends Entity {
   type: 'sor';
   data: {
     /** SoR 类型 */

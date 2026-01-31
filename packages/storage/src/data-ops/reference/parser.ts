@@ -1,4 +1,4 @@
-import { ParsedReference } from './types.js';
+import type { ParsedReference } from './types.js';
 
 /**
  * Parse a reference string into its components
@@ -11,12 +11,14 @@ import { ParsedReference } from './types.js';
  * - Scope: "scope:domain/entity-id"
  */
 export function parseReference(ref: string): ParsedReference {
-  if (!ref) {
+  const value = ref.trim();
+
+  if (!value) {
     throw new Error('Reference string cannot be empty');
   }
 
   // Project reference: project:{project_id}/{id}
-  const projectMatch = ref.match(/^project:([^\/]+)\/(.+)$/);
+  const projectMatch = value.match(/^project:([^\/]+)\/(.+)$/);
   if (projectMatch) {
     return {
       original: ref,
@@ -27,34 +29,33 @@ export function parseReference(ref: string): ParsedReference {
   }
 
   // Repo reference: repo:{repo_id}/{id}
-  // repo_id might contain slashes (e.g. company/repo), so we need to be careful.
-  // We assume the ID is the last part after the last slash, but that's risky if ID has slashes?
-  // IDs shouldn't have slashes usually (kebab-case).
-  // However, the spec says "repo:{repo_id}/{id}". 
-  // Let's assume repo_id is everything between "repo:" and the last slash.
-  // Actually, standard repo IDs often have one slash (owner/name).
-  // Let's look for "repo:" prefix.
-  if (ref.startsWith('repo:')) {
-    const parts = ref.slice(5).split('/');
-    if (parts.length >= 2) {
-      const id = parts.pop()!;
-      const repoId = parts.join('/');
+  // repo_id 通常是 "owner/repo"，其后为实体 ID（可包含斜杠）
+  if (value.startsWith('repo:')) {
+    const rest = value.slice('repo:'.length);
+    const parts = rest.split('/');
+    if (parts.length >= 3) {
+      const repoId = `${parts[0]}/${parts[1]}`;
+      const id = parts.slice(2).join('/');
+      if (!id) {
+        throw new Error('Repo reference must include an id');
+      }
       return {
         original: ref,
         format: 'repo',
-        repoId: repoId,
-        id: id
+        repoId,
+        id
       };
     }
+    throw new Error('Invalid repo reference format');
   }
 
   // Scope reference: scope:{scope}/{id}
-  const scopeMatch = ref.match(/^scope:([^\/]+)\/(.+)$/);
+  const scopeMatch = value.match(/^scope:([^\/]+)\/(.+)$/);
   if (scopeMatch) {
     return {
       original: ref,
       format: 'scope',
-      scope: scopeMatch[1],
+      scope: scopeMatch[1] as ParsedReference['scope'],
       id: scopeMatch[2]
     };
   }
@@ -63,6 +64,6 @@ export function parseReference(ref: string): ParsedReference {
   return {
     original: ref,
     format: 'simple',
-    id: ref
+    id: value
   };
 }
