@@ -16,7 +16,7 @@ interface CommandIO {
 
 interface LocalCommandDeps {
   io?: CommandIO;
-  adapterFactory?: (mode: "local") => StorageAdapter;
+  adapterFactory?: (mode: "local") => Promise<StorageAdapter>;
   confirm?: (message: string) => Promise<boolean>;
   loadConfig?: typeof loadConfig;
   loadGlobalConfig?: typeof loadGlobalConfig;
@@ -130,7 +130,7 @@ export async function localCommand(
       io.log(`大小: ${formatBytes(stats.size)}`);
       io.log(`更新时间: ${stats.mtime.toISOString()}`);
 
-      const adapter = adapterFactory("local");
+      const adapter = await adapterFactory("local");
       await adapter.initialize();
       try {
         const byType = await adapter.list({ group_by: "type" });
@@ -155,7 +155,7 @@ export async function localCommand(
       case "validate": {
       const format = typeof options.format === "string" ? options.format : "text";
       const quiet = options.quiet === true;
-      const adapter = adapterFactory("local");
+      const adapter = await adapterFactory("local");
       await adapter.initialize();
       try {
         const result = await adapter.validate({});
@@ -191,7 +191,7 @@ export async function localCommand(
         typeof options["entity-ids"] === "string"
           ? options["entity-ids"].split(",").map((item) => item.trim()).filter(Boolean)
           : undefined;
-      const adapter = adapterFactory("local");
+      const adapter = await adapterFactory("local");
       await adapter.initialize();
       try {
         const result = await adapter.repair({ dry_run: dryRun, entity_ids: entityIds });
@@ -215,14 +215,14 @@ export async function localCommand(
           ? options.output
           : buildBackupFilename();
       const status =
-        typeof options.status === "string" && ["published", "approved", "all"].includes(options.status)
+        (typeof options.status === "string" && ["published", "approved", "all"].includes(options.status)
           ? options.status
-          : "published";
+          : "published") as "published" | "approved" | "all";
       const format =
-        typeof options.format === "string" && ["tar.gz", "json"].includes(options.format)
+        (typeof options.format === "string" && ["tar.gz", "json"].includes(options.format)
           ? options.format
-          : "tar.gz";
-      const adapter = adapterFactory("local");
+          : "tar.gz") as "tar.gz" | "json";
+      const adapter = await adapterFactory("local");
       await adapter.initialize();
       try {
         const result = await adapter.backup({ output, status_filter: status, format });
@@ -267,7 +267,7 @@ export async function localCommand(
         typeof options["validate-checksums"] === "string"
           ? options["validate-checksums"] !== "false"
           : true;
-      const adapter = adapterFactory("local");
+      const adapter = await adapterFactory("local");
       await adapter.initialize();
       try {
         const result = await adapter.restore({

@@ -9,8 +9,10 @@ import type {
   EntityType,
   DepsParams,
   DepsNode,
+  DepsResult,
   ImpactParams,
   ImpactNode,
+  ImpactResult,
 } from '../adapter.js';
 import type { AdapterContext } from './types.js';
 import { expandEntityCacheKeys, normalizeProject, toEntityCacheKey } from './cache-keys.js';
@@ -22,7 +24,7 @@ import { expandEntityCacheKeys, normalizeProject, toEntityCacheKey } from './cac
 /**
  * 查询依赖关系
  */
-export async function queryDeps(ctx: AdapterContext, params: DepsParams): Promise<DepsNode[]> {
+export async function queryDeps(ctx: AdapterContext, params: DepsParams): Promise<DepsResult> {
   const proposalId = params.proposal_id ?? null;
   const depth = params.depth || 1;
   const direction = params.direction || 'both';
@@ -35,7 +37,10 @@ export async function queryDeps(ctx: AdapterContext, params: DepsParams): Promis
   const cacheKey = `deps:${toEntityCacheKey(normalizedProject, params.id)}:${direction}:${depth}:${cacheProposal}`;
   const cached = ctx.cache.get(cacheKey);
   if (cached) {
-    return cached as DepsNode[];
+    return {
+      nodes: cached as DepsNode[],
+      degraded: false,
+    };
   }
 
   // 确保图数据是最新的
@@ -62,7 +67,10 @@ export async function queryDeps(ctx: AdapterContext, params: DepsParams): Promis
   ];
   ctx.cache.set(cacheKey, depsNodes, relatedEntities);
 
-  return depsNodes;
+  return {
+    nodes: depsNodes,
+    degraded: false,
+  };
 }
 
 // ============================================================
@@ -72,7 +80,10 @@ export async function queryDeps(ctx: AdapterContext, params: DepsParams): Promis
 /**
  * 查询影响分析
  */
-export async function queryImpact(ctx: AdapterContext, params: ImpactParams): Promise<ImpactNode[]> {
+export async function queryImpact(
+  ctx: AdapterContext,
+  params: ImpactParams
+): Promise<ImpactResult> {
   const proposalId = params.proposal_id ?? null;
   const depth = params.depth || 2;
   const normalizedProject = normalizeProject(
@@ -84,7 +95,10 @@ export async function queryImpact(ctx: AdapterContext, params: ImpactParams): Pr
   const cacheKey = `impact:${toEntityCacheKey(normalizedProject, params.id)}:${depth}:${cacheProposal}`;
   const cached = ctx.cache.get(cacheKey);
   if (cached) {
-    return cached as ImpactNode[];
+    return {
+      nodes: cached as ImpactNode[],
+      degraded: false,
+    };
   }
 
   // 确保图数据是最新的
@@ -119,5 +133,8 @@ export async function queryImpact(ctx: AdapterContext, params: ImpactParams): Pr
   ];
   ctx.cache.set(cacheKey, impactNodes, relatedEntities);
 
-  return impactNodes;
+  return {
+    nodes: impactNodes,
+    degraded: false,
+  };
 }

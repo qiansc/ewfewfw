@@ -211,11 +211,14 @@ describe('LiteAdapter utils fixes', () => {
       ?.concurrent_feats?.[0]?.changes_summary;
     expect(summary).toBe('Upgrade to v2');
 
-    const resultDisabled = await save(createContext({ feat: { concurrent_warning: false } }), {
+    const resultDisabled = await save(
+      createContext({ feat: { concurrent_warning: false, auto_notify: false } }),
+      {
       type: 'system',
       data: { id: 'svc', name: 'svc' },
       proposal_id: 'feat-a',
-    });
+      }
+    );
     expect(resultDisabled.warnings).toBeUndefined();
 
     const resultForced = await save(createContext(), {

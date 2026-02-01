@@ -5,6 +5,7 @@ import { normalizeReferenceScope } from './types.js';
 import type {
   ReferenceCandidate,
   ReferenceError,
+  ResolvedReference,
   ValidationResult,
   ResolveContext,
 } from './types.js';
@@ -184,7 +185,10 @@ function normalizeReferenceEntry(entry: unknown): ReferenceEntry | null {
   return { ref, resolved };
 }
 
-function buildSuggestions(resolved: { id: string; format?: string; scope?: string }, ref: string): string[] {
+function buildSuggestions(
+  resolved: Pick<ResolvedReference, 'id' | 'format' | 'scope'>,
+  ref: string
+): string[] {
   const suggestions: string[] = [`确认实体 "${resolved.id}" 已创建或同步到当前数据库`];
 
   if (resolved.format === 'simple') {

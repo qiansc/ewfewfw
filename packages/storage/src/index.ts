@@ -29,15 +29,25 @@ export {
 export type { StorageMode, ServerConfig, C4AConfig } from './get-adapter.js';
 
 // 模式切换
-export { LocalBackup, LocalRestore, formatConflictSummary } from './mode-switch.js';
+export { LocalBackup, LocalRestore, migrateLocalToServer, migrateServerToLocal, formatConflictSummary } from './mode-switch.js';
 export type {
   ConflictPolicy,
+  PermissionPolicy,
   BackupOptions,
   RestoreOptions,
   BackupResult,
   RestoreResult,
   ConflictSummary,
+  MigrateOptions,
+  MigrateResult,
+  MigrateProgress,
+  MigrationCheckpoint,
+  PermissionCheckResult,
+  PermissionChecker,
+  MigrateFailure,
+  MigrateStats,
 } from './mode-switch.js';
+export { MigrationError } from './mode-switch.js';
 
 // SQLite Store
 export { SQLiteStore } from './sqlite-store.js';

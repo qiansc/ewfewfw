@@ -16,7 +16,7 @@ import { getAdapter } from "@c4a/storage";
  * @returns 删除结果
  */
 export async function storeDeleteHandler(args: StoreDeleteInput): Promise<StoreDeleteResult> {
-  const adapter = getAdapter();
+  const adapter = await getAdapter();
 
   // 确保适配器已初始化
   await adapter.initialize();

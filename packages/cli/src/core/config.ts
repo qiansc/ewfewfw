@@ -12,7 +12,13 @@ export interface GlobalConfig {
   server?: {
     installed_at?: string;
     url?: string;
-    services?: { mongodb?: string; neo4j?: string; milvus?: string };
+    services?: {
+      mongodb?: string;
+      neo4j?: string;
+      milvus?: string;
+      ollama?: string;
+      storage_backend?: string;
+    };
   };
   remote?: { url?: string; selected_at?: string };
 }

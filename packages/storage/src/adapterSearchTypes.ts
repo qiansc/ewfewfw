@@ -83,6 +83,16 @@ export interface DepsNode {
 }
 
 /**
+ * 依赖查询结果（包含降级状态）
+ */
+export interface DepsResult {
+  nodes: DepsNode[];
+  degraded: boolean;
+  degraded_reason?: 'NEO4J_QUERY_FAILED' | 'NEO4J_UNAVAILABLE';
+  degraded_message?: string;
+}
+
+/**
  * 影响分析参数
  */
 export interface ImpactParams {
@@ -103,4 +113,14 @@ export interface ImpactNode {
   distance: number;
   impact_level: 'direct' | 'indirect';
   reason?: string;
+}
+
+/**
+ * 影响分析结果（包含降级状态）
+ */
+export interface ImpactResult {
+  nodes: ImpactNode[];
+  degraded: boolean;
+  degraded_reason?: 'NEO4J_QUERY_FAILED' | 'NEO4J_UNAVAILABLE';
+  degraded_message?: string;
 }

@@ -28,9 +28,9 @@ import type {
   SearchParams,
   SearchResult,
   DepsParams,
-  DepsNode,
+  DepsResult,
   ImpactParams,
-  ImpactNode,
+  ImpactResult,
   FeatLifecycleParams,
   FeatLifecycleResult,
   FeatMergeParams,
@@ -179,11 +179,11 @@ export class LiteAdapter implements StorageAdapter {
     return search(this.getContext(), params);
   }
 
-  async queryDeps(params: DepsParams): Promise<DepsNode[]> {
+  async queryDeps(params: DepsParams): Promise<DepsResult> {
     return queryDeps(this.getContext(), params);
   }
 
-  async queryImpact(params: ImpactParams): Promise<ImpactNode[]> {
+  async queryImpact(params: ImpactParams): Promise<ImpactResult> {
     return queryImpact(this.getContext(), params);
   }
 

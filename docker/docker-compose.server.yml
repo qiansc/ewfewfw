@@ -1,9 +1,4 @@
-# C4A v0.2 Docker Compose 配置
-#
-# 使用方式:
-#   开发环境 (存储+Ollama): docker compose up mongodb neo4j milvus ollama
-#   全服务 (含 MCP):        docker compose --profile mcp up
-#   生产模式:               docker compose --profile prod up
+# C4A v0.3 Server 模式 Docker Compose
 
 services:
   # ==================== 存储服务 ====================
@@ -60,8 +55,6 @@ services:
       start_period: 60s
 
   # ==================== Embedding Service ====================
-
-  # Ollama for local embedding (default for dev)
   ollama:
     image: ollama/ollama:latest
     container_name: c4a-ollama
@@ -76,7 +69,6 @@ services:
       retries: 3
       start_period: 10s
 
-  # Ollama model initialization (runs once to pull the embedding model)
   ollama-init:
     image: ollama/ollama:latest
     container_name: c4a-ollama-init
@@ -100,9 +92,46 @@ services:
         fi
     restart: "no"
 
-  # ==================== MCP Servers ====================
+  # ==================== storage-backend ====================
+  storage-backend:
+    build:
+      context: ..
+      dockerfile: packages/storage-backend/Dockerfile
+    container_name: c4a-storage-backend
+    ports:
+      - "8055:8055"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      milvus:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    environment:
+      STORAGE_MONGODB_URI: mongodb://mongodb:27017/c4a
+      STORAGE_NEO4J_URI: bolt://neo4j:7687
+      STORAGE_NEO4J_USER: neo4j
+      STORAGE_NEO4J_PASSWORD: ${NEO4J_PASSWORD:-c4a_password}
+      STORAGE_MILVUS_HOST: milvus
+      STORAGE_MILVUS_PORT: 19530
+      STORAGE_OLLAMA_URL: http://ollama:11434
+    volumes:
+      - /tmp/c4a-shared:/tmp/c4a-shared
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request, sys; sys.exit(0) if urllib.request.urlopen('http://localhost:8055/health').status == 200 else 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # TypeScript Store MCP Server
+  # ==================== MCP Servers ====================
   c4a-store-mcp:
     build:
       context: ..
@@ -114,16 +143,16 @@ services:
       MCP_SERVER: mcp-store
       MCP_TRANSPORT: streamable-http
       MCP_PORT: 8051
+      C4A_STORAGE_BACKEND_URL: http://storage-backend:8055
+    depends_on:
+      storage-backend:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8051/health"]
       interval: 10s
       timeout: 5s
       retries: 3
-    profiles:
-      - mcp
-      - prod
 
-  # TypeScript Query MCP Server
   c4a-query-mcp:
     build:
       context: ..
@@ -135,43 +164,15 @@ services:
       MCP_SERVER: mcp-query
       MCP_TRANSPORT: streamable-http
       MCP_PORT: 8054
+      C4A_STORAGE_BACKEND_URL: http://storage-backend:8055
+    depends_on:
+      storage-backend:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8054/health"]
       interval: 10s
       timeout: 5s
       retries: 3
-    profiles:
-      - mcp
-      - prod
-
-  # TypeScript Visual MCP Server (Gemini + Mermaid)
-  c4a-visual-mcp:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.mcp-ts
-    container_name: c4a-visual-mcp
-    ports:
-      - "${VISUAL_MCP_PORT:-8053}:8053"
-    volumes:
-      - ../prompts/visual-templates:/app/prompts/visual-templates:ro
-      - ../.c4a/assets/images:/app/.c4a/assets/images
-      - ../.c4a/cache/visual:/app/.c4a/cache/visual
-    environment:
-      MCP_SERVER: mcp-visual
-      MCP_TRANSPORT: streamable-http
-      MCP_PORT: 8053
-      VISUAL_MCP_PORT: 8053
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      VISUAL_STORAGE_BASE_PATH: /app/.c4a
-      VISUAL_TEMPLATES_PATH: /app/prompts/visual-templates
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8053/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-    profiles:
-      - mcp
-      - prod
 
 volumes:
   mongodb_data:

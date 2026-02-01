@@ -189,7 +189,12 @@ describe("batch sync helpers", () => {
 
     const originalFetch = globalThis.fetch;
     globalThis.fetch = (async (input, init) => {
-      const url = typeof input === "string" ? input : input.url;
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
       const method = init?.method ?? "GET";
 
       if (url.endsWith("/sync/session") && method === "POST") {
@@ -262,16 +267,28 @@ describe("store handlers", () => {
       type: "system",
       data: { id: entityId, name: "System" },
       id: entityId,
+      format: "yaml",
+      proposal_id: null,
+      enforce_adr: false,
+      skip_adr_check: false,
+      ignore_concurrent_warning: false,
+      force_save: false,
     });
     expect(save.success).toBe(true);
 
-    const read = await storeReadHandler({ id: entityId, format: "object" });
+    const read = await storeReadHandler({ id: entityId, format: "object", proposal_id: null });
+    if (!("entity" in read)) {
+      throw new Error("Expected entity response");
+    }
     expect(read.entity?.id).toBe(entityId);
 
-    const list = await storeListHandler({ limit: 10 });
-    expect(list.items?.some((item) => item.id === entityId)).toBe(true);
+    const list = await storeListHandler({ offset: 0, limit: 10, count_only: false });
+    if (!("items" in list)) {
+      throw new Error("Expected list response");
+    }
+    expect(list.items.some((item) => item.id === entityId)).toBe(true);
 
-    const deleted = await storeDeleteHandler({ id: entityId });
+    const deleted = await storeDeleteHandler({ id: entityId, force: false });
     expect(deleted.success).toBe(true);
   });
 
@@ -285,6 +302,9 @@ describe("store handlers", () => {
       direction: "import",
       path: ".context/dsl",
       format: "yaml",
+      mode: "incremental",
+      status_filter: "published",
+      conflict_policy: "skip",
     });
     expect(imported.success).toBe(true);
     expect(imported.stats.created).toBeGreaterThan(0);
@@ -293,6 +313,8 @@ describe("store handlers", () => {
       direction: "export",
       path: ".context/export",
       format: "yaml",
+      mode: "incremental",
+      status_filter: "published",
       conflict_policy: "override",
     });
     expect(exported.success).toBe(true);
@@ -312,8 +334,12 @@ describe("store handlers", () => {
           },
         ],
       },
+      execute: false,
     });
-    expect(plan.plan?.to_upload.length).toBe(1);
+    expect(plan.executed).toBe(false);
+    if (plan.executed === false) {
+      expect(plan.stats.to_upload).toBe(1);
+    }
   });
 
   test("feat handlers cover lifecycle, checklist, merge, workflow", async () => {
@@ -321,7 +347,9 @@ describe("store handlers", () => {
     const lifecycle = await storeFeatLifecycleHandler({
       action: "create",
       feat_id: featId,
-      metadata: { title: "feat", created_by: "tester" },
+      sync_checklist: false,
+      force_publish: false,
+      metadata: { title: "feat", description: "", created_by: "tester" },
     });
     expect(lifecycle.success).toBe(true);
 
@@ -331,6 +359,11 @@ describe("store handlers", () => {
       data: { id: featEntityId, name: "Feat System" },
       id: featEntityId,
       proposal_id: featId,
+      format: "yaml",
+      enforce_adr: false,
+      skip_adr_check: false,
+      ignore_concurrent_warning: false,
+      force_save: false,
     });
     expect(saved.success).toBe(true);
 
@@ -377,7 +410,11 @@ describe("store handlers", () => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(historyId, "alpha", "", "system", "", "archive", null, null, new Date().toISOString());
 
-    const history = await storeReadHistoryHandler({ entity_id: historyId });
+    const history = await storeReadHistoryHandler({
+      entity_id: historyId,
+      limit: 10,
+      order: "desc",
+    });
     expect(history.items?.[0]?.action).toBe("archive");
 
     const backupEntityId = `backup-${randomUUID()}`;
@@ -385,6 +422,12 @@ describe("store handlers", () => {
       type: "system",
       data: { id: backupEntityId, name: "Backup" },
       id: backupEntityId,
+      format: "yaml",
+      proposal_id: null,
+      enforce_adr: false,
+      skip_adr_check: false,
+      ignore_concurrent_warning: false,
+      force_save: false,
     });
 
     const backupFile = join(TMP_ROOT, "backup.json");

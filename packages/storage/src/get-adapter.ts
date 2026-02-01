@@ -5,7 +5,7 @@
  *
  * 根据配置返回对应的 StorageAdapter 实例：
  * - mode: local → LiteAdapter (SQLite)
- * - mode: server → ServerAdapter (HTTP API)
+ * - mode: server/remote → ServerAdapter (HTTP API)
  */
 
 import { existsSync, readFileSync } from 'node:fs';
@@ -23,7 +23,7 @@ import type { StorageAdapter } from './adapter.js';
 /**
  * 存储模式
  */
-export type StorageMode = 'local' | 'server';
+export type StorageMode = 'local' | 'server' | 'remote';
 
 /**
  * Server 模式配置
@@ -31,6 +31,11 @@ export type StorageMode = 'local' | 'server';
 export interface ServerConfig {
   url: string;
   timeout?: number;
+  retries?: number;
+  retryDelayMs?: number;
+  maxConnections?: number;
+  headers?: Record<string, string>;
+  logRequests?: boolean;
 }
 
 /**
@@ -39,6 +44,7 @@ export interface ServerConfig {
 export interface C4AConfig {
   mode?: StorageMode;
   server?: ServerConfig;
+  remote?: ServerConfig;
   project_id?: string;
   repo_id?: string;
   feat?: {
@@ -75,6 +81,16 @@ export function loadConfig(basePath: string = process.cwd()): C4AConfig {
     }
   }
 
+  if (basePath === process.cwd()) {
+    const backendUrl = process.env.C4A_STORAGE_BACKEND_URL;
+    if (backendUrl) {
+      return {
+        mode: 'server',
+        server: { url: backendUrl },
+      };
+    }
+  }
+
   // 默认配置
   return { mode: 'local' };
 }
@@ -100,6 +116,7 @@ function buildAdapterConfigKey(params: {
     };
   };
   server?: ServerConfig;
+  remote?: ServerConfig;
 }): string {
   return JSON.stringify({
     mode: params.mode,
@@ -119,6 +136,22 @@ function buildAdapterConfigKey(params: {
       ? {
           url: params.server.url ?? null,
           timeout: params.server.timeout ?? null,
+          retries: params.server.retries ?? null,
+          retryDelayMs: params.server.retryDelayMs ?? null,
+          maxConnections: params.server.maxConnections ?? null,
+          headers: params.server.headers ?? null,
+          logRequests: params.server.logRequests ?? null,
+        }
+      : null,
+    remote: params.remote
+      ? {
+          url: params.remote.url ?? null,
+          timeout: params.remote.timeout ?? null,
+          retries: params.remote.retries ?? null,
+          retryDelayMs: params.remote.retryDelayMs ?? null,
+          maxConnections: params.remote.maxConnections ?? null,
+          headers: params.remote.headers ?? null,
+          logRequests: params.remote.logRequests ?? null,
         }
       : null,
   });
@@ -129,18 +162,21 @@ function buildAdapterConfigKey(params: {
  *
  * 根据配置文件中的 mode 返回对应的 Adapter：
  * - local: LiteAdapter (SQLite)
- * - server: ServerAdapter (HTTP API，暂未实现)
+ * - server/remote: ServerAdapter (HTTP API)
  *
  * @param options - 可选配置覆盖
  * @returns StorageAdapter 实例
  */
-export function getAdapter(options?: {
+export async function getAdapter(options?: {
   basePath?: string;
   forceMode?: StorageMode;
   config?: Partial<LiteAdapterConfig>;
-}): StorageAdapter {
+}): Promise<StorageAdapter> {
   const config = loadConfig(options?.basePath);
   const mode = options?.forceMode || config.mode || 'local';
+  if (mode !== 'local' && mode !== 'server' && mode !== 'remote') {
+    throw new Error(`Unknown mode: ${mode}`);
+  }
   const featConfig = {
     concurrent_warning:
       options?.config?.feat?.concurrent_warning ?? config.feat?.concurrent_warning,
@@ -161,11 +197,12 @@ export function getAdapter(options?: {
     mode,
     local: localConfig,
     server: config.server,
+    remote: config.remote,
   });
 
   // 如果配置改变，需要重新创建实例
   if (adapterInstance && currentConfigKey !== configKey) {
-    adapterInstance.close().catch(() => {});
+    await adapterInstance.close().catch(() => {});
     adapterInstance = null;
     currentMode = null;
     currentConfigKey = null;
@@ -178,12 +215,22 @@ export function getAdapter(options?: {
     if (mode === 'local') {
       adapterInstance = new LiteAdapter(localConfig);
     } else {
-      const serverConfig = config.server;
+      const serverConfig = mode === 'server' ? config.server : config.remote;
+      const modeLabel = mode === 'server' ? 'server' : 'remote';
       if (!serverConfig?.url) {
-        throw new Error('Server mode requires server.url in .context/.c4a.yaml');
+        throw new Error(`${modeLabel} mode requires ${modeLabel}.url in .context/.c4a.yaml`);
       }
       adapterInstance = new ServerAdapter(serverConfig);
     }
+  }
+
+  try {
+    await adapterInstance.initialize();
+  } catch (error) {
+    adapterInstance = null;
+    currentMode = null;
+    currentConfigKey = null;
+    throw error;
   }
 
   return adapterInstance;
@@ -219,5 +266,5 @@ export function isLocalMode(): boolean {
  * 检查是否为 Server 模式
  */
 export function isServerMode(): boolean {
-  return currentMode === 'server';
+  return currentMode === 'server' || currentMode === 'remote';
 }

@@ -1,0 +1,26 @@
+[project]
+name = "c4a-storage-backend"
+version = "0.3.0"
+description = "C4A Storage Backend - MongoDB/Neo4j/Milvus adapter"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.109.0",
+    "uvicorn>=0.27.0",
+    "motor>=3.3.0",
+    "pymongo>=4.6.0",
+    "neo4j>=5.15.0",
+    "pymilvus>=2.3.0",
+    "pydantic>=2.5.0",
+    "python-dotenv>=1.0.0",
+    "httpx>=0.26.0",
+    "openai>=1.0.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.1.0",
+    "mypy>=1.8.0",
+]

@@ -95,7 +95,7 @@ beforeAll(() => {
     },
   };
 
-  const stubEmbedder = (async () => ({ data: makeEmbedding(1) })) as FeatureExtractionPipeline;
+  const stubEmbedder = (async () => ({ data: makeEmbedding(1) })) as unknown as FeatureExtractionPipeline;
   setEmbedderForTest(stubEmbedder);
 });
 
@@ -134,6 +134,34 @@ describe('Search Integration', () => {
     );
 
     expect(results[0]?.id).toBe('entity-a');
+  });
+
+  test('vector search prefers feat version over main branch', async () => {
+    const vectorStore = store.getVectorStore();
+    expect(vectorStore).not.toBeNull();
+
+    insertEntity({ id: 'entity-x', sourceProject: 'default', proposalId: null, data: { name: 'main' } });
+    insertEntity({
+      id: 'entity-x',
+      sourceProject: 'default',
+      proposalId: 'feat-1',
+      data: { name: 'feat' },
+    });
+
+    vectorStore?.add(generateVectorKey('default', 'entity-x', ''), makeEmbedding(1));
+    vectorStore?.add(generateVectorKey('default', 'entity-x', 'feat-1'), makeEmbedding(1));
+    vectorStore?.save();
+
+    const results = await semanticSearch(
+      store.getDatabase(),
+      vectorStore as NonNullable<typeof vectorStore>,
+      'query',
+      'feat-1',
+      5
+    );
+
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0]?.proposal_id).toBe('feat-1');
   });
 
   test('fallback to LIKE when vector search has no results', async () => {

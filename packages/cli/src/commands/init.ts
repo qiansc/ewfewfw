@@ -327,11 +327,11 @@ export async function initCommand(
       const scope = scopeInput
         .split(",")
         .map((value) => value.trim())
-        .filter(Boolean) as AdrPolicyConfig["scope"];
+        .filter(Boolean);
       adrPolicy = {
         enforce,
         on_missing: onMissing,
-        scope: scope.length > 0 ? scope : undefined,
+        scope: scope.length > 0 ? (scope as AdrPolicyConfig["scope"]) : undefined,
       };
     }
 

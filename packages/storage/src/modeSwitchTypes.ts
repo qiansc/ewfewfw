@@ -9,6 +9,18 @@ import type { EntityType, EntityStatus } from './adapter.js';
  */
 export type ConflictPolicy = 'skip' | 'override' | 'merge' | 'error';
 
+export type PermissionPolicy = 'skip' | 'error';
+
+export type MigrationPhase =
+  | 'read'
+  | 'permissions'
+  | 'feats'
+  | 'entities'
+  | 'relations'
+  | 'vectors'
+  | 'rollback'
+  | 'done';
+
 /**
  * 备份选项
  */
@@ -35,6 +47,52 @@ export interface RestoreOptions {
   rebuildVectors?: boolean;
   /** 恢复进度回调 */
   onProgress?: (progress: RestoreProgress) => void;
+}
+
+/**
+ * 迁移进度
+ */
+export interface MigrateProgress {
+  phase: MigrationPhase;
+  current: number;
+  total: number;
+  message?: string;
+}
+
+export interface MigrationCheckpoint {
+  entities_index?: number;
+  relations_index?: number;
+  feats_index?: number;
+  phase?: MigrationPhase;
+  updated_at?: string;
+}
+
+export interface PermissionCheckResult {
+  allowed: boolean;
+  code?: string;
+  reason?: string;
+}
+
+export type PermissionChecker = (input: {
+  entity: ExportEntity;
+  target: 'server' | 'local';
+}) => Promise<PermissionCheckResult> | PermissionCheckResult;
+
+export interface MigrateOptions {
+  conflictPolicy?: ConflictPolicy;
+  permissionPolicy?: PermissionPolicy;
+  permissionChecker?: PermissionChecker;
+  statusFilter?: 'published' | 'approved' | 'all';
+  rebuildVectors?: boolean;
+  background?: boolean;
+  onProgress?: (progress: MigrateProgress) => void;
+  checkpoint?: {
+    path: string;
+    resume?: boolean;
+    saveInterval?: number;
+  };
+  rollbackOnFailure?: boolean;
+  failFast?: boolean;
 }
 
 /**
@@ -85,6 +143,33 @@ export interface RestoreProgress {
   current: number;
   total: number;
   message?: string;
+}
+
+export interface MigrateFailure {
+  id: string;
+  phase: 'feats' | 'entities' | 'relations';
+  error: string;
+}
+
+export interface MigrateStats {
+  feats: { created: number; updated: number; skipped: number; failed: number };
+  entities: { created: number; updated: number; skipped: number; failed: number };
+  relations: { created: number; skipped: number; failed: number };
+}
+
+export interface MigrateResult {
+  success: boolean;
+  stats: MigrateStats;
+  conflicts?: Array<{
+    id: string;
+    reason: string;
+    resolution: string;
+    target_type?: string;
+    target_status?: string;
+  }>;
+  conflict_summary?: ConflictSummary;
+  failures?: MigrateFailure[];
+  checkpoint?: MigrationCheckpoint;
 }
 
 export interface ConflictSummary {

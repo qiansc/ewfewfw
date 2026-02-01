@@ -21,10 +21,8 @@ function createDefaultRunner(): CommandRunner {
     new Promise<CommandResult>((resolve) => {
       execFile(command, args, { encoding: "utf-8" }, (error, stdout, stderr) => {
         if (error) {
-          const exitCode =
-            typeof (error as NodeJS.ErrnoException).code === "number"
-              ? (error as NodeJS.ErrnoException).code
-              : 1;
+          const code = (error as NodeJS.ErrnoException).code;
+          const exitCode = typeof code === "number" ? code : 1;
           resolve({
             stdout: stdout ?? "",
             stderr: stderr ?? (error as Error).message,
@@ -37,7 +35,13 @@ function createDefaultRunner(): CommandRunner {
     });
 }
 
-const DEFAULT_CONTAINER_NAMES = ["c4a-mongodb", "c4a-neo4j", "c4a-milvus", "c4a-ollama"];
+const DEFAULT_CONTAINER_NAMES = [
+  "c4a-mongodb",
+  "c4a-neo4j",
+  "c4a-milvus",
+  "c4a-ollama",
+  "c4a-storage-backend",
+];
 
 function parseContainerStatusLine(line: string): ContainerStatus | null {
   if (!line.trim()) return null;

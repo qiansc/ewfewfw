@@ -10,12 +10,13 @@ RUN apk add --no-cache curl
 
 # Copy workspace config
 COPY package.json bun.lockb* ./
-COPY tsconfig.json ./
 
 # Copy package.json files for dependency resolution
 COPY packages/core/package.json packages/core/
+COPY packages/storage/package.json packages/storage/
 COPY packages/mcp-store/package.json packages/mcp-store/
 COPY packages/mcp-extract/package.json packages/mcp-extract/
+COPY packages/mcp-extract/scripts packages/mcp-extract/scripts
 COPY packages/mcp-query/package.json packages/mcp-query/
 COPY packages/mcp-visual/package.json packages/mcp-visual/
 
@@ -24,6 +25,7 @@ RUN bun install --frozen-lockfile || bun install
 
 # Copy source files
 COPY packages/core packages/core
+COPY packages/storage packages/storage
 COPY packages/mcp-store packages/mcp-store
 COPY packages/mcp-extract packages/mcp-extract
 COPY packages/mcp-query packages/mcp-query

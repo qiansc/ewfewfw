@@ -4,6 +4,7 @@
  * 本文件只注册 mcp-tools.md 中定义的 c4a_store_* 工具
  */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { getAdapter } from "@c4a/storage";
 import {
   StoreSaveInputSchema,
   StoreReadInputSchema,
@@ -43,6 +44,11 @@ export function createServer(): McpServer {
   const server = new McpServer({
     name: "c4a-store-mcp",
     version: "0.1.0",
+  });
+
+  const adapterReady = getAdapter();
+  adapterReady.catch((error) => {
+    console.error(`[c4a-store-mcp] adapter init failed: ${String(error)}`);
   });
 
   // ============ Store 工具（数据库操作）============

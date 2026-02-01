@@ -16,7 +16,7 @@ import type {
 export async function storeRepairHandler(
   args: StoreRepairInput
 ): Promise<StoreRepairResult> {
-  const adapter = getAdapter();
+  const adapter = await getAdapter();
   await adapter.initialize();
 
   const result = await adapter.repair({

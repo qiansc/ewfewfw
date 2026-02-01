@@ -7,7 +7,7 @@ export async function querySearchHandler(
   args: QuerySearchInput,
   options: QueryHandlerOptions = {}
 ): Promise<QuerySearchResult> {
-  const adapter = options.adapter ?? getAdapter();
+  const adapter = options.adapter ?? (await getAdapter());
 
   // 确保适配器已初始化
   await adapter.initialize();

@@ -10,6 +10,7 @@ import { sync, planSync } from '../data-ops/sync/syncEngine.js';
 import { updateWorkflowStep } from '../data-ops/workflow/updateWorkflowStep.js';
 import { createDataOpsContext } from '../lite-adapter/dataOpsContext.js';
 import type { AdapterContext } from '../lite-adapter/types.js';
+import type { EntityType } from '../adapterBaseTypes.js';
 
 const TMP_ROOT = join(process.cwd(), '.tmp', 'data-ops-tests');
 const DB_PATH = join(TMP_ROOT, `data-ops-${Date.now()}.db`);
@@ -354,21 +355,21 @@ describe('Data Ops refactor', () => {
         {
           path: 'systems/local-only.yaml',
           entity_id: 'local-only',
-          type: 'system',
+          type: 'system' as EntityType,
           content_hash: 'hash-local-only',
           updated_at: now,
         },
         {
           path: 'systems/local-deleted-remote.yaml',
           entity_id: 'local-deleted-remote',
-          type: 'system',
+          type: 'system' as EntityType,
           content_hash: 'hash-local-del',
           updated_at: now,
         },
         {
           path: 'systems/both-modified.yaml',
           entity_id: 'both-modified',
-          type: 'system',
+          type: 'system' as EntityType,
           content_hash: 'hash-local',
           updated_at: now,
         },

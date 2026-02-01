@@ -22,7 +22,7 @@ import { getAdapter } from "@c4a/storage";
 export async function storeReadHandler(
   args: StoreReadInput
 ): Promise<StoreReadResult | StoreReadFormattedResult | StoreReadFormattedResult[]> {
-  const adapter = getAdapter();
+  const adapter = await getAdapter();
 
   // 确保适配器已初始化
   await adapter.initialize();

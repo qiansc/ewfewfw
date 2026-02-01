@@ -178,7 +178,7 @@ export async function getReference(
 /**
  * 根据 ID 查找图片
  */
-async function findImageById(imageId: string): Promise<StoredImage | null> {
+async function findImageById(imageId: string): Promise<StoredImage | undefined> {
   const basePath = getBasePath();
   const searchPaths = [
     join(basePath, STORAGE_PATHS.cache),
@@ -193,7 +193,7 @@ async function findImageById(imageId: string): Promise<StoredImage | null> {
     if (found) return found;
   }
 
-  return null;
+  return undefined;
 }
 
 /**
@@ -202,7 +202,7 @@ async function findImageById(imageId: string): Promise<StoredImage | null> {
 async function searchInDirectory(
   dir: string,
   imageId: string
-): Promise<StoredImage | null> {
+): Promise<StoredImage | undefined> {
   try {
     const entries = await readdir(dir, { withFileTypes: true });
 
@@ -228,7 +228,7 @@ async function searchInDirectory(
     // 忽略目录访问错误
   }
 
-  return null;
+  return undefined;
 }
 
 /**

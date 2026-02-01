@@ -53,10 +53,10 @@ describe("runCommand", () => {
     const { logs, errors, restore } = captureConsole();
     const previousExit = process.exitCode;
     process.exitCode = undefined;
-    let exitCode: number | undefined;
+    let exitCode = 0;
     try {
       await runCommand(["nope"]);
-      exitCode = process.exitCode;
+      exitCode = process.exitCode ?? 0;
     } finally {
       restore();
       process.exitCode = previousExit;

@@ -15,6 +15,7 @@ describe('stepExecutor', () => {
       input: { value: 1 },
       execute: async () => {
         counter += 1;
+        return { success: true };
       },
     };
 
@@ -28,6 +29,7 @@ describe('stepExecutor', () => {
       input: { value: 1 },
       execute: async () => {
         counter += 1;
+        return { success: true };
       },
     };
 

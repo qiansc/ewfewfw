@@ -144,6 +144,31 @@ export interface RepairResult {
 }
 
 // ============================================================
+// 一致性检查类型
+// ============================================================
+
+/**
+ * 一致性检查详情
+ */
+export interface ConsistencyDetail {
+  id: string;
+  neo4j: string;
+  milvus: string;
+}
+
+/**
+ * 一致性检查结果
+ */
+export interface ConsistencyResult {
+  total: number;
+  synced: number;
+  pending: number;
+  failed: number;
+  no_status: number;
+  details: ConsistencyDetail[];
+}
+
+// ============================================================
 // 验证类型
 // ============================================================
 

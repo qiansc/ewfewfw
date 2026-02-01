@@ -16,7 +16,7 @@ import { getAdapter } from "@c4a/storage";
  * @returns 保存结果
  */
 export async function storeSaveHandler(args: StoreSaveInput): Promise<StoreSaveResult> {
-  const adapter = getAdapter();
+  const adapter = await getAdapter();
 
   // 确保适配器已初始化
   await adapter.initialize();

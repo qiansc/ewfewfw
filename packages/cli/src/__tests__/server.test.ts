@@ -36,6 +36,46 @@ describe("serverCommand", () => {
     expect((calls[0].params as { output: string }).output).toBe("backup.tar.gz");
   });
 
+  test("restore calls mcp client and runs permission precheck", async () => {
+    const calls: Array<{ method: string; params: unknown }> = [];
+    const logs: string[] = [];
+    let permissionChecked = false;
+    const createMcpClient = (_options?: { baseUrl?: string; transport?: string }) =>
+      ({
+        request: async (method: string, params: unknown) => {
+          calls.push({ method, params });
+          return { success: true, stats: { entities: 1, relations: 2, vectors: 3 } };
+        },
+      }) as any;
+
+    await serverCommand(["restore", "backup.tar.gz", "--yes", "--conflict-policy=override"], {
+      docker,
+      loadConfig,
+      createMcpClient,
+      emitError: () => {},
+      permissionChecker: async (backupFile: string) => {
+        permissionChecked = true;
+        expect(backupFile).toBe("backup.tar.gz");
+        return {
+          total: 1,
+          allowed: 1,
+          denied: 0,
+          projects: { "demo-project": { total: 1, allowed: 1, denied: 0 } },
+        };
+      },
+      io: {
+        log: (message: string) => logs.push(message),
+        error: (message: string) => logs.push(message),
+      },
+    });
+
+    expect(permissionChecked).toBe(true);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe("c4a_store_restore");
+    expect((calls[0].params as { input: string }).input).toBe("backup.tar.gz");
+    expect((calls[0].params as { conflict_policy: string }).conflict_policy).toBe("override");
+  });
+
   test("status prints service summary", async () => {
     const logs: string[] = [];
     await serverCommand(["status"], {
@@ -45,6 +85,13 @@ describe("serverCommand", () => {
           { name: "c4a-mongodb", status: "Up 1 minute (healthy)", state: "running", health: "healthy" },
         ],
       },
+      checkHealth: async () => ({
+        mongodb: true,
+        neo4j: false,
+        milvus: false,
+        ollama: false,
+        storage_backend: false,
+      }),
       loadConfig: async () => ({
         server: { installed_at: "2026-01-01T00:00:00Z", url: "http://localhost:8051" },
       }),
@@ -57,6 +104,34 @@ describe("serverCommand", () => {
 
     expect(logs.join("\n")).toContain("MongoDB");
     expect(logs.join("\n")).toContain("运行中");
+  });
+
+  test("status uses storage_backend service url when provided", async () => {
+    const logs: string[] = [];
+    await serverCommand(["status"], {
+      docker,
+      checkHealth: async () => ({
+        mongodb: true,
+        neo4j: true,
+        milvus: true,
+        ollama: true,
+        storage_backend: true,
+      }),
+      loadConfig: async () => ({
+        server: {
+          installed_at: "2026-01-01T00:00:00Z",
+          url: "http://localhost:8051",
+          services: { storage_backend: "localhost:9999" },
+        },
+      }),
+      io: {
+        log: (message: string) => logs.push(message),
+        error: (message: string) => logs.push(message),
+      },
+      emitError: () => {},
+    });
+
+    expect(logs.join("\n")).toContain("storage-backend: http://localhost:9999");
   });
 
   test("check-permissions outputs json when requested", async () => {

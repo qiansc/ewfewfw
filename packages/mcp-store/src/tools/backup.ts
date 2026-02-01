@@ -16,7 +16,7 @@ import type {
 export async function storeBackupHandler(
   args: StoreBackupInput
 ): Promise<StoreBackupResult> {
-  const adapter = getAdapter();
+  const adapter = await getAdapter();
   await adapter.initialize();
 
   const result = await adapter.backup({

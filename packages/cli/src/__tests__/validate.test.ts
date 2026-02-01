@@ -91,7 +91,7 @@ describe("validateCommand", () => {
 
       process.exitCode = undefined;
       await validateCommand(["--strict"], deps);
-      expect(process.exitCode).toBe(2);
+      expect(process.exitCode ?? 0).toBe(2);
       process.exitCode = 0;
     });
   });
