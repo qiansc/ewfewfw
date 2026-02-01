@@ -10,6 +10,7 @@
     "build": "bun build ./src/index.ts --outdir ./dist --target bun",
     "test": "bun test",
     "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
     "postinstall": "node scripts/copy-wasm.js"
   },
   "dependencies": {

@@ -10,7 +10,8 @@
     "dev": "bun --watch src/index.tsx",
     "start": "bun run src/index.tsx",
     "lint": "tsc --noEmit",
-    "test": "bun test"
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@c4a/core": "workspace:*",

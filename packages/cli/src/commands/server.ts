@@ -1,10 +1,4 @@
-import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
-import { execFile } from "node:child_process";
-import { gunzipSync } from "node:zlib";
 import { loadGlobalConfig, getInstalledModes } from "../core/config.js";
-import type { GlobalConfig } from "../core/config.js";
 import { McpClient, type McpTransport } from "../core/mcp-client.js";
 import { parseArgs } from "../utils/args.js";
 import { buildErrorResponse, printErrorResponse } from "../utils/errorResponse.js";
@@ -14,324 +8,62 @@ import {
   restartContainers,
   stopContainers,
   getContainerLogs,
-  type ContainerStatus,
-  type CommandResult,
 } from "../utils/docker.js";
 import { promptConfirm } from "../utils/prompt.js";
-
-interface CommandIO {
-  log: (message: string) => void;
-  error: (message: string) => void;
-}
-
-interface ServerCommandDeps {
-  io?: CommandIO;
-  docker?: {
-    checkDockerInstalled: typeof checkDockerInstalled;
-    getContainerStatus: typeof getContainerStatus;
-    restartContainers: typeof restartContainers;
-    stopContainers: typeof stopContainers;
-    getContainerLogs: typeof getContainerLogs;
-  };
-  confirm?: (message: string) => Promise<boolean>;
-  loadConfig?: typeof loadGlobalConfig;
-  createMcpClient?: (options: { baseUrl?: string; transport?: McpTransport }) => McpClient;
-  emitError?: (response: ReturnType<typeof buildErrorResponse>) => void;
-  permissionChecker?: (backupFile: string, user?: string) => Promise<PermissionSummary>;
-  composeDown?: (composeFile: string) => Promise<CommandResult>;
-  checkHealth?: (config: unknown, statuses: ContainerStatus[]) => Promise<ServiceHealth>;
-}
-
-interface BackupEntity {
-  source_project?: string;
-  metadata?: { source_project?: string };
-}
-
-interface PermissionSummary {
-  total: number;
-  allowed: number;
-  denied: number;
-  projects: Record<string, { total: number; allowed: number; denied: number }>;
-}
-
-interface ServiceHealth {
-  mongodb: boolean;
-  neo4j: boolean;
-  milvus: boolean;
-  ollama: boolean;
-  storage_backend: boolean;
-}
-
-const SERVER_STATUS_SERVICES = [
-  { label: "MongoDB", container: "c4a-mongodb", ports: "27017" },
-  { label: "Neo4j", container: "c4a-neo4j", ports: "7474/7687" },
-  { label: "Milvus", container: "c4a-milvus", ports: "19530" },
-  { label: "Ollama", container: "c4a-ollama", ports: "11434" },
-  { label: "Storage Backend", container: "c4a-storage-backend", ports: "8055" },
-];
-
-const SERVER_CONTAINERS = SERVER_STATUS_SERVICES.map((item) => item.container);
-
-const SERVER_CONTAINER_ALIASES: Record<string, string> = {
-  mongodb: "c4a-mongodb",
-  neo4j: "c4a-neo4j",
-  milvus: "c4a-milvus",
-  ollama: "c4a-ollama",
-  backend: "c4a-storage-backend",
-  storage: "c4a-storage-backend",
-  "storage-backend": "c4a-storage-backend",
-};
-
-type HealthResponse = {
-  status?: string;
-  mongodb?: boolean;
-  neo4j?: boolean;
-  milvus?: boolean;
-  ollama?: boolean;
-  storage_backend?: boolean;
-  service?: string;
-};
-
-async function fetchServerHealth(baseUrl?: string): Promise<HealthResponse | null> {
-  if (!baseUrl) return null;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000);
-  try {
-    const response = await fetch(`${baseUrl.replace(/\/+$/, "")}/health`, {
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      return null;
-    }
-    return (await response.json()) as HealthResponse;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
-function normalizeHttpUrl(value?: string): string | undefined {
-  if (!value) return undefined;
-  if (value.startsWith("http://") || value.startsWith("https://")) {
-    return value;
-  }
-  return `http://${value}`;
-}
-
-function resolveStorageBackendUrl(config?: { server?: { url?: string; services?: { storage_backend?: string } } }): string {
-  const serviceUrl = normalizeHttpUrl(config?.server?.services?.storage_backend);
-  if (serviceUrl) return serviceUrl;
-  const serverUrl = normalizeHttpUrl(config?.server?.url);
-  return serverUrl ?? "http://localhost:8055";
-}
-
-function isContainerHealthy(item?: ContainerStatus): boolean {
-  if (!item) return false;
-  if (item.state !== "running") return false;
-  if (!item.health) return true;
-  return item.health === "healthy";
-}
-
-function deriveContainerHealth(statusMap: Map<string, ContainerStatus>): ServiceHealth {
-  return {
-    mongodb: isContainerHealthy(statusMap.get("c4a-mongodb")),
-    neo4j: isContainerHealthy(statusMap.get("c4a-neo4j")),
-    milvus: isContainerHealthy(statusMap.get("c4a-milvus")),
-    ollama: isContainerHealthy(statusMap.get("c4a-ollama")),
-    storage_backend: isContainerHealthy(statusMap.get("c4a-storage-backend")),
-  };
-}
-
-function formatBytes(size?: number): string {
-  if (!size || size <= 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB"];
-  let value = size;
-  let index = 0;
-  while (value >= 1024 && index < units.length - 1) {
-    value /= 1024;
-    index += 1;
-  }
-  return `${value.toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
-}
+import type { CommandIO, ServerCommandDeps } from "./serverTypes.js";
+import {
+  checkProjectPermission,
+  readBackupEntities,
+  resolveStorageBackendUrl,
+  summarizePermissions,
+  summarizePermissionsWithCheck,
+} from "./serverHelpers.js";
+import {
+  handleClean,
+  handleLogs,
+  handleRestart,
+  handleStatus,
+  handleStop,
+  runComposeDown,
+} from "./serverDocker.js";
+import { handleBackup, handleCheckPermissions, handleRestore } from "./serverBackup.js";
+import {
+  handleCheckConsistency,
+  handleRebuildMilvus,
+  handleRebuildNeo4j,
+} from "./serverMaintenance.js";
 
 function printHelp(io: CommandIO): void {
   io.log("c4a server <command>");
-  io.log("可用子命令: status, restart, stop, logs, backup, restore, clean, check-permissions");
-}
-
-function resolveContainerName(input: string): string {
-  return SERVER_CONTAINER_ALIASES[input] ?? input;
-}
-
-function formatContainerSummary(
-  service: { label: string; container: string; ports: string },
-  item?: ContainerStatus,
-): string {
-  const state =
-    item?.state === "running"
-      ? "运行中"
-      : item?.state === "exited"
-        ? "已停止"
-        : item?.state === "not_found"
-          ? "未创建"
-          : "未知";
-  const health =
-    item?.health === "healthy"
-      ? "健康"
-      : item?.health === "unhealthy"
-        ? "异常"
-        : item?.health === "starting"
-          ? "启动中"
-          : "未知";
-  const ports = item?.ports ?? service.ports;
-  return `${service.label} (${service.container}) | ${ports} | ${state} | ${health}`;
-}
-
-function buildBackupFilename(): string {
-  const now = new Date();
-  const pad = (value: number) => String(value).padStart(2, "0");
-  const name = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(
-    now.getHours(),
-  )}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-  return `c4a-backup-${name}.tar.gz`;
-}
-
-function extractTarJson(archive: Buffer): string {
-  if (archive.length < 512) {
-    throw new Error("备份文件格式错误");
-  }
-  const sizeRaw = archive.toString("utf-8", 124, 136).replace(/\0.*$/, "").trim();
-  const size = Number.parseInt(sizeRaw, 8);
-  if (!Number.isFinite(size) || size <= 0) {
-    throw new Error("备份文件格式错误");
-  }
-  const start = 512;
-  const end = start + size;
-  if (end > archive.length) {
-    throw new Error("备份文件格式错误");
-  }
-  return archive.toString("utf-8", start, end);
-}
-
-async function readBackupEntities(backupFile: string): Promise<BackupEntity[]> {
-  const raw = await readFile(backupFile);
-  const isGzip = backupFile.endsWith(".gz");
-  const buffer = isGzip ? gunzipSync(raw) : raw;
-  const isTar = backupFile.endsWith(".tar.gz") || backupFile.endsWith(".tgz");
-  const jsonText = isTar ? extractTarJson(buffer) : buffer.toString("utf-8");
-  const data = JSON.parse(jsonText) as { entities?: BackupEntity[] };
-  if (!Array.isArray(data.entities)) {
-    throw new Error("备份文件缺少 entities 字段");
-  }
-  return data.entities.map((entity) => ({
-    source_project: entity.source_project ?? entity.metadata?.source_project,
-  }));
-}
-
-function summarizePermissions(entities: BackupEntity[]): PermissionSummary {
-  const projects: PermissionSummary["projects"] = {};
-  for (const entity of entities) {
-    const project = entity.source_project || "unknown";
-    if (!projects[project]) {
-      projects[project] = { total: 0, allowed: 0, denied: 0 };
-    }
-    projects[project].total += 1;
-  }
-  return {
-    total: 0,
-    allowed: 0,
-    denied: 0,
-    projects,
-  };
-}
-
-async function checkProjectPermission(
-  baseUrl: string,
-  userId: string,
-  projectId: string,
-): Promise<boolean> {
-  const trimmedBase = baseUrl.replace(/\/+$/, "");
-  const response = await fetch(`${trimmedBase}/permissions/check`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "X-User-ID": userId,
-    },
-    body: JSON.stringify({ user_id: userId, project_id: projectId, action: "write" }),
-  });
-  if (!response.ok) {
-    return false;
-  }
-  const data = (await response.json()) as { allowed?: boolean };
-  return data.allowed === true;
-}
-
-async function summarizePermissionsWithCheck(
-  summary: PermissionSummary,
-  check?: (projectId: string) => Promise<boolean>,
-): Promise<PermissionSummary> {
-  const projects = summary.projects;
-  for (const [projectId, stats] of Object.entries(projects)) {
-    if (projectId === "unknown") {
-      stats.denied = stats.total;
-      continue;
-    }
-    if (!check) {
-      stats.allowed = stats.total;
-      continue;
-    }
-    try {
-      const allowed = await check(projectId);
-      if (allowed) {
-        stats.allowed = stats.total;
-      } else {
-        stats.denied = stats.total;
-      }
-    } catch {
-      stats.denied = stats.total;
-    }
-  }
-
-  const totals = Object.values(projects).reduce(
-    (acc, stats) => {
-      acc.total += stats.total;
-      acc.allowed += stats.allowed;
-      acc.denied += stats.denied;
-      return acc;
-    },
-    { total: 0, allowed: 0, denied: 0 },
-  );
-  return { ...summary, ...totals };
-}
-
-async function runComposeDown(composeFile: string): Promise<CommandResult> {
-  return new Promise((resolveResult) => {
-    execFile(
-      "docker",
-      ["compose", "-f", composeFile, "down", "-v"],
-      { encoding: "utf-8" },
-      (error, stdout, stderr) => {
-        if (error) {
-          const code = (error as NodeJS.ErrnoException).code;
-          const exitCode = typeof code === "number" ? code : 1;
-          resolveResult({
-            stdout: stdout ?? "",
-            stderr: stderr ?? (error as Error).message,
-            exitCode,
-          });
-          return;
-        }
-        resolveResult({ stdout: stdout ?? "", stderr: stderr ?? "", exitCode: 0 });
-      },
-    );
-  });
+  io.log("可用子命令:");
+  io.log("  status              查看服务状态");
+  io.log("  restart             重启服务");
+  io.log("  stop                停止服务");
+  io.log("  logs [service]      查看日志");
+  io.log("  backup              备份数据");
+  io.log("  restore <file>      恢复数据");
+  io.log("  clean               清理数据");
+  io.log("  check-permissions   检查备份文件权限");
+  io.log("  check-consistency   检查数据一致性");
+  io.log("  rebuild-neo4j       重建 Neo4j 数据");
+  io.log("  rebuild-milvus      重建 Milvus 数据");
+  io.log("");
+  io.log("通用参数:");
+  io.log("  --user <id>         指定用户 ID（默认从配置读取）");
+  io.log("  --format json       JSON 格式输出");
 }
 
 export async function serverCommand(
   args: string[],
   deps: ServerCommandDeps = {},
 ): Promise<void> {
+  function resolveUserId(options: Record<string, unknown>): string {
+    if (typeof options.user === "string" && options.user) {
+      return options.user;
+    }
+    return "cli-user";
+  }
+
   const io: CommandIO = deps.io ?? console;
   const docker = deps.docker ?? {
     checkDockerInstalled,
@@ -374,7 +106,7 @@ export async function serverCommand(
       const entities = await readBackupEntities(backupFile);
       const summary = summarizePermissions(entities);
       const baseUrl = resolveStorageBackendUrl(config ?? undefined);
-      const userId = user ?? "anonymous";
+      const userId = user ?? "cli-user";
       return await summarizePermissionsWithCheck(summary, (projectId) =>
         checkProjectPermission(baseUrl, userId, projectId),
       );
@@ -396,280 +128,71 @@ export async function serverCommand(
   try {
     switch (subcommand) {
       case "status": {
-      const statuses = await docker.getContainerStatus(SERVER_CONTAINERS);
-      const statusMap = new Map(statuses.map((item) => [item.name, item]));
-      io.log("服务状态:");
-      for (const service of SERVER_STATUS_SERVICES) {
-        const item = statusMap.get(service.container);
-        io.log(formatContainerSummary(service, item));
-      }
-
-      const baseUrl = resolveStorageBackendUrl(config ?? undefined);
-      const containerHealth = deriveContainerHealth(statusMap);
-      let serviceHealth: ServiceHealth | null = null;
-
-      if (checkHealth) {
-        serviceHealth = await checkHealth(config ?? null, statuses);
-      } else {
-        const remote = await fetchServerHealth(baseUrl);
-        if (remote) {
-          const storageBackend =
-            typeof remote.storage_backend === "boolean"
-              ? remote.storage_backend
-              : remote.status === "ok"
-                ? true
-                : containerHealth.storage_backend;
-          serviceHealth = {
-            mongodb: typeof remote.mongodb === "boolean" ? remote.mongodb : containerHealth.mongodb,
-            neo4j: typeof remote.neo4j === "boolean" ? remote.neo4j : containerHealth.neo4j,
-            milvus: typeof remote.milvus === "boolean" ? remote.milvus : containerHealth.milvus,
-            ollama: typeof remote.ollama === "boolean" ? remote.ollama : containerHealth.ollama,
-            storage_backend: storageBackend,
-          };
-        }
-      }
-
-      if (!serviceHealth) {
-        serviceHealth = containerHealth;
-      }
-
-      io.log("");
-      io.log("服务健康状态:");
-      io.log(`  storage-backend: ${serviceHealth.storage_backend ? "✅" : "❌"}`);
-      io.log(`  MongoDB: ${serviceHealth.mongodb ? "✅" : "❌"}`);
-      io.log(`  Neo4j: ${serviceHealth.neo4j ? "✅" : "❌"}`);
-      io.log(`  Milvus: ${serviceHealth.milvus ? "✅" : "❌"}`);
-      io.log(`  Ollama: ${serviceHealth.ollama ? "✅" : "❌"}`);
-
-      io.log("");
-      io.log("连接信息:");
-      io.log(`  storage-backend: ${baseUrl}`);
-      const services = config?.server?.services;
-      if (services) {
-        if (services.mongodb) io.log(`  MongoDB: ${services.mongodb}`);
-        if (services.neo4j) io.log(`  Neo4j: ${services.neo4j}`);
-        if (services.milvus) io.log(`  Milvus: ${services.milvus}`);
-        if (services.ollama) io.log(`  Ollama: ${services.ollama}`);
-        if (services.storage_backend) io.log(`  Storage Backend: ${services.storage_backend}`);
-      }
+      await handleStatus({ io, docker, config, checkHealth });
       return;
     }
       case "restart": {
-      const result = await docker.restartContainers(SERVER_CONTAINERS);
-      if (result.exitCode !== 0) {
-        emitError(
-          buildErrorResponse("C4A-SERVER-003", result.stderr || "重启失败"),
-        );
-        process.exitCode = 1;
-        return;
-      }
-      io.log("已重启 C4A 服务容器。");
+      await handleRestart({ io, docker, emitError });
       return;
     }
       case "stop": {
-      const result = await docker.stopContainers(SERVER_CONTAINERS);
-      if (result.exitCode !== 0) {
-        emitError(
-          buildErrorResponse("C4A-SERVER-004", result.stderr || "停止失败"),
-        );
-        process.exitCode = 1;
-        return;
-      }
-      io.log("已停止 C4A 服务容器。");
+      await handleStop({ io, docker, emitError });
       return;
     }
       case "logs": {
       const target = positionals[1];
-      const containerName = target ? resolveContainerName(target) : undefined;
       const tail = typeof options.tail === "string" ? Number(options.tail) : 200;
-      const result = await docker.getContainerLogs(containerName, {
-        tail: Number.isFinite(tail) ? tail : 200,
-        timestamps: true,
-      });
-      if (result.exitCode !== 0) {
-        emitError(
-          buildErrorResponse("C4A-SERVER-005", result.stderr || "获取日志失败"),
-        );
-        process.exitCode = 1;
-        return;
-      }
-      io.log(result.stdout.trim() || "暂无日志");
+      await handleLogs({ io, docker, emitError, target, tail });
       return;
     }
       case "backup": {
-      const output =
-        typeof options.output === "string" && options.output
-          ? options.output
-          : buildBackupFilename();
-      const status =
-        typeof options.status === "string" && ["published", "approved", "all"].includes(options.status)
-          ? options.status
-          : "published";
-      const format =
-        typeof options.format === "string" && ["tar.gz", "json"].includes(options.format)
-          ? options.format
-          : "tar.gz";
-      const client = createMcpClient({ baseUrl: config?.server?.url, transport: "stdio" });
-      io.log("正在备份服务器数据...");
-      const result = await client.request<{
-        success: boolean;
-        file?: string;
-        size?: number;
-        format_version?: string;
-        stats?: { entities: number; relations: number; vectors: number };
-        error?: string;
-      }>(
-        "c4a_store_backup",
-        { output, status_filter: status, format, include_metadata: true },
-      );
-      if (!result.success) {
-        emitError(
-          buildErrorResponse("C4A-SERVER-006", result.error ?? "备份失败"),
-        );
-        process.exitCode = 1;
-        return;
-      }
-      const file = result.file ?? output;
-      io.log("✅ 备份完成");
-      io.log(`文件: ${file}`);
-      if (typeof result.size === "number") {
-        io.log(`大小: ${formatBytes(result.size)}`);
-      }
-      if (result.stats) {
-        io.log(`包含: ${result.stats.entities} 个实体, ${result.stats.relations} 个关系, ${result.stats.vectors} 个向量`);
-      }
+      await handleBackup({ io, createMcpClient, config, options, emitError });
       return;
     }
       case "restore": {
-      const input =
-        typeof options.input === "string"
-          ? options.input
-          : typeof positionals[1] === "string"
-            ? positionals[1]
-            : "";
-      if (!input) {
-        emitError(
-          buildErrorResponse("C4A-SERVER-007", "缺少备份文件路径", {
-            field: "input",
-            suggestion: "例如: c4a server restore ./backup.tar.gz",
-          }),
-        );
-        process.exitCode = 1;
-        return;
-      }
-      const permissionSummary = await permissionChecker(
-        input,
-        typeof options.user === "string" ? options.user : undefined,
-      );
-      if (permissionSummary.denied > 0) {
-        io.log("⚠️  权限预检查发现不可导入实体：");
-        for (const [project, stats] of Object.entries(permissionSummary.projects)) {
-          if (stats.denied > 0) {
-            io.log(`- ${project}: 无权限 ${stats.denied} 个实体`);
-          }
-        }
-      }
-      const confirmed = options.yes === true ? true : await confirm("恢复操作会覆盖现有数据，确认继续？");
-      if (!confirmed) {
-        io.log("已取消恢复操作。");
-        return;
-      }
-      const conflictPolicy =
-        typeof options["conflict-policy"] === "string" ? options["conflict-policy"] : "skip";
-      const validateChecksums =
-        typeof options["validate-checksums"] === "string"
-          ? options["validate-checksums"] !== "false"
-          : true;
-      const client = createMcpClient({ baseUrl: config?.server?.url, transport: "stdio" });
-      io.log("正在恢复服务器数据...");
-      const result = await client.request<{
-        success: boolean;
-        format_version?: string;
-        compatible?: boolean;
-        stats?: { entities: number; relations: number; vectors: number };
-        conflicts?: Array<{ entity_id: string; reason: string; resolution: string }>;
-        error?: string;
-      }>(
-        "c4a_store_restore",
-        {
-          input,
-          conflict_policy: conflictPolicy as "skip" | "override" | "merge" | "error",
-          validate_checksums: validateChecksums,
-        },
-      );
-      if (!result.success) {
-        emitError(
-          buildErrorResponse("C4A-SERVER-008", result.error ?? "恢复失败"),
-        );
-        process.exitCode = 1;
-        return;
-      }
-      io.log("✅ 恢复完成");
-      if (result.stats) {
-        io.log(`实体: ${result.stats.entities}, 关系: ${result.stats.relations}, 向量: ${result.stats.vectors}`);
-      }
-      if (result.conflicts && result.conflicts.length > 0) {
-        io.log(`冲突: ${result.conflicts.length} 条`);
-      }
+      const userId = resolveUserId(options);
+      await handleRestore({
+        io,
+        createMcpClient,
+        config,
+        options,
+        positionals,
+        confirm,
+        emitError,
+        permissionChecker,
+        userId,
+      });
       return;
     }
       case "clean": {
-      const confirmed = options.yes === true ? true : await confirm("清理将删除所有服务数据，确认继续？");
-      if (!confirmed) {
-        io.log("已取消清理操作。");
-        return;
-      }
-      const composeFile = resolve(import.meta.dirname, "../../../..", "docker", "docker-compose.server.yml");
-      if (!existsSync(composeFile)) {
-        emitError(
-          buildErrorResponse("C4A-SERVER-009", "未找到 docker-compose.server.yml，无法执行清理"),
-        );
-        process.exitCode = 1;
-        return;
-      }
-      const result = await composeDown(composeFile);
-      if (result.exitCode !== 0) {
-        emitError(
-          buildErrorResponse("C4A-SERVER-010", result.stderr || "清理失败"),
-        );
-        process.exitCode = 1;
-        return;
-      }
-      io.log("已清理服务数据。");
+      await handleClean({ io, confirm, composeDown, emitError });
       return;
     }
       case "check-permissions": {
-      const backupFile =
-        typeof options.backup === "string"
-          ? options.backup
-          : typeof positionals[1] === "string"
-            ? positionals[1]
-            : "";
-      if (!backupFile) {
-        emitError(
-          buildErrorResponse("C4A-SERVER-011", "缺少备份文件参数 --backup", {
-            field: "backup",
-            suggestion: "例如: c4a server check-permissions --backup ./backup.tar.gz",
-          }),
-        );
-        process.exitCode = 1;
-        return;
-      }
-      const summary = await permissionChecker(
-        backupFile,
-        typeof options.user === "string" ? options.user : undefined,
-      );
-      const outputJson = options.format === "json";
-      if (outputJson) {
-        io.log(JSON.stringify(summary, null, 2));
-        return;
-      }
-      io.log("权限预检查结果:");
-      for (const [project, stats] of Object.entries(summary.projects)) {
-        const label = stats.denied > 0 ? "❌" : "✅";
-        io.log(`${label} ${project}: 可导入 ${stats.allowed} / 无权限 ${stats.denied}`);
-      }
-      io.log(`总计: 可导入 ${summary.allowed} / 无权限 ${summary.denied}`);
+      const userId = resolveUserId(options);
+      await handleCheckPermissions({
+        io,
+        options,
+        positionals,
+        emitError,
+        permissionChecker,
+        userId,
+      });
+      return;
+    }
+      case "check-consistency": {
+      const userId = resolveUserId(options);
+      await handleCheckConsistency({ io, config, options, emitError, userId });
+      return;
+    }
+      case "rebuild-neo4j": {
+      const userId = resolveUserId(options);
+      await handleRebuildNeo4j({ io, config, options, emitError, confirm, userId });
+      return;
+    }
+      case "rebuild-milvus": {
+      const userId = resolveUserId(options);
+      await handleRebuildMilvus({ io, config, options, emitError, confirm, userId });
       return;
     }
       default: {
@@ -683,9 +206,7 @@ export async function serverCommand(
       }
     }
   } catch (error) {
-    emitError(
-      buildErrorResponse("C4A-SERVER-999", (error as Error).message || "命令执行失败"),
-    );
+    emitError(buildErrorResponse("C4A-SERVER-999", (error as Error).message || "命令执行失败"));
     process.exitCode = 1;
   }
 }

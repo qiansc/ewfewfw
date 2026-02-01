@@ -21,14 +21,17 @@ Part 13 Server Mode 已完成，Part 07 Data Ops 已完成。现在需要补充 
 | 子模块 | 设计文档 | 核心能力 | 任务编号 |
 |--------|---------|---------|---------|
 | check-consistency 命令 | [cross-project-transaction.md](../v0.3.0/detailed-design/data-ops/cross-project-transaction.md) §6.6 | 检查 MongoDB/Neo4j/Milvus 一致性 | 08S.1 |
-| sync-pending 命令 | [cross-project-transaction.md](../v0.3.0/detailed-design/data-ops/cross-project-transaction.md) §6.6 | 触发待同步实体修复 | 08S.2 |
-| rebuild-neo4j 命令 | [cross-project-transaction.md](../v0.3.0/detailed-design/data-ops/cross-project-transaction.md) §6.6 | 从 MongoDB 重建 Neo4j | 08S.3 |
-| rebuild-milvus 命令 | [cross-project-transaction.md](../v0.3.0/detailed-design/data-ops/cross-project-transaction.md) §6.6 | 从 MongoDB 重建 Milvus | 08S.4 |
-| 文档与验证 | - | summary.md 更新 | 08S.5 |
+| rebuild-neo4j 命令 | [cross-project-transaction.md](../v0.3.0/detailed-design/data-ops/cross-project-transaction.md) §6.6 | 从 MongoDB 重建 Neo4j | 08S.2 |
+| rebuild-milvus 命令 | [cross-project-transaction.md](../v0.3.0/detailed-design/data-ops/cross-project-transaction.md) §6.6 | 从 MongoDB 重建 Milvus | 08S.3 |
+| 文档与验证 | - | summary.md 更新 | 08S.4 |
 
 **依赖关系**：
 - 依赖 Part 13 Server Mode（已完成）
 - 后端 API 已就绪：`/utils/check-consistency`、`/utils/repair`
+
+**关键问题说明**：
+- ⚠️ **sync-pending 命令移除**：设计文档要求"同步待处理实体"，但后端 `/utils/repair` 实际是全量重建（遍历所有关系/实体），无法按 `sync_status` 过滤。为避免语义不一致和高成本操作风险，移除此命令。用户可使用 `rebuild-neo4j` / `rebuild-milvus` 明确重建意图。
+- ⚠️ **权限系统集成**：所有命令支持 `--user` 参数传递用户 ID，默认从全局配置读取。后端强制校验权限，避免 403 错误。
 
 ---
 
@@ -39,9 +42,10 @@ Part 13 Server Mode 已完成，Part 07 Data Ops 已完成。现在需要补充 
 
 请执行 Part 08 Server CLI Commands 的前置验证任务：
 
-1. 验证后端 API 已就绪：
+1. 验证后端 API 已就绪（注意：若权限表已存在数据，需确保 test 用户有权限或使用有权限的用户）：
    - curl -X POST http://localhost:8055/utils/check-consistency -H "Content-Type: application/json" -H "X-User-ID: test" -d '{}'
    - curl -X POST http://localhost:8055/utils/repair -H "Content-Type: application/json" -H "X-User-ID: test" -d '{"scope": "all", "dry_run": true}'
+   - 若返回 403，请更换为有权限的用户 ID 或清空权限表
 
 2. 阅读现有 CLI 实现：
    - packages/cli/src/commands/server.ts（当前 server 子命令）
@@ -51,9 +55,9 @@ Part 13 Server Mode 已完成，Part 07 Data Ops 已完成。现在需要补充 
    - v0.3.0/detailed-design/data-ops/cross-project-transaction.md §6.6
    - 需要实现的命令：
      - c4a server check-consistency
-     - c4a server sync-pending
      - c4a server rebuild-neo4j
      - c4a server rebuild-milvus
+   - sync-pending 移除原因：后端 /utils/repair 是全量重建，无法按 sync_status 过滤
 
 4. 产物：
    - 确认后端 API 可用
@@ -72,28 +76,44 @@ Part 13 Server Mode 已完成，Part 07 Data Ops 已完成。现在需要补充 
 
 请在 packages/cli/src/commands/server.ts 中添加以下子命令：
 
+0. 通用：用户 ID 获取逻辑（所有命令共用）：
+   ```typescript
+   // 在 serverCommand 函数开头添加
+   function resolveUserId(options: Record<string, unknown>): string {
+     // 使用 --user 参数，否则使用默认值
+     if (typeof options.user === "string" && options.user) {
+       return options.user;
+     }
+     // 默认值（无配置来源，GlobalConfig 当前不支持 user_id）
+     return "cli-user";
+   }
+   ```
+
 1. 任务 08S.1 - check-consistency 命令：
    - 调用 `/utils/check-consistency` 端点
    - 支持 --project 参数过滤项目
+   - 支持 --user 参数指定用户 ID
    - 支持 --format=json 输出格式
 
    ```typescript
    case "check-consistency": {
      const projectId = typeof options.project === "string" ? options.project : undefined;
      const format = options.format === "json" ? "json" : "text";
+     const userId = resolveUserId(options);
 
      const baseUrl = resolveStorageBackendUrl(config ?? undefined);
      const response = await fetch(`${baseUrl}/utils/check-consistency`, {
        method: "POST",
        headers: {
          "Content-Type": "application/json",
-         "X-User-ID": "cli-user",
+         "X-User-ID": userId,
        },
        body: JSON.stringify({ project_id: projectId }),
      });
 
      if (!response.ok) {
-       emitError(buildErrorResponse("C4A-SERVER-013", "一致性检查失败"));
+       const errorText = await response.text();
+       emitError(buildErrorResponse("C4A-SERVER-013", `一致性检查失败: ${errorText}`));
        process.exitCode = 1;
        return;
      }
@@ -133,51 +153,10 @@ Part 13 Server Mode 已完成，Part 07 Data Ops 已完成。现在需要补充 
    }
    ```
 
-2. 任务 08S.2 - sync-pending 命令：
-   - 调用 `/utils/repair` 端点（scope: all）
-   - 支持 --dry-run 参数
-
-   ```typescript
-   case "sync-pending": {
-     const dryRun = options["dry-run"] === true;
-
-     const baseUrl = resolveStorageBackendUrl(config ?? undefined);
-     io.log(dryRun ? "预览待同步实体..." : "正在同步待处理实体...");
-
-     const response = await fetch(`${baseUrl}/utils/repair`, {
-       method: "POST",
-       headers: {
-         "Content-Type": "application/json",
-         "X-User-ID": "cli-user",
-       },
-       body: JSON.stringify({ scope: "all", dry_run: dryRun }),
-     });
-
-     if (!response.ok) {
-       emitError(buildErrorResponse("C4A-SERVER-014", "同步失败"));
-       process.exitCode = 1;
-       return;
-     }
-
-     const result = await response.json() as {
-       success: boolean;
-       scanned: number;
-       inconsistencies: Array<{ id: string; issue: string; fixed?: boolean }>;
-       stats: { neo4j_synced: number; milvus_synced: number };
-     };
-
-     io.log(`已扫描 ${result.scanned} 个实体`);
-     io.log(`发现 ${result.inconsistencies.length} 项不一致`);
-     if (result.stats) {
-       io.log(`Neo4j 同步: ${result.stats.neo4j_synced}`);
-       io.log(`Milvus 同步: ${result.stats.milvus_synced}`);
-     }
-     return;
-   }
-   ```
-
-3. 任务 08S.3 - rebuild-neo4j 命令：
+2. 任务 08S.2 - rebuild-neo4j 命令：
    - 调用 `/utils/repair` 端点（scope: neo4j）
+   - 支持 --user 参数指定用户 ID
+   - 支持 --format=json 输出格式
    - 需要确认提示
 
    ```typescript
@@ -188,20 +167,26 @@ Part 13 Server Mode 已完成，Part 07 Data Ops 已完成。现在需要补充 
        return;
      }
 
+     const format = options.format === "json" ? "json" : "text";
+     const userId = resolveUserId(options);
      const baseUrl = resolveStorageBackendUrl(config ?? undefined);
-     io.log("正在重建 Neo4j 数据...");
+
+     if (format === "text") {
+       io.log("正在重建 Neo4j 数据...");
+     }
 
      const response = await fetch(`${baseUrl}/utils/repair`, {
        method: "POST",
        headers: {
          "Content-Type": "application/json",
-         "X-User-ID": "cli-user",
+         "X-User-ID": userId,
        },
        body: JSON.stringify({ scope: "neo4j" }),
      });
 
      if (!response.ok) {
-       emitError(buildErrorResponse("C4A-SERVER-015", "Neo4j 重建失败"));
+       const errorText = await response.text();
+       emitError(buildErrorResponse("C4A-SERVER-014", `Neo4j 重建失败: ${errorText}`));
        process.exitCode = 1;
        return;
      }
@@ -209,17 +194,28 @@ Part 13 Server Mode 已完成，Part 07 Data Ops 已完成。现在需要补充 
      const result = await response.json() as {
        success: boolean;
        scanned: number;
-       stats: { neo4j_synced: number };
+       inconsistencies: Array<{ entity_id: string; issue: string; fixed: boolean }>;
+       stats: { neo4j_fixed: number; milvus_fixed: number; failed: number };
      };
 
+     if (format === "json") {
+       io.log(JSON.stringify(result, null, 2));
+       return;
+     }
+
      io.log("✅ Neo4j 重建完成");
-     io.log(`已同步 ${result.stats?.neo4j_synced ?? 0} 个实体的关系数据`);
+     io.log(`已同步 ${result.stats?.neo4j_fixed ?? 0} 个关系`);
+     if (result.stats?.failed > 0) {
+       io.log(`⚠️  失败 ${result.stats.failed} 个`);
+     }
      return;
    }
    ```
 
-4. 任务 08S.4 - rebuild-milvus 命令：
+3. 任务 08S.3 - rebuild-milvus 命令：
    - 调用 `/utils/repair` 端点（scope: milvus）
+   - 支持 --user 参数指定用户 ID
+   - 支持 --format=json 输出格式
    - 需要确认提示
 
    ```typescript
@@ -230,20 +226,26 @@ Part 13 Server Mode 已完成，Part 07 Data Ops 已完成。现在需要补充 
        return;
      }
 
+     const format = options.format === "json" ? "json" : "text";
+     const userId = resolveUserId(options);
      const baseUrl = resolveStorageBackendUrl(config ?? undefined);
-     io.log("正在重建 Milvus 数据...");
+
+     if (format === "text") {
+       io.log("正在重建 Milvus 数据...");
+     }
 
      const response = await fetch(`${baseUrl}/utils/repair`, {
        method: "POST",
        headers: {
          "Content-Type": "application/json",
-         "X-User-ID": "cli-user",
+         "X-User-ID": userId,
        },
        body: JSON.stringify({ scope: "milvus" }),
      });
 
      if (!response.ok) {
-       emitError(buildErrorResponse("C4A-SERVER-016", "Milvus 重建失败"));
+       const errorText = await response.text();
+       emitError(buildErrorResponse("C4A-SERVER-015", `Milvus 重建失败: ${errorText}`));
        process.exitCode = 1;
        return;
      }
@@ -251,16 +253,25 @@ Part 13 Server Mode 已完成，Part 07 Data Ops 已完成。现在需要补充 
      const result = await response.json() as {
        success: boolean;
        scanned: number;
-       stats: { milvus_synced: number };
+       inconsistencies: Array<{ entity_id: string; issue: string; fixed: boolean }>;
+       stats: { neo4j_fixed: number; milvus_fixed: number; failed: number };
      };
 
+     if (format === "json") {
+       io.log(JSON.stringify(result, null, 2));
+       return;
+     }
+
      io.log("✅ Milvus 重建完成");
-     io.log(`已同步 ${result.stats?.milvus_synced ?? 0} 个实体的向量数据`);
+     io.log(`已同步 ${result.stats?.milvus_fixed ?? 0} 个向量`);
+     if (result.stats?.failed > 0) {
+       io.log(`⚠️  失败 ${result.stats.failed} 个`);
+     }
      return;
    }
    ```
 
-5. 更新 printHelp 函数：
+4. 更新 printHelp 函数：
    ```typescript
    function printHelp(io: CommandIO): void {
      io.log("c4a server <command>");
@@ -274,17 +285,80 @@ Part 13 Server Mode 已完成，Part 07 Data Ops 已完成。现在需要补充 
      io.log("  clean               清理数据");
      io.log("  check-permissions   检查备份文件权限");
      io.log("  check-consistency   检查数据一致性");
-     io.log("  sync-pending        同步待处理实体");
      io.log("  rebuild-neo4j       重建 Neo4j 数据");
      io.log("  rebuild-milvus      重建 Milvus 数据");
+     io.log("");
+     io.log("通用参数:");
+     io.log("  --user <id>         指定用户 ID（默认从配置读取）");
+     io.log("  --format json       JSON 格式输出");
    }
    ```
 
-6. 添加测试用例：
+5. 添加测试用例：
    - packages/cli/src/__tests__/server.test.ts
-   - 测试 check-consistency、sync-pending、rebuild-neo4j、rebuild-milvus
+   - 测试 check-consistency、rebuild-neo4j、rebuild-milvus
+   - Mock fetch 和 confirm 依赖
+   - 注意：项目使用 bun:test，不是 Vitest
 
-7. 验证：
+   ```typescript
+   import { describe, it, expect, mock, spyOn, beforeEach, afterEach } from "bun:test";
+   import { serverCommand } from "../commands/server.js";
+
+   describe("server commands", () => {
+     const mockIo = { log: mock(() => {}), error: mock(() => {}) };
+     const mockLoadConfig = mock(async () => ({
+       server: { installed_at: "2026-01-01T00:00:00Z", url: "http://localhost:8055" },
+     }));
+     const originalFetch = globalThis.fetch;
+
+     afterEach(() => {
+       globalThis.fetch = originalFetch;
+     });
+
+     it("check-consistency with --user", async () => {
+       const mockFetch = mock(() =>
+         Promise.resolve({
+           ok: true,
+           json: async () => ({ total: 10, synced: 8, pending: 2, failed: 0, no_status: 0, details: [] }),
+         } as Response)
+       );
+       globalThis.fetch = mockFetch;
+
+       await serverCommand(["check-consistency", "--user", "test-user"], {
+         io: mockIo,
+         loadConfig: mockLoadConfig,
+         emitError: mock(() => {}),
+       });
+
+       expect(mockFetch).toHaveBeenCalledWith(
+         expect.stringContaining("/utils/check-consistency"),
+         expect.objectContaining({
+           headers: expect.objectContaining({ "X-User-ID": "test-user" }),
+         })
+       );
+     });
+
+     it("rebuild-neo4j with --yes and --format=json", async () => {
+       const mockFetch = mock(() =>
+         Promise.resolve({
+           ok: true,
+           json: async () => ({ success: true, scanned: 100, stats: { neo4j_fixed: 100, failed: 0 }, inconsistencies: [] }),
+         } as Response)
+       );
+       globalThis.fetch = mockFetch;
+
+       await serverCommand(["rebuild-neo4j", "--yes", "--format", "json"], {
+         io: mockIo,
+         loadConfig: mockLoadConfig,
+         emitError: mock(() => {}),
+       });
+
+       expect(mockIo.log).toHaveBeenCalledWith(expect.stringContaining('"success": true'));
+     });
+   });
+   ```
+
+6. 验证：
    ```bash
    # 类型检查
    bun run typecheck
@@ -293,8 +367,9 @@ Part 13 Server Mode 已完成，Part 07 Data Ops 已完成。现在需要补充 
    bun run --filter @c4a/cli test
 
    # 手动测试（需要 Server 模式运行）
-   c4a server check-consistency
-   c4a server sync-pending --dry-run
+   c4a server check-consistency --user admin
+   c4a server rebuild-neo4j --yes --user admin
+   c4a server rebuild-milvus --yes --format json --user admin
    ```
 ```
 
@@ -309,7 +384,6 @@ Part 13 Server Mode 已完成，Part 07 Data Ops 已完成。现在需要补充 
 
 1. 验证所有命令实现：
    - c4a server check-consistency
-   - c4a server sync-pending
    - c4a server rebuild-neo4j
    - c4a server rebuild-milvus
 
@@ -319,21 +393,21 @@ Part 13 Server Mode 已完成，Part 07 Data Ops 已完成。现在需要补充 
    bun run --filter @c4a/cli test
    ```
 
-3. 任务 08S.5 - 更新 summary.md：
+3. 任务 08S.4 - 更新 summary.md：
    - 在 Part 08 备注中添加补充说明
    - 更新 changes/08-user-cli-check-permissions.md 状态
 
 4. 更新 changes/08-user-cli-check-permissions.md：
    - 标记 check-permissions 已完成（Part 13 中实现）
    - 添加新增命令说明
+   - 说明 sync-pending 移除原因
 
 5. 验证清单：
-   - [ ] check-consistency 命令正常工作
-   - [ ] sync-pending 命令正常工作
-   - [ ] rebuild-neo4j 命令正常工作
-   - [ ] rebuild-milvus 命令正常工作
-   - [ ] 全量测试通过
-   - [ ] summary.md 已更新
+   - [x] check-consistency 命令正常工作（含 --user 和 --format=json）
+   - [x] rebuild-neo4j 命令正常工作（含 --user 和 --format=json）
+   - [x] rebuild-milvus 命令正常工作（含 --user 和 --format=json）
+   - [x] 全量测试通过（含 mock 测试）
+   - [x] summary.md 已更新
 
 6. 产物：
    - packages/cli/src/commands/server.ts 更新
@@ -348,9 +422,9 @@ Part 13 Server Mode 已完成，Part 07 Data Ops 已完成。现在需要补充 
 
 | 步骤 | Agent | 任务编号 | 状态 | 完成时间 |
 |------|-------|---------|:----:|---------|
-| 0 | Agent-0 | 前置验证 | [ ] | - |
-| 1 | Agent-1 | 08S.1-08S.4 (CLI 命令) | [ ] | - |
-| 2 | Agent-2 | 08S.5 (集成收尾) | [ ] | - |
+| 0 | Agent-0 | 前置验证 | [x] | 2026-02-01 |
+| 1 | Agent-1 | 08S.1-08S.3 (CLI 命令) | [x] | 2026-02-01 |
+| 2 | Agent-2 | 08S.4 (集成收尾) | [x] | 2026-02-01 |
 
 ---
 
@@ -358,11 +432,10 @@ Part 13 Server Mode 已完成，Part 07 Data Ops 已完成。现在需要补充 
 
 | 编号 | 任务 | Agent | 状态 |
 |------|------|-------|:----:|
-| 08S.1 | check-consistency 命令 | Agent-1 | [ ] |
-| 08S.2 | sync-pending 命令 | Agent-1 | [ ] |
-| 08S.3 | rebuild-neo4j 命令 | Agent-1 | [ ] |
-| 08S.4 | rebuild-milvus 命令 | Agent-1 | [ ] |
-| 08S.5 | summary.md 更新 | Agent-2 | [ ] |
+| 08S.1 | check-consistency 命令 | Agent-1 | [x] |
+| 08S.2 | rebuild-neo4j 命令 | Agent-1 | [x] |
+| 08S.3 | rebuild-milvus 命令 | Agent-1 | [x] |
+| 08S.4 | summary.md 更新 | Agent-2 | [x] |
 
 ---
 
@@ -389,20 +462,36 @@ Part 13 Server Mode 已完成，Part 07 Data Ops 已完成。现在需要补充 
 
 ### 1. 命令与后端 API 映射
 
-| CLI 命令 | 后端 API | 参数 |
-|----------|---------|------|
-| check-consistency | POST /utils/check-consistency | project_id |
-| sync-pending | POST /utils/repair | scope: "all" |
-| rebuild-neo4j | POST /utils/repair | scope: "neo4j" |
-| rebuild-milvus | POST /utils/repair | scope: "milvus" |
+| CLI 命令 | 后端 API | Header |
+|----------|---------|--------|
+| check-consistency | POST /utils/check-consistency | X-User-ID (必需) |
+| rebuild-neo4j | POST /utils/repair | X-User-ID (必需) |
+| rebuild-milvus | POST /utils/repair | X-User-ID (必需) |
 
-### 2. 输出格式
+**Body 参数**：
+- check-consistency: `{ project_id?: string }`
+- rebuild-neo4j: `{ scope: "neo4j" }`
+- rebuild-milvus: `{ scope: "milvus" }`
+
+### 2. 用户 ID 传递
+
+所有命令支持 `--user` 参数指定用户 ID，优先级：
+1. `--user` 命令行参数
+2. 默认值 `"cli-user"`
+
+> 注：当前 GlobalConfig 不支持 `server.user_id` 字段。如需支持配置文件指定默认用户，需在 v0.4.0 中扩展 GlobalConfig。
+
+### 3. 输出格式
 
 所有命令支持 `--format=json` 参数，便于脚本集成。
 
-### 3. 确认提示
+### 4. 确认提示
 
 rebuild-neo4j 和 rebuild-milvus 需要用户确认，支持 `--yes` 跳过确认。
+
+### 5. sync-pending 命令移除说明
+
+设计文档要求"同步待处理实体"，但后端 `/utils/repair` 实际是全量重建（遍历所有关系/实体），无法按 `sync_status` 过滤。为避免语义不一致和高成本操作风险，移除此命令。用户可使用 `rebuild-neo4j` / `rebuild-milvus` 明确重建意图。
 
 ---
 
@@ -412,7 +501,7 @@ rebuild-neo4j 和 rebuild-milvus 需要用户确认，支持 `--yes` 跳过确�
 
 | summary 位置 | 更新内容 |
 |-------------|---------|
-| Part 08 备注 | 添加 08S.1-08S.5 完成记录 |
+| Part 08 备注 | 添加 08S.1-08S.4 完成记录 |
 
 ---
 

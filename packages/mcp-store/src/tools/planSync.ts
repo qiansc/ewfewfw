@@ -10,7 +10,124 @@ import type {
   StorePlanSyncExecutedResult,
 } from "../schemas.js";
 import { getAdapter } from "@c4a/storage";
-import type { LocalManifest, SyncSnapshot } from "@c4a/storage";
+import type { LocalManifest, SyncPlan, SyncSnapshot } from "@c4a/storage";
+
+type PlanSyncStats = {
+  to_upload: number;
+  to_download: number;
+  conflicts: number;
+  to_delete: number;
+};
+
+type PlanSyncAction = StorePlanSyncResult["actions"][number];
+
+type ExecutedStats = StorePlanSyncExecutedResult["stats"];
+
+function buildActions(plan: SyncPlan): PlanSyncAction[] {
+  const actions: PlanSyncAction[] = [];
+  for (const item of plan.to_upload) {
+    actions.push(item);
+  }
+  for (const item of plan.to_download) {
+    actions.push(item);
+  }
+  for (const item of plan.to_delete_local) {
+    actions.push(item);
+  }
+  for (const item of plan.to_delete_remote) {
+    actions.push(item);
+  }
+  for (const conflict of plan.conflicts) {
+    actions.push({
+      op: "conflict",
+      entity_id: conflict.entity_id,
+      conflict_type: conflict.conflict_type,
+      local_hash: conflict.local_hash,
+      remote_hash: conflict.remote_hash,
+      remote_content: conflict.remote_content,
+      reason: conflict.reason,
+    });
+  }
+  return actions;
+}
+
+function buildStats(plan: SyncPlan): PlanSyncStats {
+  return {
+    to_upload: plan.to_upload.length,
+    to_download: plan.to_download.length,
+    conflicts: plan.conflicts.length,
+    to_delete: plan.to_delete_local.length + plan.to_delete_remote.length,
+  };
+}
+
+function buildStatsFromActions(actions: PlanSyncAction[]): PlanSyncStats {
+  const stats: PlanSyncStats = {
+    to_upload: 0,
+    to_download: 0,
+    conflicts: 0,
+    to_delete: 0,
+  };
+  for (const action of actions) {
+    switch (action.op) {
+      case "upload":
+        stats.to_upload += 1;
+        break;
+      case "download":
+        stats.to_download += 1;
+        break;
+      case "delete_local":
+      case "delete_remote":
+        stats.to_delete += 1;
+        break;
+      case "conflict":
+        stats.conflicts += 1;
+        break;
+      default:
+        break;
+    }
+  }
+  return stats;
+}
+
+function buildExecutedStats(
+  actions: StorePlanSyncExecutedResult["actions"],
+  result: StorePlanSyncExecutedResult["results"] | undefined,
+  existing?: ExecutedStats,
+): ExecutedStats {
+  if (existing) {
+    return existing;
+  }
+  const stats: ExecutedStats = {
+    uploaded: result?.uploaded?.length ?? 0,
+    to_download: 0,
+    conflicts: 0,
+    to_delete: 0,
+  };
+  for (const action of actions) {
+    switch (action.op) {
+      case "download":
+        stats.to_download += 1;
+        break;
+      case "conflict":
+        stats.conflicts += 1;
+        break;
+      case "delete_local":
+      case "delete_remote":
+        stats.to_delete += 1;
+        break;
+      default:
+        break;
+    }
+  }
+  return stats;
+}
+
+function ensureSnapshot(snapshot?: SyncSnapshot | null): SyncSnapshot {
+  if (snapshot) {
+    return snapshot;
+  }
+  return { synced_at: new Date().toISOString(), entities: {} };
+}
 
 /**
  * c4a_store_plan_sync 处理函数
@@ -38,9 +155,39 @@ export async function storePlanSyncHandler(
     execute: args.execute ?? false,
   });
 
-  // 根据 execute 返回不同格式
-  if (args.execute && result.executed) {
-    return result as unknown as StorePlanSyncExecutedResult;
+  if ("plan" in result && result.plan) {
+    const actions = buildActions(result.plan);
+    const stats = buildStats(result.plan);
+    return {
+      success: true,
+      executed: false,
+      actions,
+      new_snapshot: ensureSnapshot(result.new_snapshot ?? null),
+      stats,
+    };
+  }
+
+  if ("executed" in result && result.executed) {
+    const executed = result as unknown as StorePlanSyncExecutedResult;
+    const actions = executed.actions ?? [];
+    return {
+      ...executed,
+      actions,
+      stats: buildExecutedStats(actions, executed.results, executed.stats),
+      new_snapshot: ensureSnapshot(executed.new_snapshot ?? null),
+    };
+  }
+
+  if ("executed" in result && result.executed === false) {
+    const draft = result as Partial<StorePlanSyncResult>;
+    const actions = draft.actions ?? [];
+    return {
+      success: draft.success ?? true,
+      executed: false,
+      actions,
+      new_snapshot: ensureSnapshot(draft.new_snapshot ?? null),
+      stats: draft.stats ?? buildStatsFromActions(actions),
+    };
   }
 
   return result as unknown as StorePlanSyncResult;

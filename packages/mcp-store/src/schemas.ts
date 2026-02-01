@@ -397,8 +397,9 @@ export const StorePlanSyncInputSchema = z.object({
 export const SyncActionSchema = z.object({
   op: z.enum(["upload", "download", "conflict", "delete_local", "delete_remote", "skip"]).describe("操作类型"),
   entity_id: z.string().describe("实体 ID"),
-  path: z.string().describe("文件路径"),
-  reason: z.string().describe("操作原因"),
+  type: EntityTypeSchema.optional().describe("实体类型"),
+  path: z.string().optional().describe("文件路径"),
+  reason: z.string().optional().describe("操作原因"),
   conflict_type: z.enum(["both_modified", "local_deleted", "remote_deleted"]).optional().describe("冲突类型"),
   local_hash: z.string().optional().describe("本地哈希"),
   remote_hash: z.string().optional().describe("远程哈希"),

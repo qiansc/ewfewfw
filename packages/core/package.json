@@ -15,7 +15,8 @@
     "dev": "bun --watch src/index.ts",
     "build": "bun build ./src/index.ts --outdir ./dist --target node",
     "test": "bun test",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "zod": "^3.23.0",

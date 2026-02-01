@@ -481,6 +481,9 @@ packages/
 | 8.21 | CLI 目录迁移 | [x] | packages/cli 新结构 |
 
 > 备注（2026-01-31）：8.13 为 v0.4.0 计划项，Part 08 其余完成；补齐 sync 双向变更确认与冲突处理递归参数修复。
+> 备注（2026-02-01）：check-permissions 已在 Part 13 完成；补齐 server check-consistency / rebuild-neo4j / rebuild-milvus 命令与测试，并记录 sync-pending 移除原因（后端仅支持全量重建，详见 changes/08-user-cli-check-permissions.md）。
+> 备注（2026-02-01）：新增根脚本 typecheck（指向 @c4a/cli），并完成 server 命令手动验证（check-consistency / rebuild-neo4j / rebuild-milvus）。
+> 备注（2026-02-01）：全量 typecheck 与 @c4a/cli 测试通过，完成 Part 08 集成收尾验证。
 
 **相关设计文档：**
 
