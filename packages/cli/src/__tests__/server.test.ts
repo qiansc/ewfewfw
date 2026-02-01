@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { serverCommand } from "../commands/server.js";
 
 describe("serverCommand", () => {
@@ -12,6 +12,16 @@ describe("serverCommand", () => {
 
   const loadConfig = async () => ({
     server: { installed_at: "2026-01-01T00:00:00Z", url: "http://localhost:8051" },
+  });
+
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
   });
 
   test("backup calls mcp client with output", async () => {
@@ -158,6 +168,101 @@ describe("serverCommand", () => {
     const parsed = JSON.parse(output);
     expect(parsed.allowed).toBe(2);
     expect(parsed.projects["demo-project"].total).toBe(2);
+  });
+
+  test("check-consistency with --user", async () => {
+    const mockFetch = mock(
+      async () =>
+        ({
+          ok: true,
+          json: async () => ({
+            total: 10,
+            synced: 8,
+            pending: 2,
+            failed: 0,
+            no_status: 0,
+            details: [],
+          }),
+        }) as Response,
+    );
+    globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+    await serverCommand(["check-consistency", "--user", "test-user"], {
+      loadConfig,
+      emitError: mock(() => {}),
+      io: { log: mock(() => {}), error: mock(() => {}) },
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining("/utils/check-consistency"),
+      expect.objectContaining({
+        headers: expect.objectContaining({ "X-User-ID": "test-user" }),
+      }),
+    );
+  });
+
+  test("rebuild-neo4j with --yes and --format=json", async () => {
+    const logs: string[] = [];
+    const mockFetch = mock(
+      async () =>
+        ({
+          ok: true,
+          json: async () => ({
+            success: true,
+            scanned: 100,
+            stats: { neo4j_fixed: 100, milvus_fixed: 0, failed: 0 },
+            inconsistencies: [],
+          }),
+        }) as Response,
+    );
+    globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+    await serverCommand(["rebuild-neo4j", "--yes", "--format", "json"], {
+      loadConfig,
+      emitError: mock(() => {}),
+      confirm: mock(async () => true),
+      io: {
+        log: (message: string) => logs.push(message),
+        error: (message: string) => logs.push(message),
+      },
+    });
+
+    expect(logs.join("\n")).toContain("\"success\": true");
+  });
+
+  test("rebuild-milvus prompts and calls repair", async () => {
+    const logs: string[] = [];
+    const confirm = mock(async () => true);
+    const mockFetch = mock(
+      async () =>
+        ({
+          ok: true,
+          json: async () => ({
+            success: true,
+            scanned: 50,
+            stats: { neo4j_fixed: 0, milvus_fixed: 50, failed: 0 },
+            inconsistencies: [],
+          }),
+        }) as Response,
+    );
+    globalThis.fetch = mockFetch as unknown as typeof fetch;
+
+    await serverCommand(["rebuild-milvus"], {
+      loadConfig,
+      emitError: mock(() => {}),
+      confirm,
+      io: {
+        log: (message: string) => logs.push(message),
+        error: (message: string) => logs.push(message),
+      },
+    });
+
+    expect(confirm).toHaveBeenCalled();
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining("/utils/repair"),
+      expect.objectContaining({ body: JSON.stringify({ scope: "milvus" }) }),
+    );
+    expect(logs.join("\n")).toContain("✅ Milvus 重建完成");
   });
 });
 
