@@ -214,6 +214,15 @@ cp .env.example .env    # 复制环境变量模板
 - 类型检查/测试/构建应参考 `package.json` 中的 `scripts`（如 `bun run test`、`bun run build`）。
 - **单包测试**：不要用 `bun run test --filter <name>`（会把过滤器传给所有包导致无匹配报错）；请使用 `bun run --filter @c4a/<package> test`，或在根 `package.json` 中添加对应的 `test:<package>` 脚本。
 
+### Python 服务测试（storage-backend）
+
+```bash
+cd packages/storage-backend
+python3 -m venv .venv && . .venv/bin/activate
+python -m pip install -e ".[dev]"
+python -m pytest
+```
+
 ## 启动模式
 
 | 模式 | 命令 | 适用场景 |
@@ -261,6 +270,7 @@ cp .env.example .env    # 复制环境变量模板
 ### 代码规模规则 (必须遵守)
 
 **单个模块文件不得超过 800 行。** 当文件接近或超过此限制时：
+**计划文档不受此限制**
 
 1. **立即暂停代码实现**
 2. **向用户报告当前文件行数**

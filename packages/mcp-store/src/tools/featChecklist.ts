@@ -37,7 +37,7 @@ export interface StoreFeatChecklistInput {
 export async function storeFeatChecklistHandler(
   args: StoreFeatChecklistInput
 ): Promise<ChecklistResult> {
-  const adapter = getAdapter();
+  const adapter = await getAdapter();
 
   // 确保适配器已初始化
   await adapter.initialize();

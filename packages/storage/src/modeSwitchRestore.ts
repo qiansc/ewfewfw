@@ -2,11 +2,14 @@
  * Local 模式恢复
  */
 
-import { createReadStream } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { createGunzip } from 'node:zlib';
 import { pipeline } from 'node:stream/promises';
 import { SQLiteStore } from './sqlite-store.js';
+import type { LiteAdapter } from './lite-adapter.js';
+import type { ServerAdapter } from './server-adapter.js';
 import type { ConflictPolicy } from './modeSwitchTypes.js';
 import type {
   RestoreOptions,
@@ -16,8 +19,12 @@ import type {
   ExportEntity,
   ExportRelation,
   ExportFeat,
+  MigrateOptions,
+  MigrateResult,
+  MigrateProgress,
 } from './modeSwitchTypes.js';
 import { EXPORT_VERSION } from './modeSwitchTypes.js';
+import { MigrationError } from './modeSwitchErrors.js';
 import { restoreFromStream } from './modeSwitchRestoreStream.js';
 import {
   normalizeExportData,
@@ -28,6 +35,7 @@ import {
   validateRelation,
   validateFeat,
 } from './modeSwitchRestoreNormalize.js';
+import { readBackupData } from './modeSwitchReadBackup.js';
 
 const STREAMING_THRESHOLD_BYTES = 50 * 1024 * 1024;
 type ConflictEntry = NonNullable<RestoreResult['conflicts']>[number];
@@ -595,4 +603,119 @@ export class LocalRestore {
       relation.properties ? JSON.stringify(relation.properties) : null
     );
   }
+}
+
+function reportMigrationProgress(
+  options: MigrateOptions | undefined,
+  phase: MigrateProgress['phase'],
+  current: number,
+  total: number,
+  message?: string
+): void {
+  if (!options?.onProgress) return;
+  options.onProgress({ phase, current, total, message });
+}
+
+function ensureTmpDir(): string {
+  const sharedDir = process.env.C4A_STORAGE_BACKEND_SHARED_DIR;
+  const tmpDir = sharedDir ? resolve(sharedDir) : join(process.cwd(), '.tmp');
+  if (!existsSync(tmpDir)) {
+    mkdirSync(tmpDir, { recursive: true });
+  }
+  return tmpDir;
+}
+
+function buildBackupName(): string {
+  const now = new Date();
+  const pad = (value: number) => String(value).padStart(2, '0');
+  const name = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(
+    now.getHours()
+  )}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  return `c4a-server-backup-${name}.tar.gz`;
+}
+
+function buildBackupPath(): string {
+  return join(ensureTmpDir(), buildBackupName());
+}
+
+function buildRemoteBackupPath(): string {
+  return join('/tmp', buildBackupName());
+}
+
+export async function migrateServerToLocal(
+  serverAdapter: ServerAdapter,
+  liteAdapter: LiteAdapter,
+  options: MigrateOptions = {}
+): Promise<MigrateResult> {
+  const sharedDir = process.env.C4A_STORAGE_BACKEND_SHARED_DIR;
+  const backupPath = buildBackupPath();
+  const remoteBackupPath = sharedDir ? backupPath : buildRemoteBackupPath();
+  const statusFilter = options.statusFilter ?? 'published';
+
+  reportMigrationProgress(options, 'read', 0, 1);
+  const backupResult = await serverAdapter.backup({
+    output: remoteBackupPath,
+    status_filter: statusFilter,
+    format: 'tar.gz',
+    include_metadata: true,
+  });
+
+  if (!backupResult.success) {
+    throw new MigrationError('C4A-MIGRATE-004', backupResult.error ?? '连接失败');
+  }
+  reportMigrationProgress(options, 'read', 1, 1);
+
+  let restoreInput = backupResult.file ?? remoteBackupPath;
+  if (!existsSync(restoreInput)) {
+    try {
+      await serverAdapter.downloadBackup(restoreInput, backupPath);
+      restoreInput = backupPath;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new MigrationError('C4A-MIGRATE-004', message);
+    }
+  }
+
+  const restoreResult = await liteAdapter.restore({
+    input: restoreInput,
+    conflict_policy: options.conflictPolicy,
+    validate_checksums: true,
+  });
+
+  if (!restoreResult.success) {
+    throw new MigrationError('C4A-MIGRATE-002', restoreResult.error ?? '恢复失败');
+  }
+
+  if (options.rebuildVectors !== false) {
+    reportMigrationProgress(options, 'vectors', 0, 1);
+    try {
+      const store = SQLiteStore.getInstance();
+      const rebuild = await store.rebuildVectorIndex();
+      reportMigrationProgress(options, 'vectors', rebuild.indexed, rebuild.total);
+    } catch {
+      // 向量重建失败不阻断主流程
+    }
+  }
+
+  reportMigrationProgress(options, 'done', 1, 1);
+
+  let parsed: ExportData | null = null;
+  try {
+    parsed = await readBackupData(backupResult.file ?? backupPath);
+  } catch {
+    parsed = null;
+  }
+  return {
+    success: true,
+    stats: {
+      feats: { created: parsed?.feats.length ?? 0, updated: 0, skipped: 0, failed: 0 },
+      entities: {
+        created: restoreResult.stats?.entities ?? 0,
+        updated: 0,
+        skipped: 0,
+        failed: 0,
+      },
+      relations: { created: restoreResult.stats?.relations ?? 0, skipped: 0, failed: 0 },
+    },
+  };
 }

@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import type {
-  DepsNode,
   DepsParams,
-  ImpactNode,
+  DepsResult,
   ImpactParams,
+  ImpactResult,
   SearchParams,
   SearchResult,
 } from "@c4a/storage";
@@ -34,11 +34,11 @@ describe("mcp-query handlers", () => {
           has_more: true,
         };
       },
-      async queryDeps(_params: DepsParams): Promise<DepsNode[]> {
-        return [];
+      async queryDeps(_params: DepsParams): Promise<DepsResult> {
+        return { nodes: [], degraded: false };
       },
-      async queryImpact(_params: ImpactParams): Promise<ImpactNode[]> {
-        return [];
+      async queryImpact(_params: ImpactParams): Promise<ImpactResult> {
+        return { nodes: [], degraded: false };
       },
     };
 
@@ -71,19 +71,22 @@ describe("mcp-query handlers", () => {
           search_mode: "vector",
         };
       },
-      async queryDeps(_params: DepsParams): Promise<DepsNode[]> {
-        return [
-          {
-            id: "dep-1",
-            source_project: "alpha",
-            type: "component",
-            distance: 1,
-            relation_type: "depends_on",
-          },
-        ];
+      async queryDeps(_params: DepsParams): Promise<DepsResult> {
+        return {
+          nodes: [
+            {
+              id: "dep-1",
+              source_project: "alpha",
+              type: "component",
+              distance: 1,
+              relation_type: "depends_on",
+            },
+          ],
+          degraded: false,
+        };
       },
-      async queryImpact(_params: ImpactParams): Promise<ImpactNode[]> {
-        return [];
+      async queryImpact(_params: ImpactParams): Promise<ImpactResult> {
+        return { nodes: [], degraded: false };
       },
     };
 
@@ -104,6 +107,42 @@ describe("mcp-query handlers", () => {
     expect(result.degraded_reason).toBe("PENDING_SYNC");
   });
 
+  test("deps returns adapter degraded info when adapter reports degraded", async () => {
+    const adapter = {
+      async initialize() {},
+      async search(_params: SearchParams): Promise<SearchResult> {
+        return {
+          items: [],
+          degraded: false,
+          search_mode: "vector",
+        };
+      },
+      async queryDeps(_params: DepsParams): Promise<DepsResult> {
+        return {
+          nodes: [],
+          degraded: true,
+          degraded_reason: "NEO4J_QUERY_FAILED",
+          degraded_message: "neo4j down",
+        };
+      },
+      async queryImpact(_params: ImpactParams): Promise<ImpactResult> {
+        return { nodes: [], degraded: false };
+      },
+    };
+
+    const result = await queryDepsHandler(
+      { id: "svc-1", direction: "downstream", proposal_id: null },
+      {
+        adapter,
+        checkSyncStatus: async () => ({ degraded: false }),
+      }
+    );
+
+    expect(result.degraded).toBe(true);
+    expect(result.degraded_reason).toBe("NEO4J_QUERY_FAILED");
+    expect(result.degraded_message).toBe("neo4j down");
+  });
+
   test("impact returns simplified result in local mode", async () => {
     const adapter = {
       async initialize() {},
@@ -114,19 +153,22 @@ describe("mcp-query handlers", () => {
           search_mode: "vector",
         };
       },
-      async queryDeps(_params: DepsParams): Promise<DepsNode[]> {
-        return [];
+      async queryDeps(_params: DepsParams): Promise<DepsResult> {
+        return { nodes: [], degraded: false };
       },
-      async queryImpact(_params: ImpactParams): Promise<ImpactNode[]> {
-        return [
-          {
-            id: "dep-1",
-            source_project: "alpha",
-            type: "component",
-            distance: 1,
-            impact_level: "direct",
-          },
-        ];
+      async queryImpact(_params: ImpactParams): Promise<ImpactResult> {
+        return {
+          nodes: [
+            {
+              id: "dep-1",
+              source_project: "alpha",
+              type: "component",
+              distance: 1,
+              impact_level: "direct",
+            },
+          ],
+          degraded: false,
+        };
       },
     };
 
@@ -157,12 +199,12 @@ describe("mcp-query handlers", () => {
           search_mode: "vector",
         };
       },
-      async queryDeps(_params: DepsParams): Promise<DepsNode[]> {
-        return [];
+      async queryDeps(_params: DepsParams): Promise<DepsResult> {
+        return { nodes: [], degraded: false };
       },
-      async queryImpact(_params: ImpactParams): Promise<ImpactNode[]> {
+      async queryImpact(_params: ImpactParams): Promise<ImpactResult> {
         called = true;
-        return [];
+        return { nodes: [], degraded: false };
       },
     };
 
@@ -179,7 +221,51 @@ describe("mcp-query handlers", () => {
     );
 
     expect(result.success).toBe(false);
+    if (result.success !== false) {
+      throw new Error("Expected degraded response");
+    }
     expect(result.error).toBe("DEGRADED_MODE_UNSUPPORTED");
     expect(called).toBe(false);
+  });
+
+  test("impact returns error when adapter reports degraded in server mode", async () => {
+    let called = false;
+    const adapter = {
+      async initialize() {},
+      async search(_params: SearchParams): Promise<SearchResult> {
+        return {
+          items: [],
+          degraded: false,
+          search_mode: "vector",
+        };
+      },
+      async queryDeps(_params: DepsParams): Promise<DepsResult> {
+        return { nodes: [], degraded: false };
+      },
+      async queryImpact(_params: ImpactParams): Promise<ImpactResult> {
+        called = true;
+        return {
+          nodes: [],
+          degraded: true,
+          degraded_reason: "NEO4J_QUERY_FAILED",
+        };
+      },
+    };
+
+    const result = await queryImpactHandler(
+      { id: "svc-1", proposal_id: null },
+      {
+        adapter,
+        checkSyncStatus: async () => ({ degraded: false }),
+        isLocalMode: () => false,
+      }
+    );
+
+    expect(called).toBe(true);
+    expect(result.success).toBe(false);
+    if (result.success !== false) {
+      throw new Error("Expected degraded response");
+    }
+    expect(result.error).toBe("DEGRADED_MODE_UNSUPPORTED");
   });
 });

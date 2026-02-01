@@ -16,7 +16,7 @@ import type {
 export async function storeRestoreHandler(
   args: StoreRestoreInput
 ): Promise<StoreRestoreResult> {
-  const adapter = getAdapter();
+  const adapter = await getAdapter();
   await adapter.initialize();
 
   const result = await adapter.restore({

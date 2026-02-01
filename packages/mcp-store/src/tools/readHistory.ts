@@ -16,7 +16,7 @@ import type {
 export async function storeReadHistoryHandler(
   args: StoreReadHistoryInput
 ): Promise<StoreReadHistoryResult> {
-  const adapter = getAdapter();
+  const adapter = await getAdapter();
   await adapter.initialize();
 
   const result = await adapter.readHistory({

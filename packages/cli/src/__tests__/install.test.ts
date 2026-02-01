@@ -1,6 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { installCommand } from "../commands/install.js";
-import type { GlobalConfig } from "../core/config.js";
+import type { ProjectConfig } from "../core/config.js";
+
+type CapturedConfig = {
+  version?: string;
+  local?: { installed_at?: string; embedding_model?: string };
+  server?: { installed_at?: string };
+  remote?: { selected_at?: string };
+};
 
 function createPrompter(confirmValue = true) {
   return {
@@ -19,7 +26,7 @@ describe("installCommand", () => {
     const previousHome = process.env.C4A_HOME;
     process.env.C4A_HOME = "/tmp/c4a-test-home";
 
-    let capturedConfig: GlobalConfig | null = null;
+    let capturedConfig: CapturedConfig | null = null;
     let capturedDbPath: string | null = null;
     let downloadCalled = false;
 
@@ -40,10 +47,11 @@ describe("installCommand", () => {
       },
     });
 
-    expect(capturedConfig?.version).toBe("0.3.0");
-    expect(capturedConfig?.local?.installed_at).toBe("2026-01-01T00:00:00.000Z");
-    expect(capturedConfig?.local?.embedding_model).toBe("all-MiniLM-L6-v2");
-    expect(capturedDbPath).toContain("/tmp/c4a-test-home/.c4a/store.db");
+    const config: CapturedConfig = capturedConfig ?? {};
+    expect(config.version).toBe("0.3.0");
+    expect(config.local?.installed_at).toBe("2026-01-01T00:00:00.000Z");
+    expect(config.local?.embedding_model).toBe("all-MiniLM-L6-v2");
+    expect(capturedDbPath ?? "").toContain("/tmp/c4a-test-home/.c4a/store.db");
     expect(downloadCalled).toBe(true);
 
     process.env.C4A_HOME = previousHome;
@@ -56,7 +64,8 @@ describe("installCommand", () => {
     await installCommand(["local"], {
       io: { log: () => {}, error: () => {} },
       prompter: createPrompter(false),
-      loadProjectConfig: async () => ({ mode: "remote", remote: { url: "https://c4a.example.com" } }),
+      loadProjectConfig: async () =>
+        ({ mode: "remote", remote: { url: "https://c4a.example.com" } }) satisfies ProjectConfig,
       loadGlobalConfig: async () => ({}),
       saveGlobalConfig: async () => {
         saveCalled = true;
@@ -73,7 +82,7 @@ describe("installCommand", () => {
   });
 
   test("local install preserves existing server config (multi-mode)", async () => {
-    let capturedConfig: GlobalConfig | null = null;
+    let capturedConfig: CapturedConfig | null = null;
 
     await installCommand(["local"], {
       io: { log: () => {}, error: () => {} },
@@ -93,12 +102,13 @@ describe("installCommand", () => {
       downloadEmbeddingModel: async () => {},
     });
 
-    expect(capturedConfig?.server?.installed_at).toBe("2026-01-01T00:00:00Z");
-    expect(capturedConfig?.local?.installed_at).toBe("2026-01-02T00:00:00.000Z");
+    const config: CapturedConfig = capturedConfig ?? {};
+    expect(config.server?.installed_at).toBe("2026-01-01T00:00:00Z");
+    expect(config.local?.installed_at).toBe("2026-01-02T00:00:00.000Z");
   });
 
   test("remote selection preserves installed modes", async () => {
-    let capturedConfig: GlobalConfig | null = null;
+    let capturedConfig: CapturedConfig | null = null;
 
     await installCommand(["remote"], {
       io: { log: () => {}, error: () => {} },
@@ -113,8 +123,9 @@ describe("installCommand", () => {
       },
     });
 
-    expect(capturedConfig?.remote?.selected_at).toBe("2026-01-03T00:00:00.000Z");
-    expect(capturedConfig?.local?.installed_at).toBe("2026-01-01T00:00:00Z");
-    expect(capturedConfig?.server?.installed_at).toBe("2026-01-02T00:00:00Z");
+    const config: CapturedConfig = capturedConfig ?? {};
+    expect(config.remote?.selected_at).toBe("2026-01-03T00:00:00.000Z");
+    expect(config.local?.installed_at).toBe("2026-01-01T00:00:00Z");
+    expect(config.server?.installed_at).toBe("2026-01-02T00:00:00Z");
   });
 });

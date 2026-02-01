@@ -314,8 +314,8 @@ async function cmdDocker() {
 
   console.log("\n  MCP 端点:");
   console.log("    - mcp-store:  http://localhost:8051/mcp");
-  console.log("    - mcp-extract: http://localhost:8052/mcp");
-  console.log("    - mcp-query:  http://localhost:8054/mcp\n");
+  console.log("    - mcp-query:  http://localhost:8054/mcp");
+  console.log("    - mcp-extract: 本地 stdio (始终本地)\n");
 }
 
 async function cmdProd() {
@@ -333,8 +333,8 @@ async function cmdProd() {
 
   console.log("\n  MCP 端点:");
   console.log("    - mcp-store:  http://localhost:8051/mcp");
-  console.log("    - mcp-extract: http://localhost:8052/mcp");
-  console.log("    - mcp-query:  http://localhost:8054/mcp\n");
+  console.log("    - mcp-query:  http://localhost:8054/mcp");
+  console.log("    - mcp-extract: 本地 stdio (始终本地)\n");
 }
 
 async function cmdDebugDsl() {

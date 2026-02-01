@@ -44,7 +44,7 @@ describe('graph-operations cache isolation', () => {
       direction: 'downstream',
       depth: 1,
     });
-    expect(alpha.map((node) => node.id)).toEqual(['dep']);
+    expect(alpha.nodes.map((node) => node.id)).toEqual(['dep']);
 
     const beta = await queryDeps(ctx, {
       id: 'svc',
@@ -52,7 +52,7 @@ describe('graph-operations cache isolation', () => {
       direction: 'downstream',
       depth: 1,
     });
-    expect(beta.map((node) => node.id)).toEqual(['other']);
+    expect(beta.nodes.map((node) => node.id)).toEqual(['other']);
   });
 
   test('project-scoped invalidation clears cached entry', async () => {

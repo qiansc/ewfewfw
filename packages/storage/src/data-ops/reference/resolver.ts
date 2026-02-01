@@ -147,8 +147,9 @@ function candidateMatchesTarget(
   target: { id: string; projectId?: string | null; repoId?: string | null; scope?: string | null }
 ): boolean {
   if (candidate.id !== target.id) return false;
-  if (target.scope) {
-    return candidate.scope === target.scope;
+  const targetScope = normalizeScope(target.scope);
+  if (targetScope) {
+    return candidate.scope === targetScope;
   }
 
   const targetRepo = normalizeRepoId(target.repoId);
@@ -177,7 +178,7 @@ function resolveExplicitReference(
       id: target.id,
       targetProject: target.projectId ?? null,
       targetRepo: target.repoId ?? null,
-      scope: target.scope ?? null,
+      scope: normalizeScope(target.scope),
       resolved: !hasLookup,
       warning: hasLookup ? `Entity '${target.id}' not found` : undefined,
     };
@@ -190,7 +191,7 @@ function resolveExplicitReference(
     id: target.id,
     targetProject: target.projectId ?? null,
     targetRepo: target.repoId ?? null,
-    scope: target.scope ?? null,
+    scope: normalizeScope(target.scope),
     resolved: found,
     warning: found ? undefined : `Entity '${target.id}' not found`,
   };

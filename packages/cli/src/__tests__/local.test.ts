@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { Stats } from "node:fs";
 import { localCommand } from "../commands/local.js";
 
 describe("localCommand", () => {
@@ -8,7 +9,7 @@ describe("localCommand", () => {
 
   test("backup uses default output when not provided", async () => {
     const backupCalls: Array<{ output: string }> = [];
-    const adapterFactory = () =>
+    const adapterFactory = async () =>
       ({
         initialize: async () => {},
         close: async () => {},
@@ -52,7 +53,7 @@ describe("localCommand", () => {
 
   test("status prints db stats and counts", async () => {
     const logs: string[] = [];
-    const adapterFactory = () =>
+    const adapterFactory = async () =>
       ({
         initialize: async () => {},
         close: async () => {},
@@ -70,7 +71,8 @@ describe("localCommand", () => {
       resolveDbPath: () => "/tmp/store.db",
       fileOps: {
         existsSync: () => true,
-        stat: async () => ({ size: 2048, mtime: new Date("2026-01-01T00:00:00Z") }),
+        stat: (async () =>
+          ({ size: 2048, mtime: new Date("2026-01-01T00:00:00Z") }) as unknown as Stats) as unknown as typeof import("node:fs/promises").stat,
         rm: async () => {},
       },
       io: {

@@ -70,6 +70,7 @@ function generateChecklist(
   const entities = ctx.storage.listFeatEntitiesForMerge(featId);
   const items = buildChecklistItems(entities);
   const now = new Date().toISOString();
+  const expectedUpdatedAt = feat.updated_at ?? now;
 
   const checklist: Checklist = {
     version: '1.0',
@@ -100,7 +101,7 @@ function generateChecklist(
     featId,
     checklist,
     feat.checklist_version ?? null,
-    feat.updated_at,
+    expectedUpdatedAt,
     now
   );
   if (!updateResult.success) {
@@ -256,6 +257,7 @@ function patchChecklist(
 
   const now = new Date().toISOString();
   checklist.updated_at = now;
+  const expectedUpdatedAt = feat.updated_at ?? now;
 
   if (validate !== false) {
     const validationErrors = validateChecklistStructure(checklist);
@@ -275,7 +277,7 @@ function patchChecklist(
     featId,
     checklist,
     feat.checklist_version ?? null,
-    feat.updated_at,
+    expectedUpdatedAt,
     now
   );
   if (!updateResult.success) {
@@ -398,12 +400,13 @@ function clearChecklist(ctx: DataOpsContext, featId: string): ChecklistResult {
   }
 
   const now = new Date().toISOString();
+  const expectedUpdatedAt = feat.updated_at ?? now;
   const updateResult = updateChecklistRecord(
     ctx,
     featId,
     null,
     feat.checklist_version ?? null,
-    feat.updated_at,
+    expectedUpdatedAt,
     now
   );
   if (!updateResult.success) {

@@ -74,7 +74,7 @@ class FakeDatabase {
   relations: RelationRow[] = [];
   feats: FeatRow[] = [];
 
-  prepare(sql: string): { all?: () => unknown[]; get?: (...args: unknown[]) => unknown; run?: (...args: unknown[]) => void } {
+  prepare(sql: string): any {
     const normalized = sql.replace(/\s+/g, ' ').trim();
 
     if (normalized.includes('FROM entities e') && normalized.includes('JOIN metadata')) {

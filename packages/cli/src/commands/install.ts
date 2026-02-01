@@ -58,7 +58,13 @@ interface InstallDeps {
   emitError?: (response: ReturnType<typeof buildErrorResponse>) => void;
 }
 
-const SERVER_CONTAINERS = ["c4a-mongodb", "c4a-neo4j", "c4a-milvus", "c4a-ollama"];
+const SERVER_CONTAINERS = [
+  "c4a-mongodb",
+  "c4a-neo4j",
+  "c4a-milvus",
+  "c4a-ollama",
+  "c4a-storage-backend",
+];
 
 function resolveHomeDir(): string {
   return process.env.C4A_HOME || homedir();
@@ -95,10 +101,12 @@ async function composeUp(composeFile: string): Promise<CommandResult> {
       { encoding: "utf-8" },
       (error, stdout, stderr) => {
         if (error) {
+          const code = (error as NodeJS.ErrnoException).code;
+          const exitCode = typeof code === "number" ? code : 1;
           resolveResult({
             stdout: stdout ?? "",
             stderr: stderr ?? (error as Error).message,
-            exitCode: typeof (error as NodeJS.ErrnoException).code === "number" ? (error as NodeJS.ErrnoException).code : 1,
+            exitCode,
           });
           return;
         }
@@ -208,7 +216,7 @@ async function installServer(
   const globalDir = resolveGlobalDir();
   await deps.ensureDir(globalDir);
 
-  const composeFile = resolve(import.meta.dirname, "../../../..", "docker", "docker-compose.yml");
+  const composeFile = resolve(import.meta.dirname, "../../../..", "docker", "docker-compose.server.yml");
   const result = await deps.composeUp(composeFile);
   if (result.exitCode !== 0) {
     deps.emitError(
@@ -233,12 +241,14 @@ async function installServer(
     ...globalConfig,
     version: "0.3.0",
     server: {
-      url: "http://localhost:8050",
+      url: "http://localhost:8055",
       installed_at: deps.now().toISOString(),
       services: {
         mongodb: "localhost:27017",
         neo4j: "localhost:7474",
         milvus: "localhost:19530",
+        ollama: "localhost:11434",
+        storage_backend: "localhost:8055",
       },
     },
   };
@@ -273,7 +283,7 @@ export async function installCommand(
     let mode: InstallMode | undefined = modeArg;
 
     if (!mode) {
-      mode = await prompter.select(
+      mode = await prompter.select<InstallMode>(
         "选择安装模式:",
         [
           { label: "local  - 本地模式 (SQLite)", value: "local" },

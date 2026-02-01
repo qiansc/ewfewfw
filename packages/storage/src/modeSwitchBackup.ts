@@ -3,13 +3,14 @@
  */
 
 import { createWriteStream, existsSync, mkdirSync } from 'node:fs';
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { createGzip } from 'node:zlib';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { SQLiteStore } from './sqlite-store.js';
 import type { EntityType, EntityStatus } from './adapter.js';
+import type { ServerAdapter } from './server-adapter.js';
 import type {
   BackupOptions,
   BackupResult,
@@ -18,9 +19,18 @@ import type {
   ExportRelation,
   ExportFeat,
   BackupProgress,
+  MigrateOptions,
+  MigrateResult,
+  MigrateProgress,
+  MigrationCheckpoint,
+  MigrateFailure,
+  PermissionCheckResult,
 } from './modeSwitchTypes.js';
 import { EXPORT_VERSION } from './modeSwitchTypes.js';
+import { MigrationError } from './modeSwitchErrors.js';
 import * as converter from '@c4a/core';
+import { readBackupData } from './modeSwitchReadBackup.js';
+import { applyChecklist, buildEntityPayload, transitionFeatStatus } from './modeSwitchMigrationUtils.js';
 
 type ConvertedEntity = Record<string, unknown> & {
   id?: string;
@@ -328,4 +338,431 @@ export class LocalBackup {
       size: Buffer.byteLength(jsonContent),
     };
   }
+}
+
+function reportMigrationProgress(
+  options: MigrateOptions | undefined,
+  phase: MigrateProgress['phase'],
+  current: number,
+  total: number,
+  message?: string
+): void {
+  if (!options?.onProgress) return;
+  options.onProgress({ phase, current, total, message });
+}
+
+async function loadCheckpoint(options: MigrateOptions | undefined): Promise<MigrationCheckpoint | null> {
+  const checkpoint = options?.checkpoint;
+  if (!checkpoint?.path || checkpoint.resume !== true) return null;
+  if (!existsSync(checkpoint.path)) return null;
+  try {
+    const content = await readFile(checkpoint.path, 'utf-8');
+    const parsed = JSON.parse(content) as MigrationCheckpoint;
+    return parsed ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function saveCheckpoint(
+  options: MigrateOptions | undefined,
+  checkpoint: MigrationCheckpoint
+): Promise<void> {
+  if (!options?.checkpoint?.path) return;
+  await writeFile(options.checkpoint.path, JSON.stringify(checkpoint, null, 2), 'utf-8');
+}
+
+function normalizePermissionResult(result: PermissionCheckResult | boolean): PermissionCheckResult {
+  if (typeof result === 'boolean') {
+    return { allowed: result };
+  }
+  return result;
+}
+
+function shouldFailFast(options: MigrateOptions | undefined): boolean {
+  return options?.failFast === true;
+}
+
+async function rollbackEntities(
+  serverAdapter: ServerAdapter,
+  items: Array<{ id: string; proposal_id?: string | null }>
+): Promise<void> {
+  for (const item of items) {
+    try {
+      await serverAdapter.delete({ id: item.id, proposal_id: item.proposal_id ?? null, force: true });
+    } catch {
+      // 忽略回滚失败，避免阻断主流程
+    }
+  }
+}
+
+function ensureServerError(error: unknown): MigrationError {
+  if (error instanceof MigrationError) return error;
+  const message = error instanceof Error ? error.message : String(error);
+  return new MigrationError('C4A-MIGRATE-004', message);
+}
+
+async function resolvePermission(
+  entity: ExportEntity,
+  options: MigrateOptions | undefined
+): Promise<PermissionCheckResult> {
+  if (!options?.permissionChecker) {
+    return { allowed: true };
+  }
+  const result = await options.permissionChecker({ entity, target: 'server' });
+  return normalizePermissionResult(result);
+}
+
+function buildConflictSummary(
+  conflicts: Array<{
+    id: string;
+    reason: string;
+    resolution: string;
+    target_type?: string;
+    target_status?: string;
+  }>
+): MigrateResult['conflict_summary'] {
+  if (conflicts.length === 0) {
+    return {
+      total: 0,
+      by_target: {},
+      by_entity_type: {},
+      by_status: {},
+      by_feat_status: {},
+      by_reason: {},
+      by_resolution: {},
+      by_target_resolution: {},
+      by_target_status: {},
+    };
+  }
+  const byTarget: Record<string, number> = {};
+  const byEntityType: Record<string, number> = {};
+  const byStatus: Record<string, number> = {};
+  const byFeatStatus: Record<string, number> = {};
+  const byReason: Record<string, number> = {};
+  const byResolution: Record<string, number> = {};
+  const byTargetResolution: Record<string, Record<string, number>> = {};
+  const byTargetStatus: Record<string, Record<string, number>> = {};
+  for (const conflict of conflicts) {
+    const target = conflict.id.startsWith('feat:') ? 'feat' : 'entity';
+    const entityType = conflict.target_type ?? (target === 'feat' ? 'feat' : 'unknown');
+    const status = conflict.target_status ?? 'unknown';
+    byTarget[target] = (byTarget[target] ?? 0) + 1;
+    byEntityType[entityType] = (byEntityType[entityType] ?? 0) + 1;
+    byStatus[status] = (byStatus[status] ?? 0) + 1;
+    if (target === 'feat') {
+      byFeatStatus[status] = (byFeatStatus[status] ?? 0) + 1;
+    }
+    byReason[conflict.reason] = (byReason[conflict.reason] ?? 0) + 1;
+    byResolution[conflict.resolution] = (byResolution[conflict.resolution] ?? 0) + 1;
+    if (!byTargetResolution[target]) {
+      byTargetResolution[target] = {};
+    }
+    byTargetResolution[target][conflict.resolution] =
+      (byTargetResolution[target][conflict.resolution] ?? 0) + 1;
+    if (!byTargetStatus[target]) {
+      byTargetStatus[target] = {};
+    }
+    byTargetStatus[target][status] = (byTargetStatus[target][status] ?? 0) + 1;
+  }
+  return {
+    total: conflicts.length,
+    by_target: byTarget,
+    by_entity_type: byEntityType,
+    by_status: byStatus,
+    by_feat_status: byFeatStatus,
+    by_reason: byReason,
+    by_resolution: byResolution,
+    by_target_resolution: byTargetResolution,
+    by_target_status: byTargetStatus,
+  };
+}
+
+export async function migrateLocalToServer(
+  backupPath: string,
+  serverAdapter: ServerAdapter,
+  options: MigrateOptions = {}
+): Promise<MigrateResult> {
+  const conflictPolicy = options.conflictPolicy ?? 'skip';
+  const permissionPolicy = options.permissionPolicy ?? 'error';
+  const checkpointState = await loadCheckpoint(options);
+  const saveInterval = options.checkpoint?.saveInterval ?? 50;
+  const failures: MigrateFailure[] = [];
+  const conflicts: NonNullable<MigrateResult['conflicts']> = [];
+  const createdEntities: Array<{ id: string; proposal_id?: string | null }> = [];
+
+  reportMigrationProgress(options, 'read', 0, 1);
+  const backup = await readBackupData(backupPath);
+  reportMigrationProgress(options, 'read', 1, 1);
+
+  const stats = {
+    feats: { created: 0, updated: 0, skipped: 0, failed: 0 },
+    entities: { created: 0, updated: 0, skipped: 0, failed: 0 },
+    relations: { created: 0, skipped: 0, failed: 0 },
+  };
+
+  const checkpoint: MigrationCheckpoint = {
+    entities_index: checkpointState?.entities_index ?? 0,
+    relations_index: checkpointState?.relations_index ?? 0,
+    feats_index: checkpointState?.feats_index ?? 0,
+    phase: checkpointState?.phase ?? 'read',
+  };
+
+  try {
+    if (backup.feats.length > 0) {
+      for (let i = checkpoint.feats_index ?? 0; i < backup.feats.length; i += 1) {
+        checkpoint.phase = 'feats';
+        const feat = backup.feats[i];
+        let skipFurther = false;
+        try {
+          const createResult = await serverAdapter.featLifecycle({
+            action: 'create',
+            feat_id: feat.id,
+            metadata: {
+              title: feat.title ?? feat.id,
+              description: feat.description ?? '',
+              created_by: feat.created_by ?? 'unknown',
+            },
+          });
+
+          if (!createResult.success) {
+            if (createResult.error === 'FEAT_EXISTS') {
+              if (conflictPolicy === 'error') {
+                throw new Error(`Conflict detected for feat ${feat.id}`);
+              }
+              if (conflictPolicy === 'override') {
+                await serverAdapter.featLifecycle({ action: 'delete', feat_id: feat.id });
+                await serverAdapter.featLifecycle({
+                  action: 'create',
+                  feat_id: feat.id,
+                  metadata: {
+                    title: feat.title ?? feat.id,
+                    description: feat.description ?? '',
+                    created_by: feat.created_by ?? 'unknown',
+                  },
+                });
+                stats.feats.updated += 1;
+                conflicts.push({
+                  id: `feat:${feat.id}`,
+                  reason: 'feat_exists',
+                  resolution: 'overridden',
+                  target_type: 'feat',
+                  target_status: feat.status,
+                });
+              } else {
+                stats.feats.skipped += 1;
+                conflicts.push({
+                  id: `feat:${feat.id}`,
+                  reason: 'feat_exists',
+                  resolution: 'skipped',
+                  target_type: 'feat',
+                  target_status: feat.status,
+                });
+                skipFurther = true;
+              }
+            } else {
+              throw new Error(createResult.message ?? createResult.error ?? '创建 feat 失败');
+            }
+          } else {
+            stats.feats.created += 1;
+          }
+
+          if (!skipFurther) {
+            if (feat.status && feat.status !== 'draft') {
+              await transitionFeatStatus(serverAdapter, feat.id, feat.status);
+            }
+            await applyChecklist(serverAdapter, feat);
+          }
+        } catch (error) {
+          stats.feats.failed += 1;
+          failures.push({ id: feat.id, phase: 'feats', error: (error as Error).message });
+          if (shouldFailFast(options)) {
+            throw error;
+          }
+        }
+        checkpoint.feats_index = i + 1;
+        reportMigrationProgress(options, 'feats', i + 1, backup.feats.length);
+        if ((i + 1) % saveInterval === 0) {
+          checkpoint.updated_at = new Date().toISOString();
+          await saveCheckpoint(options, checkpoint);
+        }
+      }
+    }
+
+    for (let i = checkpoint.entities_index ?? 0; i < backup.entities.length; i += 1) {
+      checkpoint.phase = 'entities';
+      const entity = backup.entities[i];
+      try {
+        const permission = await resolvePermission(entity, options);
+        if (!permission.allowed) {
+          const message = permission.reason ?? '权限不足';
+          const error = new MigrationError('C4A-MIGRATE-003', message, {
+            entity_id: entity.id,
+            code: permission.code,
+          });
+          if (permissionPolicy === 'error') {
+            throw error;
+          }
+          stats.entities.skipped += 1;
+          failures.push({ id: entity.id, phase: 'entities', error: message });
+          reportMigrationProgress(options, 'permissions', i + 1, backup.entities.length);
+          continue;
+        }
+
+        const existing = await serverAdapter.read({
+          id: entity.id,
+          proposal_id: entity.proposal_id ?? null,
+          format: 'object',
+        });
+
+        const existingEntity = (existing && 'entity' in existing ? existing.entity : null) ?? null;
+
+        if (existingEntity) {
+          const incomingHash = entity.metadata.content_hash;
+          if (incomingHash && existingEntity.metadata?.content_hash === incomingHash) {
+            stats.entities.skipped += 1;
+            conflicts.push({
+              id: entity.id,
+              reason: 'hash_match',
+              resolution: 'skipped',
+              target_type: entity.type,
+              target_status: entity.metadata.status,
+            });
+            continue;
+          }
+
+          if (conflictPolicy === 'error') {
+            throw new Error(`Conflict detected for entity ${entity.id}`);
+          }
+
+          if (conflictPolicy === 'skip') {
+            stats.entities.skipped += 1;
+            conflicts.push({
+              id: entity.id,
+              reason: 'hash_mismatch',
+              resolution: 'skipped',
+              target_type: entity.type,
+              target_status: entity.metadata.status,
+            });
+            continue;
+          }
+
+          if (conflictPolicy === 'merge') {
+            const incomingTime = new Date(entity.metadata.updated_at).getTime();
+            const existingTime = new Date(existingEntity.metadata.updated_at).getTime();
+            if (!Number.isNaN(existingTime) && incomingTime <= existingTime) {
+              stats.entities.skipped += 1;
+              conflicts.push({
+                id: entity.id,
+                reason: 'existing_newer',
+                resolution: 'skipped',
+                target_type: entity.type,
+                target_status: entity.metadata.status,
+              });
+              continue;
+            }
+            conflicts.push({
+              id: entity.id,
+              reason: 'backup_newer',
+              resolution: 'overridden',
+              target_type: entity.type,
+              target_status: entity.metadata.status,
+            });
+          } else {
+            conflicts.push({
+              id: entity.id,
+              reason: 'hash_mismatch',
+              resolution: 'overridden',
+              target_type: entity.type,
+              target_status: entity.metadata.status,
+            });
+          }
+        }
+
+        const saveResult = await serverAdapter.save({
+          id: entity.id,
+          type: entity.type,
+          data: buildEntityPayload(entity),
+          source_project: entity.metadata.source_project,
+          proposal_id: entity.proposal_id ?? null,
+          force_save: true,
+          ignore_concurrent_warning: true,
+        });
+
+        if (!saveResult.success) {
+          throw new Error(saveResult.error?.message ?? '保存失败');
+        }
+
+        if (existingEntity) {
+          stats.entities.updated += 1;
+        } else {
+          stats.entities.created += 1;
+          createdEntities.push({ id: entity.id, proposal_id: entity.proposal_id ?? null });
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        stats.entities.failed += 1;
+        failures.push({ id: entity.id, phase: 'entities', error: message });
+        if (shouldFailFast(options)) {
+          throw error;
+        }
+      }
+
+      checkpoint.entities_index = i + 1;
+      reportMigrationProgress(options, 'entities', i + 1, backup.entities.length);
+      if ((i + 1) % saveInterval === 0) {
+        checkpoint.updated_at = new Date().toISOString();
+        await saveCheckpoint(options, checkpoint);
+      }
+    }
+
+    if (backup.relations.length > 0) {
+      for (let i = checkpoint.relations_index ?? 0; i < backup.relations.length; i += 1) {
+        checkpoint.phase = 'relations';
+        const relation = backup.relations[i];
+        try {
+          if ('saveRelation' in serverAdapter && typeof (serverAdapter as ServerAdapter & { saveRelation?: unknown }).saveRelation === 'function') {
+            await (serverAdapter as ServerAdapter & { saveRelation: (rel: ExportRelation) => Promise<void> }).saveRelation(
+              relation
+            );
+            stats.relations.created += 1;
+          } else {
+            stats.relations.skipped += 1;
+          }
+        } catch (error) {
+          stats.relations.failed += 1;
+          failures.push({ id: relation.id ?? `${relation.from_id}-${relation.rel_type}-${relation.to_id}`, phase: 'relations', error: (error as Error).message });
+          if (shouldFailFast(options)) {
+            throw error;
+          }
+        }
+        checkpoint.relations_index = i + 1;
+        reportMigrationProgress(options, 'relations', i + 1, backup.relations.length);
+        if ((i + 1) % saveInterval === 0) {
+          checkpoint.updated_at = new Date().toISOString();
+          await saveCheckpoint(options, checkpoint);
+        }
+      }
+    }
+
+    checkpoint.phase = 'done';
+    checkpoint.updated_at = new Date().toISOString();
+    await saveCheckpoint(options, checkpoint);
+  } catch (error) {
+    if (options.rollbackOnFailure) {
+      reportMigrationProgress(options, 'rollback', createdEntities.length, createdEntities.length);
+      await rollbackEntities(serverAdapter, createdEntities);
+    }
+    throw ensureServerError(error);
+  }
+
+  const conflictSummary = buildConflictSummary(conflicts);
+  return {
+    success: failures.length === 0,
+    stats,
+    conflicts: conflicts.length > 0 ? conflicts : undefined,
+    conflict_summary: conflictSummary,
+    failures: failures.length > 0 ? failures : undefined,
+    checkpoint,
+  };
 }

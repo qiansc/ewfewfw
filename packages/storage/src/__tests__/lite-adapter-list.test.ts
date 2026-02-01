@@ -6,7 +6,7 @@ import { InMemoryGraph } from '../in-memory-graph.js';
 import { GraphQueryCache } from '../graph-query-cache.js';
 import { list } from '../lite-adapter/crud-read.js';
 import type { AdapterContext } from '../lite-adapter/types.js';
-import type { EntityStatus } from '../adapterCrudTypes.js';
+import type { EntityStatus } from '../adapterBaseTypes.js';
 
 const TMP_ROOT = join(process.cwd(), '.tmp', 'store-tests');
 const DB_PATH = join(TMP_ROOT, `lite-adapter-list-${Date.now()}.db`);

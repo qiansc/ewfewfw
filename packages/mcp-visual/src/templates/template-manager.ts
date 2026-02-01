@@ -261,7 +261,7 @@ export async function getGlobalStyle(language: "auto" | "zh" | "en" = "auto"): P
   const index = await loadIndex();
   
   // 检查是否有 style 配置
-  const rawIndex = index as Record<string, unknown>;
+  const rawIndex = index as unknown as Record<string, unknown>;
   const style = rawIndex.style as GlobalStyle | undefined;
   
   if (!style) {
@@ -302,7 +302,7 @@ export async function getLanguageConfig(): Promise<{
   note: string;
 }> {
   const index = await loadIndex();
-  const rawIndex = index as Record<string, unknown>;
+  const rawIndex = index as unknown as Record<string, unknown>;
   const languageConfig = rawIndex.language as {
     rule: string;
     default: string;

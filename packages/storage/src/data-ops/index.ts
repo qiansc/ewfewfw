@@ -4,7 +4,6 @@
 
 export type * from './types.js';
 export type * from './reference/types.js';
-export type * from './sync/types.js';
 export type * from './transaction/types.js';
 export type * from './workflow/types.js';
 

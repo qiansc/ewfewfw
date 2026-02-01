@@ -1,7 +1,7 @@
 # Part 03 MCP Store 实现记录
 
-> **更新日期**: 2026-01-27
-> **状态**: 进行中
+> **更新日期**: 2026-02-01
+> **状态**: 已完成（v0.3.0）
 
 ---
 
@@ -69,13 +69,15 @@
 
 ---
 
-## 待完成任务
+## 待完成任务（已于 2026-02-01 完成）
 
 ### 3.14 proposal_id 上下文管理
 
 - **设计文档**：`store-feat-lifecycle.md` L536-593
 - **功能**：CoW 防护机制，确保 Agent 在执行任务链时正确透传 `proposal_id`
 - **实现位置**：可能需要在 CLI/Skills 层实现上下文管理
+
+✅ 已完成（v0.3.0）
 
 ### 3.15-3.19 Checklist 相关
 
@@ -86,6 +88,8 @@
 | 3.17 | workflow_step 更新 | `store-feat-checklist.md` §3.9 |
 | 3.18 | 并发修改预警 | `store-feat-checklist.md` §3.10 |
 | 3.19 | 引用完整性预警 | `store-feat-checklist.md` §3.11 |
+
+✅ 已完成（v0.3.0）
 
 **实现要求**：
 - 需要在 `StorageAdapter` 中添加 checklist 相关方法
@@ -100,6 +104,8 @@
 | 3.21 | backup/restore | `store-utils.md` §3.13-3.14 |
 | 3.22 | repair | `store-utils.md` §3.15 |
 | 3.23 | validate | `store-utils.md` §3.16 |
+
+✅ 已完成（v0.3.0）
 
 ---
 
@@ -153,5 +159,5 @@ packages/mcp-dsl/src/
 
 1. **所有 MCP 工具必须通过 StorageAdapter**：不要直接调用 Python mcp-data
 2. **Local 模式已可用**：LiteAdapter + SQLiteStore 提供完整的本地存储能力
-3. **Server 模式待实现**：需要实现 ServerAdapter，调用 mcp-data HTTP API
+3. **Server 模式已实现**：ServerAdapter 通过 storage-backend HTTP API
 4. **lite-adapter.ts 需要重构**：文件已超过 1500 行，需要按功能拆分

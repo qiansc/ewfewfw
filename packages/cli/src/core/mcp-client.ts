@@ -329,7 +329,7 @@ export class McpClient {
 
   private async getLocalAdapter(): Promise<StorageAdapter> {
     if (!this.localAdapter) {
-      const adapter = getAdapter({ forceMode: "local" });
+      const adapter = await getAdapter({ forceMode: "local" });
       await adapter.initialize();
       this.localAdapter = adapter;
     }

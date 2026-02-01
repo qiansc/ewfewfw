@@ -147,8 +147,13 @@ export class VectorStore {
 
   save(): void {
     if (this.readonly) return;
-    this.index.save(this.indexPath);
-    this.saveKeyMap();
+    try {
+      this.index.save(this.indexPath);
+      this.saveKeyMap();
+    } catch (error) {
+      if (this.isMissingPathError(error)) return;
+      throw error;
+    }
   }
 
   flush(): void {
@@ -193,6 +198,19 @@ export class VectorStore {
     if (!existsSync(dir)) {
       mkdirSync(dir, { recursive: true });
     }
+  }
+
+  private isMissingPathError(error: unknown): boolean {
+    if (!error) return false;
+    if (error instanceof Error) {
+      const err = error as NodeJS.ErrnoException;
+      if (err.code === 'ENOENT') return true;
+      return error.message.includes('No such file or directory');
+    }
+    if (typeof error === 'string') {
+      return error.includes('No such file or directory');
+    }
+    return false;
   }
 
   private saveKeyMap(): void {

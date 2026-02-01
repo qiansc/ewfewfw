@@ -6,7 +6,10 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 const PROJECT_ROOT = resolve(import.meta.dirname, "../../../..");
-const DOCKER_COMPOSE_FILE = resolve(PROJECT_ROOT, "docker/docker-compose.yml");
+const DOCKER_COMPOSE_FILE = resolve(
+  PROJECT_ROOT,
+  "docker/docker-compose.server.yml"
+);
 
 function dockerCompose(...args: string[]) {
   return ["docker", "compose", "-f", DOCKER_COMPOSE_FILE, ...args];
@@ -99,9 +102,9 @@ export function startStorageServices(): Promise<void> {
   });
 }
 
-export function startAllServices(profile: string = "mcp"): Promise<void> {
+export function startAllServices(_profile: string = "mcp"): Promise<void> {
   return new Promise((resolve, reject) => {
-    const [cmd, ...args] = dockerCompose("--profile", profile, "up", "-d");
+    const [cmd, ...args] = dockerCompose("up", "-d");
     const proc = spawn(cmd, args, { stdio: "inherit" });
     proc.on("close", (code) => {
       if (code === 0) resolve();

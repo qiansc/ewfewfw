@@ -7,20 +7,20 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { getAdapter, loadConfig, resetAdapter } from "../get-adapter.js";
 
-function withTempDir(fn: (dir: string) => void): void {
+async function withTempDir(fn: (dir: string) => void | Promise<void>): Promise<void> {
   const root = join(process.cwd(), ".tmp");
   mkdirSync(root, { recursive: true });
   const dir = mkdtempSync(join(root, "c4a-config-"));
   try {
-    fn(dir);
+    await fn(dir);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 }
 
 describe("loadConfig", () => {
-  test("loads .context/.c4a.yaml when present", () => {
-    withTempDir((dir) => {
+  test("loads .context/.c4a.yaml when present", async () => {
+    await withTempDir((dir) => {
       const contextDir = join(dir, ".context");
       mkdirSync(contextDir, { recursive: true });
       writeFileSync(
@@ -35,8 +35,8 @@ describe("loadConfig", () => {
     });
   });
 
-  test("ignores legacy .context/.c4a.yml", () => {
-    withTempDir((dir) => {
+  test("ignores legacy .context/.c4a.yml", async () => {
+    await withTempDir((dir) => {
       const contextDir = join(dir, ".context");
       mkdirSync(contextDir, { recursive: true });
       writeFileSync(
@@ -53,11 +53,11 @@ describe("loadConfig", () => {
 });
 
 describe("getAdapter", () => {
-  test("recreates adapter when local config changes", () => {
-    withTempDir((dir) => {
+  test("recreates adapter when local config changes", async () => {
+    await withTempDir(async (dir) => {
       const dbPathA = join(dir, "a.db");
       const dbPathB = join(dir, "b.db");
-      const adapterA = getAdapter({
+      const adapterA = await getAdapter({
         basePath: dir,
         config: {
           dbPath: dbPathA,
@@ -65,7 +65,7 @@ describe("getAdapter", () => {
           enableVectorSearch: false,
         },
       }) as { config?: { dbPath?: string } };
-      const adapterB = getAdapter({
+      const adapterB = await getAdapter({
         basePath: dir,
         config: {
           dbPath: dbPathB,

@@ -93,6 +93,7 @@ describe('workflow recovery', () => {
         status: 'pending',
         execute: async () => {
           executed.push('step-1');
+          return { success: true };
         },
       },
       {
@@ -100,6 +101,7 @@ describe('workflow recovery', () => {
         status: 'pending',
         execute: async () => {
           executed.push('step-2');
+          return { success: true };
         },
       },
       {
@@ -107,6 +109,7 @@ describe('workflow recovery', () => {
         status: 'pending',
         execute: async () => {
           executed.push('step-3');
+          return { success: true };
         },
       },
     ];

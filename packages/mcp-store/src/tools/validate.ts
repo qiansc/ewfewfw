@@ -16,7 +16,7 @@ import type {
 export async function storeValidateHandler(
   args: StoreValidateInput
 ): Promise<StoreValidateResult> {
-  const adapter = getAdapter();
+  const adapter = await getAdapter();
   await adapter.initialize();
 
   const result = await adapter.validate({

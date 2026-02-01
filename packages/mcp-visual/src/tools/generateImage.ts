@@ -26,22 +26,24 @@ export async function generateImageHandler(
   }
 
   // 验证并准备生成参数
+  const { prompt: _ignored, ...rest } = input;
   const options = validateGenerateOptions({
-    ...input,
+    ...rest,
     prompt,
   });
 
   // 调用 Gemini API 生成图片
   const { buffer, metadata } = await generateWithGemini(options);
+  const { prompt: _metadataPrompt, ...metadataRest } = metadata;
 
   // 保存图片
   const saveResult = await saveImage(buffer, input.format || "PNG", input.storage_mode || "cache", {
     reportId: input.report_id,
     filename: input.filename,
     metadata: {
+      ...metadataRest,
       prompt,
       template_id: input.template_id,
-      ...metadata,
     },
   });
 

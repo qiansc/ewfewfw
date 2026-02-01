@@ -65,7 +65,7 @@ beforeAll(() => {
   mkdirSync(TMP_ROOT, { recursive: true });
   store = SQLiteStore.getInstance({ dbPath: DB_PATH });
 
-  const stubEmbedder = (async () => ({ data: makeEmbedding(1) })) as FeatureExtractionPipeline;
+  const stubEmbedder = (async () => ({ data: makeEmbedding(1) })) as unknown as FeatureExtractionPipeline;
   setEmbedderForTest(stubEmbedder);
 });
 

@@ -24,7 +24,7 @@ import type { LocalManifest, SyncSnapshot } from "@c4a/storage";
 export async function storePlanSyncHandler(
   args: StorePlanSyncInput
 ): Promise<StorePlanSyncResult | StorePlanSyncExecutedResult> {
-  const adapter = getAdapter();
+  const adapter = await getAdapter();
 
   // 确保适配器已初始化
   await adapter.initialize();

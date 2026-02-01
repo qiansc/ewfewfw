@@ -25,7 +25,7 @@
 
 import type { SaveParams, SaveResult, ReadParams, ReadResultObject, ReadResultString, ListParams, ListResult, DeleteParams, DeleteResult } from './adapterCrudTypes.js';
 import type { SyncParams, SyncResult, PlanSyncParams, PlanSyncResult } from './adapterSyncTypes.js';
-import type { SearchParams, SearchResult, DepsParams, DepsNode, ImpactParams, ImpactNode } from './adapterSearchTypes.js';
+import type { SearchParams, SearchResult, DepsParams, DepsResult, ImpactParams, ImpactResult } from './adapterSearchTypes.js';
 import type { FeatLifecycleParams, FeatLifecycleResult, FeatMergeParams, FeatMergeResult, ChecklistParams, ChecklistResult, UpdateWorkflowStepParams, UpdateWorkflowStepResult } from './adapterFeatTypes.js';
 import type { ReadHistoryParams, ReadHistoryResult, BackupParams, BackupResult, RestoreParams, RestoreResult, RepairParams, RepairResult, ValidateParams, ValidateResult } from './adapterUtilsTypes.js';
 
@@ -109,13 +109,13 @@ export interface StorageAdapter {
    * 依赖查询
    * 对应 MCP 工具: c4a_query_deps
    */
-  queryDeps(params: DepsParams): Promise<DepsNode[]>;
+  queryDeps(params: DepsParams): Promise<DepsResult>;
 
   /**
    * 影响分析
    * 对应 MCP 工具: c4a_query_impact
    */
-  queryImpact(params: ImpactParams): Promise<ImpactNode[]>;
+  queryImpact(params: ImpactParams): Promise<ImpactResult>;
 
   // ============================================================
   // Feat 生命周期操作 (c4a_store_feat_*)

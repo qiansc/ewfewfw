@@ -32,8 +32,9 @@ describe('isValidStatusTransition', () => {
 describe('entity type definitions', () => {
   test('ENTITY_TYPE_DEFS matches TYPE_TO_DIR and DIR_TO_ENTITY_TYPE', () => {
     for (const [type, def] of Object.entries(ENTITY_TYPE_DEFS)) {
-      expect(ENTITY_TYPE_TO_DIR[type as keyof typeof ENTITY_TYPE_DEFS]).toBe(def.dir);
-      expect(DIR_TO_ENTITY_TYPE[def.dir]).toBe(type);
+      const typedType = type as keyof typeof ENTITY_TYPE_DEFS;
+      expect(ENTITY_TYPE_TO_DIR[typedType]).toBe(def.dir);
+      expect(DIR_TO_ENTITY_TYPE[def.dir]).toBe(typedType);
     }
   });
 

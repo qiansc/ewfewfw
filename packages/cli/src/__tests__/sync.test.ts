@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseSyncArgs, syncCommand } from "../commands/sync.js";
+import type { ProjectConfig } from "../core/config.js";
+import type { McpTransport } from "../core/mcp-client.js";
 
 function withTempDir(fn: (dir: string) => Promise<void> | void): Promise<void> {
   const root = join(process.cwd(), ".tmp");
@@ -55,14 +57,18 @@ describe("syncCommand", () => {
 
       const calls: Array<{ method: string; params: unknown }> = [];
       const deps = {
-        loadProjectConfig: async () => ({ mode: "local", project_id: "demo" }),
-        createMcpClient: (_options?: { baseUrl?: string; transport?: string }) => ({
-          request: async (method: string, params: unknown) => {
+        loadProjectConfig: async () =>
+          ({
+            mode: "local",
+            project_id: "demo",
+          }) satisfies ProjectConfig,
+        createMcpClient: (_options: { baseUrl?: string; transport?: McpTransport }) => ({
+          request: async <T>(method: string, params: unknown) => {
             calls.push({ method, params });
             if (method === "c4a_store_list") {
-              return { items: [{ id: "x" }] };
+              return { items: [{ id: "x" }] } as T;
             }
-            return {};
+            return {} as T;
           },
         }),
         log: () => undefined,
@@ -97,29 +103,31 @@ describe("syncCommand", () => {
       );
 
       const deps = {
-        loadProjectConfig: async () => ({
-          mode: "remote",
-          project_id: "demo",
-          remote: { url: "https://example.com" },
-        }),
-        createMcpClient: (_options?: { baseUrl?: string; transport?: string }) => ({
-          request: async () => ({
-            success: true,
-            executed: true,
-            actions: [
-              {
-                op: "conflict",
-                entity_id: "demo",
-                type: "container",
-                path: "technical/containers/demo.yaml",
-                conflict_type: "both_modified",
-                remote_content:
-                  "schema: c4a/v1\ntype: container\ncontainer:\n  id: demo\n  name: Demo\n  description: Remote\n  scope: project\n  system_id: sys\n",
-              },
-            ],
-            new_snapshot: { synced_at: new Date().toISOString(), entities: {} },
-            stats: { to_download: 0, conflicts: 1 },
-          }),
+        loadProjectConfig: async () =>
+          ({
+            mode: "remote",
+            project_id: "demo",
+            remote: { url: "https://example.com" },
+          }) satisfies ProjectConfig,
+        createMcpClient: (_options: { baseUrl?: string; transport?: McpTransport }) => ({
+          request: async <T>() =>
+            ({
+              success: true,
+              executed: true,
+              actions: [
+                {
+                  op: "conflict",
+                  entity_id: "demo",
+                  type: "container",
+                  path: "technical/containers/demo.yaml",
+                  conflict_type: "both_modified",
+                  remote_content:
+                    "schema: c4a/v1\ntype: container\ncontainer:\n  id: demo\n  name: Demo\n  description: Remote\n  scope: project\n  system_id: sys\n",
+                },
+              ],
+              new_snapshot: { synced_at: new Date().toISOString(), entities: {} },
+              stats: { to_download: 0, conflicts: 1 },
+            }) as T,
         }),
         log: () => undefined,
         error: () => undefined,

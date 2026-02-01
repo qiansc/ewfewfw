@@ -125,10 +125,10 @@
 | 功能 | 文件 | 章节 | 行号 | 已读 | 已实现 |
 |------|------|------|------|:----:|:------:|
 | 2.1-2.2 | `architecture.md` | §1.1 模式对比 | L16-76 | [x] | [x] |
-| 2.3 | `architecture.md` | §1.2 存储层可插拔 | L77-95 | [x] | [x] |
+| 2.3 | `architecture.md` | §1.2 存储层可插拔 | L77-94 | [x] | [x] |
 | 2.4 | `architecture.md` | §1.3 知识生命周期 | L96-115 | [x] | [x] |
-| 2.5 | `architecture.md` | §1.4 架构图 | L116-182 | [x] | [x] |
-| 2.6 | `architecture.md` | §1.5 Skills/Commands | L183-235 | [x] | [x] |
+| 2.5 | `architecture.md` | §1.4 架构图 | L116-181 | [x] | [x] |
+| 2.6 | `architecture.md` | §1.5 Skills/Commands | L183-234 | [x] | [x] |
 | 2.7 | `architecture.md` | §2.1 存储位置 | L238-254 | [x] | [x] |
 | 2.8 | `architecture.md` | §2.2 工作目录结构 | L255-337 | [x] | [x] |
 | 2.9 | `architecture.md` | §2.3 项目配置 | L338-357 | [x] | [x] |
@@ -187,6 +187,7 @@
 | 3.24 | 移除 legacy MCP 接口 | [x] | 删除旧接口与别名 |
 
 > 备注: feat checklist 并发更新冲突校验已补齐（2026-01-31）。
+> 前置验证（2026-02-01）：健康检查/搜索降级/repair 端点已确认；`@c4a/storage` 测试 129 pass / 5 skip；storage-backend pytest 29 passed（1 warning）；coverage 未输出；待修复：graph Neo4j 降级。
 
 **相关设计文档：**
 
@@ -265,7 +266,7 @@ packages/
 | 4.2 | c4a_query_deps | [x] | 依赖查询（复用 DepsParams，含 proposal_id） |
 | 4.3 | c4a_query_impact | [x] | 影响分析（复用 ImpactParams，含 proposal_id） |
 | 4.4 | 查询一致性检测 | [x] | 不一致状态检测（Local stub 已就绪） |
-| 4.5 | 降级行为 | [ ] | Neo4j/Milvus 不可用时（返回 degraded: true） |
+| 4.5 | 降级行为 | [x] | Neo4j/Milvus 不可用时返回 degraded 标记 |
 | 4.6 | Local Mode 查询策略 | [x] | 调用 Part 06 的 USearch + InMemoryGraph |
 
 **已完成基础设施（Part 06）**：
@@ -284,12 +285,14 @@ packages/
 | 4.1 | `mcp/query.md` | §4.1 search | L1-16 | [x] | [x] |
 | 4.2 | `mcp/query.md` | §4.2 deps | L18-21 | [x] | [x] |
 | 4.3 | `mcp/query.md` | §4.3 impact | L23-26 | [x] | [x] |
-| 4.4-4.5 | `mcp/query.md` | §4.4 一致性/降级 | L30-111 | [x] | [ ] |
+| 4.4-4.5 | `mcp/query.md` | §4.4 一致性/降级 | L30-111 | [x] | [x] |
 | 4.6 | `mcp/query.md` | §4.5 Local Mode | L113-180 | [x] | [x] |
 
 **阻塞清单（等待 Part 13 Server）**：
-- 降级行为：deps/impact/search 依赖 MongoDB/Neo4j/Milvus Server 模式实现
-- checkSyncStatus：pendingSync/sync_status 数据源与健康检查逻辑
+- checkSyncStatus：sync_status + /utils/check-consistency 已实现，阻塞解除（2026-02-01）
+
+**补充说明（2026-02-01）**：
+- Server 模式实体保存已写入 `sync_status`，并新增 `/utils/check-consistency` 端点与测试用例。
 
 ---
 
@@ -640,49 +643,65 @@ packages/
 
 | # | 功能 | 完成 | 描述 |
 |---|------|:----:|------|
-| 13.1 | Docker Compose 配置 | [ ] | MongoDB + Neo4j + Milvus 编排 |
-| 13.2 | 服务健康检查 | [ ] | 各服务启动检测和依赖等待 |
-| 13.3 | MongoDB 适配器 | [ ] | 实体 CRUD + 多文档事务 |
-| 13.4 | Neo4j 适配器 | [ ] | 图关系存储 + Cypher 查询 |
-| 13.5 | Milvus 适配器 | [ ] | 向量存储 + 相似度搜索 |
-| 13.6 | 存储层抽象 (ServerStore) | [ ] | 统一接口封装三库操作 |
-| 13.7 | 三库写入顺序 | [ ] | MongoDB→Neo4j→Milvus 顺序 |
-| 13.8 | 同步状态追踪 | [ ] | sync_status 字段管理 |
-| 13.9 | 失败补偿机制 | [ ] | 后台重试 + 手动修复 |
-| 13.10 | MCP Data 服务 | [ ] | Python FastMCP HTTP 接口 |
-| 13.11 | Remote 模式支持 | [ ] | HTTP 客户端连接远程服务 |
-| 13.12 | 连接池管理 | [ ] | 各数据库连接池配置 |
-| 13.13 | MCP 命名统一 | [ ] | 仅保留 c4a_store_* / c4a_query_* |
-| 13.14 | 目录结构迁移 | [ ] | .c4a → .context |
+| 13.1 | Docker Compose 配置 | [x] | MongoDB + Neo4j + Milvus 编排 |
+| 13.2 | 服务健康检查 | [x] | 各服务启动检测和依赖等待 |
+| 13.3 | MongoDB 适配器 | [x] | 实体 CRUD + 多文档事务 |
+| 13.4 | Neo4j 适配器 | [x] | 图关系存储 + Cypher 查询 |
+| 13.5 | Milvus 适配器 | [x] | 向量存储 + 相似度搜索 |
+| 13.6 | 存储层抽象 (ServerAdapter) | [x] | 统一接口封装三库操作 |
+| 13.7 | 三库写入顺序 | [x] | MongoDB→Neo4j→Milvus 顺序 |
+| 13.8 | 同步状态追踪 | [x] | sync_status 字段管理 |
+| 13.9 | 失败补偿机制 | [x] | /utils/repair 手动修复 |
+| 13.10 | storage-backend 服务 | [x] | Python FastAPI HTTP 接口 |
+| 13.11 | Remote 模式支持 | [x] | HTTP 客户端连接远程服务 |
+| 13.12 | 连接池管理 | [x] | 各数据库连接池配置 |
+| 13.13 | MCP 命名统一 | [x] | 仅保留 c4a_store_* / c4a_query_* |
+| 13.14 | 目录结构迁移 | [x] | .c4a → .context |
 
 **相关设计文档：**
 
 | 功能 | 文件 | 章节 | 行号 | 已读 | 已实现 |
 |------|------|------|------|:----:|:------:|
-| 13.1-13.2 | `architecture.md` | §1.4 架构图 | L116-182 | [ ] | [ ] |
-| 13.3 | `data-ops/cross-project-transaction.md` | §6.1 MongoDB 事务 | L70-150 | [ ] | [ ] |
-| 13.4 | `data-ops/cross-project-transaction.md` | §6.2 Neo4j 同步 | L150-220 | [ ] | [ ] |
-| 13.5 | `data-ops/cross-project-transaction.md` | §6.2 Milvus 同步 | L220-280 | [ ] | [ ] |
-| 13.6 | `architecture.md` | §1.2 存储层可插拔 | L77-95 | [ ] | [ ] |
-| 13.7-13.9 | `data-ops/cross-project-transaction.md` | §6.3 同步状态 | L280-360 | [ ] | [ ] |
-| 13.10 | `architecture.md` | §1.5 MCP 架构 | L183-235 | [ ] | [ ] |
-| 13.11 | `architecture.md` | §1.1 模式对比 | L16-76 | [ ] | [ ] |
-| 13.12 | `mcp/store-feat-lifecycle.md` | §3.7.9 多库一致性 | L344-534 | [ ] | [ ] |
+| 13.1-13.2 | `architecture.md` | §1.4 架构图 | L116-181 | [x] | [x] |
+| 13.3 | `data-ops/cross-project-transaction.md` | §6.1 MongoDB 事务 | L70-150 | [x] | [x] |
+| 13.4 | `data-ops/cross-project-transaction.md` | §6.2 Neo4j 同步 | L150-220 | [x] | [x] |
+| 13.5 | `data-ops/cross-project-transaction.md` | §6.2 Milvus 同步 | L220-280 | [x] | [x] |
+| 13.6 | `architecture.md` | §1.2 存储层可插拔 | L77-94 | [x] | [x] |
+| 13.7-13.9 | `data-ops/cross-project-transaction.md` | §6.3 同步状态 | L280-360 | [x] | [x] |
+| 13.10 | `architecture.md` | §1.5 MCP 架构 | L183-234 | [x] | [x] |
+| 13.11 | `architecture.md` | §1.1 模式对比 | L16-76 | [x] | [x] |
+| 13.12 | `mcp/store-feat-lifecycle.md` | §3.7.9 多库一致性 | L344-534 | [x] | [x] |
 
 **实现产物：**
 
 | 文件 | 说明 |
 |------|------|
-| `docker/docker-compose.yml` | 基础编排 |
-| `docker/docker-compose.server.yml` | Server 模式 |
-| `packages/storage/src/server-adapter.ts` | ServerAdapter (TypeScript HTTP/gRPC 客户端) |
+| `docker/docker-compose.server.yml` | Server 模式（含基础编排） |
+| `packages/storage/src/server-adapter.ts` | ServerAdapter (TypeScript HTTP 客户端) |
 | `packages/storage-backend/` | Python 存储后端服务 |
-| `packages/storage-backend/src/mongo_store.py` | MongoDB 操作封装 |
-| `packages/storage-backend/src/neo4j_store.py` | Neo4j 操作封装 |
-| `packages/storage-backend/src/milvus_store.py` | Milvus 操作封装 |
-| `packages/storage-backend/src/server.py` | HTTP/gRPC Server |
+| `packages/storage-backend/src/main.py` | FastAPI 入口 |
+| `packages/storage-backend/src/adapters/mongodb.py` | MongoDB 适配器 |
+| `packages/storage-backend/src/adapters/neo4j.py` | Neo4j 适配器 |
+| `packages/storage-backend/src/adapters/milvus.py` | Milvus 适配器 |
 
-> **架构说明**：MCP Server 层统一使用 TypeScript，对用户透明。Server 模式下 ServerAdapter 通过 HTTP/gRPC 调用 Python 后端（storage-backend），Python 封装 MongoDB/Neo4j/Milvus 访问。这样设计是因为 Bun/Node.js 对这三个数据库的驱动支持不如 Python 成熟稳定。
+> **架构说明**：MCP Server 层统一使用 TypeScript，对用户透明。Server 模式下 ServerAdapter 通过 HTTP 调用 Python 后端（storage-backend），Python 封装 MongoDB/Neo4j/Milvus 访问。这样设计是因为 Bun/Node.js 对这三个数据库的驱动支持不如 Python 成熟稳定。
+
+**补充（2026-01-31）**：已完成 Agent-0 前置准备（storage-backend 目录骨架、ServerAdapter HTTP 占位、docker-compose.server.yml）。
+
+**补充（2026-02-01）**：已完成 Agent-1 ServerAdapter 核心实现（HTTP 客户端、CRUD/关系/搜索接口、单元与可选集成测试）。
+
+**补充（2026-02-01）**：已完成 storage-backend Python 测试（pytest），并验证 Docker 启动后 /health 可达。
+
+**补充（2026-02-01）**：已完成 Agent-4 模式切换与 CLI 完善（Local↔Server 迁移、权限/断点、server status 健康检查地址修正）。
+**补充（2026-02-01）**：已完成 Agent-3 权限系统（storage-backend 权限模型/服务/中间件/依赖/权限路由 + 关系写入校验）。
+**补充（2026-02-01）**：修复 Milvus collection 加载兼容性并增强向量命中解析，补充 search vector 单测。
+**补充（2026-02-01）**：扩展 storage-backend 集成测试覆盖（graph/feat/utils/sync 等路由）。
+**补充（2026-02-01）**：新增真实服务集成回归脚本（storage-backend）。
+**补充（2026-02-01）**：补充权限/错误路径集成测试覆盖（read/relations/search/utils 恢复冲突）。
+**补充（2026-02-01）**：完成 Agent-5 集成收尾（getAdapter 异步初始化、MCP Store 预热、Server 集成测试、docker-compose.server.yml 增补 MCP 服务、README Server 模式说明）。
+**补充（2026-02-01）**：修复 Server 安装链路（补齐 Docker MCP 镜像依赖与根 tsconfig、修复 storage-backend 健康检查），验证 MongoDB/Neo4j/Milvus/Embedding 与 `c4a install server` 正常。
+**补充（2026-02-01）**：内联 Server 模式配置（MCP 容器改用 `C4A_STORAGE_BACKEND_URL`，移除 `docker/c4a.server.yaml`），并统一使用 `docker-compose.server.yml`。
+**补充（2026-02-01）**：Part 13 全部任务已完成，包括图查询降级（deps/impact 返回 degraded）、sync_status 字段、/utils/check-consistency 端点。
 
 **详细计划：** [13-server-mode.md](13-server-mode.md)
 

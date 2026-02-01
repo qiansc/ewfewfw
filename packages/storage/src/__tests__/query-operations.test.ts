@@ -36,14 +36,14 @@ describe("query operations", () => {
     graph.addRelation("alpha", "dep", "alpha", "leaf", "depends_on");
 
     const ctx = createContext(graph);
-    const results = await queryDeps(ctx, {
+    const result = await queryDeps(ctx, {
       id: "svc",
       source_project: "alpha",
       direction: "downstream",
       depth: 2,
     });
 
-    const ids = results.map((node) => node.id);
+    const ids = result.nodes.map((node) => node.id);
     expect(ids).toEqual(expect.arrayContaining(["dep", "leaf"]));
   });
 
@@ -53,15 +53,15 @@ describe("query operations", () => {
     graph.addRelation("alpha", "dep", "alpha", "leaf", "depends_on");
 
     const ctx = createContext(graph);
-    const results = await queryImpact(ctx, {
+    const result = await queryImpact(ctx, {
       id: "svc",
       source_project: "alpha",
       depth: 2,
       change_type: "remove",
     });
 
-    const direct = results.find((node) => node.id === "dep");
-    const indirect = results.find((node) => node.id === "leaf");
+    const direct = result.nodes.find((node) => node.id === "dep");
+    const indirect = result.nodes.find((node) => node.id === "leaf");
     expect(direct?.impact_level).toBe("direct");
     expect(indirect?.impact_level).toBe("indirect");
     expect(direct?.reason).toBe("breaking");

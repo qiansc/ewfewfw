@@ -28,20 +28,19 @@ async function startStdioServer() {
 }
 
 async function startHttpServer() {
-  const { StreamableHTTPServerTransport } = await import(
-    "@modelcontextprotocol/sdk/server/streamableHttp.js"
+  const { WebStandardStreamableHTTPServerTransport } = await import(
+    "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js"
   );
 
   const server = createServer();
 
-  const httpTransport = new StreamableHTTPServerTransport({
+  const httpTransport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
   });
 
-  // 启动 HTTP 服务
-  Bun.serve({
+  const serveOptions = {
     port,
-    async fetch(req) {
+    async fetch(req: Request) {
       const url = new URL(req.url);
 
       // 健康检查
@@ -65,7 +64,10 @@ async function startHttpServer() {
 
       return new Response("Not Found", { status: 404 });
     },
-  });
+  } as Bun.ServeOptions;
+
+  // 启动 HTTP 服务
+  Bun.serve(serveOptions);
 
   await server.connect(httpTransport);
 

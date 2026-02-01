@@ -162,6 +162,8 @@ describe('Data Ops integration', () => {
       to_status: 'published',
       force_publish: true,
       metadata: {
+        title: featId,
+        description: '',
         created_by: 'tester',
       },
     });
@@ -281,6 +283,7 @@ describe('Data Ops integration', () => {
         metadata: { workflow: 'integration' },
         execute: async () => {
           executed.push('step-1');
+          return { success: true };
         },
       },
       {
@@ -288,6 +291,7 @@ describe('Data Ops integration', () => {
         title: 'step-2',
         execute: async () => {
           executed.push('step-2');
+          return { success: true };
         },
       },
       {
@@ -295,6 +299,7 @@ describe('Data Ops integration', () => {
         title: 'step-3',
         execute: async () => {
           executed.push('step-3');
+          return { success: true };
         },
       },
     ]);

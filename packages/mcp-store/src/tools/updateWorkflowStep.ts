@@ -22,7 +22,7 @@ import { getAdapter } from "@c4a/storage";
 export async function storeUpdateWorkflowStepHandler(
   args: StoreUpdateWorkflowStepInput
 ): Promise<StoreUpdateWorkflowStepResult> {
-  const adapter = getAdapter();
+  const adapter = await getAdapter();
 
   // 确保适配器已初始化
   await adapter.initialize();

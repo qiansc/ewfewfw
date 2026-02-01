@@ -23,7 +23,7 @@ async function fetchChecklist(featId: string): Promise<ChecklistResult> {
   const mode = projectConfig?.mode ?? "local";
 
   if (mode === "local") {
-    const adapter = getAdapter({ forceMode: "local" });
+    const adapter = await getAdapter({ forceMode: "local" });
     await adapter.initialize();
     try {
       return await adapter.featChecklist({ action: "get", feat_id: featId });

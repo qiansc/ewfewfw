@@ -6,6 +6,20 @@ import { installCommand } from "../commands/install.js";
 import { statusCommand } from "../commands/status.js";
 import { syncCommand } from "../commands/sync.js";
 import { buildMainMenu } from "../menuData.js";
+import type { ProjectConfig } from "../core/config.js";
+import type { McpTransport } from "../core/mcp-client.js";
+
+type McpClientLike = {
+  request: <T>(method: string, params: unknown) => Promise<T>;
+};
+
+function createMockClient(
+  handler: (method: string, params: unknown) => unknown,
+): McpClientLike {
+  return {
+    request: async <T>(method: string, params: unknown) => handler(method, params) as T,
+  };
+}
 
 function withTempDir(fn: (dir: string) => Promise<void> | void): Promise<void> {
   const root = join(process.cwd(), ".tmp");
@@ -33,8 +47,8 @@ function withTempDir(fn: (dir: string) => Promise<void> | void): Promise<void> {
 describe("cli integration flow", () => {
   test("init -> install -> sync -> status (local)", async () => {
     await withTempDir(async (dir) => {
-      let savedProject: Record<string, unknown> | null = null;
-      let savedGlobal: Record<string, unknown> | null = null;
+      let savedProject: any = null;
+      let savedGlobal: any = null;
 
       await installCommand(["local"], {
         io: { log: () => {}, error: () => {} },
@@ -88,16 +102,19 @@ describe("cli integration flow", () => {
 
       const syncCalls: Array<{ method: string }> = [];
       await syncCommand([], {
-        loadProjectConfig: async () => ({ mode: "local", project_id: "demo" }),
-        createMcpClient: (_options?: { baseUrl?: string; transport?: string }) => ({
-          request: async (method: string) => {
+        loadProjectConfig: async () =>
+          ({
+            mode: "local",
+            project_id: "demo",
+          }) satisfies ProjectConfig,
+        createMcpClient: (_options: { baseUrl?: string; transport?: McpTransport }) =>
+          createMockClient((method) => {
             syncCalls.push({ method });
             if (method === "c4a_store_list") {
               return { items: [] };
             }
             return {};
-          },
-        }),
+          }),
         log: () => undefined,
         error: () => undefined,
         prompt: async () => 0,
@@ -109,10 +126,13 @@ describe("cli integration flow", () => {
       const logs: string[] = [];
       await statusCommand([], {
         loadGlobalConfig: async () => ({ local: { installed_at: "2026-01-01T00:00:00Z" } }),
-        loadProjectConfig: async () => ({ mode: "local", project_id: "demo" }),
-        createMcpClient: (_options?: { baseUrl?: string; transport?: string }) => ({
-          request: async () => ({ groups: { system: { count: 1 } } }),
-        }),
+        loadProjectConfig: async () =>
+          ({
+            mode: "local",
+            project_id: "demo",
+          }) satisfies ProjectConfig,
+        createMcpClient: (_options: { baseUrl?: string; transport?: McpTransport }) =>
+          createMockClient(() => ({ groups: { system: { count: 1 } } })),
         now: () => 1000,
         log: (message: string) => logs.push(message),
         error: (message: string) => logs.push(message),
@@ -142,22 +162,21 @@ describe("cli integration flow", () => {
   test("sync mode selects transport", async () => {
     const transports: Array<string | undefined> = [];
     await syncCommand([], {
-      loadProjectConfig: async () => ({
-        mode: "remote",
-        project_id: "demo",
-        remote: { url: "https://example.com" },
-      }),
-      createMcpClient: (options?: { baseUrl?: string; transport?: string }) => {
-        transports.push(options?.transport);
-        return {
-          request: async () => ({
-            success: true,
-            executed: true,
-            actions: [],
-            new_snapshot: { synced_at: new Date().toISOString(), entities: {} },
-            stats: {},
-          }),
-        };
+      loadProjectConfig: async () =>
+        ({
+          mode: "remote",
+          project_id: "demo",
+          remote: { url: "https://example.com" },
+        }) satisfies ProjectConfig,
+      createMcpClient: (options: { baseUrl?: string; transport?: McpTransport }) => {
+        transports.push(options.transport);
+        return createMockClient(() => ({
+          success: true,
+          executed: true,
+          actions: [],
+          new_snapshot: { synced_at: new Date().toISOString(), entities: {} },
+          stats: {},
+        }));
       },
       log: () => undefined,
       error: () => undefined,
