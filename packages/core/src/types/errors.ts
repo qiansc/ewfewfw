@@ -19,7 +19,10 @@ export type ErrorCategory =
   | 'BIZ' // 业务逻辑错误
   | 'STORE' // 存储操作
   | 'PERM' // 权限错误
-  | 'MIGRATE'; // 数据迁移错误
+  | 'MIGRATE' // 数据迁移错误
+  | 'EXTRACT' // Extract MCP 错误
+  | 'QUERY' // Query MCP 错误
+  | 'VISUAL'; // Visual MCP 错误
 
 // ============================================================================
 // 错误码定义
@@ -114,6 +117,27 @@ export const MIGRATE_ERROR_CODES = {
 } as const;
 
 /**
+ * EXTRACT 类错误码
+ */
+export const EXTRACT_ERROR_CODES = {
+  INTERNAL_ERROR: 'C4A-EXTRACT-001', // Extract MCP 内部错误
+} as const;
+
+/**
+ * QUERY 类错误码
+ */
+export const QUERY_ERROR_CODES = {
+  INTERNAL_ERROR: 'C4A-QUERY-001', // Query MCP 内部错误
+} as const;
+
+/**
+ * VISUAL 类错误码
+ */
+export const VISUAL_ERROR_CODES = {
+  INTERNAL_ERROR: 'C4A-VISUAL-001', // Visual MCP 内部错误
+} as const;
+
+/**
  * 所有错误码
  */
 export const ERROR_CODES = {
@@ -124,6 +148,9 @@ export const ERROR_CODES = {
   ...STORE_ERROR_CODES,
   ...PERM_ERROR_CODES,
   ...MIGRATE_ERROR_CODES,
+  ...EXTRACT_ERROR_CODES,
+  ...QUERY_ERROR_CODES,
+  ...VISUAL_ERROR_CODES,
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
@@ -186,6 +213,9 @@ export const ERROR_CODE_TO_HTTP_STATUS: Record<ErrorCode, number> = {
   'C4A-MIGRATE-006': 422,
   'C4A-MIGRATE-007': 422,
   'C4A-MIGRATE-008': 422,
+  'C4A-EXTRACT-001': 500,
+  'C4A-QUERY-001': 500,
+  'C4A-VISUAL-001': 500,
 };
 
 // ============================================================================
@@ -261,6 +291,9 @@ export const ERROR_MESSAGES: Record<ErrorCode, { zh: string; en: string }> = {
     en: 'External entity should not have source_project',
   },
   'C4A-MIGRATE-008': { zh: 'external 实体缺少 external_url', en: 'External entity missing external_url' },
+  'C4A-EXTRACT-001': { zh: 'Extract MCP 内部错误', en: 'Extract MCP internal error' },
+  'C4A-QUERY-001': { zh: 'Query MCP 内部错误', en: 'Query MCP internal error' },
+  'C4A-VISUAL-001': { zh: 'Visual MCP 内部错误', en: 'Visual MCP internal error' },
 };
 
 // ============================================================================
@@ -351,12 +384,14 @@ export class C4AError extends Error {
    * 转换为错误响应格式
    */
   toResponse(requestId?: string): ErrorResponse {
+    const recoverableActions = this.details?.recoverable_actions;
     return {
       code: this.code,
       message: this.message,
       details: this.details,
       timestamp: this.timestamp,
       request_id: requestId,
+      recoverable_actions: recoverableActions,
     };
   }
 

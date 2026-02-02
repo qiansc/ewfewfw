@@ -54,6 +54,57 @@ class ValidateRequest(BaseModel):
     options: dict[str, Any] | None = None
 
 
+def _normalize_proposal_id(value: str | None) -> str:
+    return value or ""
+
+
+def _select_effective_entities(
+    docs: list[dict[str, Any]], proposal_id: str | None
+) -> list[dict[str, Any]]:
+    """Merge main/feat entities: feat version overrides main by (project,id,type)."""
+    target = _normalize_proposal_id(proposal_id)
+    merged: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for doc in docs:
+        pid = _normalize_proposal_id(doc.get("proposal_id"))
+        if target and pid not in {target, ""}:
+            continue
+        if not target and pid != "":
+            continue
+        key = (doc.get("source_project", ""), doc.get("id", ""), doc.get("type", ""))
+        if pid == "":
+            merged.setdefault(key, doc)
+        else:
+            merged[key] = doc
+    return list(merged.values())
+
+
+def _infer_perspective(entity: dict[str, Any]) -> str | None:
+    data = entity.get("data") or {}
+    if isinstance(data, dict):
+        if isinstance(data.get("perspective"), str):
+            return data.get("perspective")
+        if isinstance(data.get("process_type"), str):
+            return data.get("process_type")
+    if isinstance(entity.get("perspective"), str):
+        return entity.get("perspective")
+    return None
+
+
+def _build_check_result(status: str, message: str, **kwargs: Any) -> dict[str, Any]:
+    payload = {"status": status, "message": message}
+    payload.update(kwargs)
+    return payload
+
+
+def _append_suggestion(
+    suggestions: list[str], suggestion: str | None, index: int
+) -> int:
+    if suggestion:
+        suggestions.append(f"{index}. {suggestion}")
+        return index + 1
+    return index
+
+
 def _write_backup_file(path: str, payload: dict[str, Any], fmt: str) -> int:
     encoded = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
     if fmt == "json":
@@ -85,6 +136,33 @@ def _read_backup_file(path: str) -> dict[str, Any]:
 
 def _normalize_projects(projects: list[str | None]) -> list[str]:
     return [project for project in projects if project]
+
+
+def _validate_safe_path(input_path: str, root: Path) -> Path:
+    candidate = Path(input_path)
+    if candidate.is_absolute():
+        return candidate.resolve()
+    if ".." in candidate.parts:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "C4A-INPUT-007",
+                "message": "不允许父目录引用",
+                "details": {"path": input_path},
+            },
+        )
+    resolved = (root / candidate).resolve()
+    root_resolved = root.resolve()
+    if root_resolved != resolved and root_resolved not in resolved.parents:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "C4A-INPUT-006",
+                "message": "路径必须在项目根目录内",
+                "details": {"path": input_path},
+            },
+        )
+    return resolved
 
 
 async def _require_permission_for_projects(
@@ -162,6 +240,7 @@ async def backup(
     permission_service: PermissionService = Depends(get_permission_service),
 ) -> dict[str, Any]:
     adapter = await get_mongodb_adapter()
+    output_path = _validate_safe_path(params.output, Path.cwd())
     fmt = params.format or ("tar.gz" if params.output.endswith(".tar.gz") else "json")
 
     project_ids = await adapter.entities.distinct("source_project")
@@ -187,13 +266,13 @@ async def backup(
     }
 
     try:
-        size = _write_backup_file(params.output, payload, fmt)
+        size = _write_backup_file(str(output_path), payload, fmt)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return {
         "success": True,
-        "file": params.output,
+        "file": str(output_path),
         "size": size,
         "format_version": payload["version"],
         "stats": payload["stats"],
@@ -224,8 +303,9 @@ async def restore(
     user_id: str = Depends(get_current_user),
     permission_service: PermissionService = Depends(get_permission_service),
 ) -> dict[str, Any]:
+    input_path = _validate_safe_path(params.input, Path.cwd())
     try:
-        payload = _read_backup_file(params.input)
+        payload = _read_backup_file(str(input_path))
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -473,19 +553,352 @@ async def validate(
     await _require_permission_for_projects(
         permission_service, user_id, _normalize_projects(project_ids), "read"
     )
-    checks = params.checks or []
-    check_results: dict[str, Any] = {}
-    for check in checks:
-        check_results[check] = {"status": "passed", "message": "ok"}
-    summary = {
-        "passed": len(checks),
-        "warnings": 0,
-        "errors": 0,
-        "status": "passed",
+
+    proposal_id = params.proposal_id
+    target_pid = _normalize_proposal_id(proposal_id)
+
+    checks = params.checks or [
+        "functional_spec",
+        "technical_spec",
+        "contracts",
+        "references",
+        "adr_completeness",
+        "checklist",
+    ]
+
+    query: dict[str, Any] = {"proposal_id": target_pid} if target_pid == "" else {
+        "proposal_id": {"$in": [target_pid, ""]}
     }
+    docs = await adapter.entities.find(query, {"_id": 0}).to_list(length=None)
+    entities = _select_effective_entities(docs, proposal_id)
+    entity_map = {
+        (e.get("source_project", ""), e.get("id", "")): e for e in entities
+    }
+
+    by_type: dict[str, list[dict[str, Any]]] = {}
+    for entity in entities:
+        by_type.setdefault(entity.get("type", ""), []).append(entity)
+
+    check_results: dict[str, Any] = {}
+    suggestions: list[str] = []
+    suggestion_index = 1
+
+    for check in checks:
+        if check == "structure":
+            check_results[check] = _build_check_result("passed", "结构检查通过")
+            continue
+
+        if check == "relations":
+            relation_query: dict[str, Any] = (
+                {"proposal_id": {"$in": [target_pid, ""]}} if target_pid else {"proposal_id": ""}
+            )
+            relations = await adapter.relations.find(relation_query, {"_id": 0}).to_list(
+                length=None
+            )
+            check_results[check] = _build_check_result(
+                "passed",
+                "关系检查通过" if relations else "关系为空，未发现异常",
+                relation_count=len(relations),
+            )
+            continue
+
+        if check == "functional_spec":
+            products = by_type.get("product", [])
+            processes = [
+                p
+                for p in by_type.get("process", [])
+                if _infer_perspective(p) in {None, "business"}
+            ]
+            sors = [
+                s
+                for s in by_type.get("sor", [])
+                if _infer_perspective(s) in {None, "business"}
+            ]
+            if products or processes or sors:
+                check_results[check] = _build_check_result(
+                    "passed", "Functional Spec 存在"
+                )
+            else:
+                suggestion = "补充 Product / Business Process / Business SoR"
+                check_results[check] = _build_check_result(
+                    "warning",
+                    "未检测到 Functional Spec 实体",
+                    warnings=[
+                        {
+                            "code": "MISSING_FUNCTIONAL_SPEC",
+                            "message": "缺少业务侧规格实体",
+                            "suggestion": suggestion,
+                        }
+                    ],
+                )
+                suggestion_index = _append_suggestion(
+                    suggestions, suggestion, suggestion_index
+                )
+            continue
+
+        if check == "technical_spec":
+            systems = by_type.get("system", [])
+            containers = by_type.get("container", [])
+            components = by_type.get("component", [])
+            errors: list[dict[str, Any]] = []
+            for container in containers:
+                data = container.get("data") or {}
+                if not isinstance(data, dict):
+                    data = {}
+                if not data.get("system_id"):
+                    errors.append(
+                        {
+                            "code": "MISSING_SYSTEM_REF",
+                            "entity_id": container.get("id"),
+                            "message": "Container 未关联 System",
+                            "suggestion": "设置 data.system_id",
+                        }
+                    )
+            for component in components:
+                data = component.get("data") or {}
+                if not isinstance(data, dict):
+                    data = {}
+                if not data.get("container_id"):
+                    errors.append(
+                        {
+                            "code": "MISSING_CONTAINER_REF",
+                            "entity_id": component.get("id"),
+                            "message": "Component 未关联 Container",
+                            "suggestion": "设置 data.container_id",
+                        }
+                    )
+            if systems or containers or components:
+                if errors:
+                    for err in errors:
+                        suggestion_index = _append_suggestion(
+                            suggestions, err.get("suggestion"), suggestion_index
+                        )
+                    check_results[check] = _build_check_result(
+                        "error",
+                        "Technical Spec 完整性检查失败",
+                        errors=errors,
+                    )
+                else:
+                    check_results[check] = _build_check_result(
+                        "passed", "Technical Spec 完整"
+                    )
+            else:
+                suggestion = "补充 System/Container/Component 定义"
+                check_results[check] = _build_check_result(
+                    "error",
+                    "未检测到 Technical Spec 实体",
+                    errors=[
+                        {
+                            "code": "MISSING_TECH_SPEC",
+                            "message": "缺少技术侧规格实体",
+                            "suggestion": suggestion,
+                        }
+                    ],
+                )
+                suggestion_index = _append_suggestion(
+                    suggestions, suggestion, suggestion_index
+                )
+            continue
+
+        if check == "contracts":
+            contracts = by_type.get("contract", [])
+            components = by_type.get("component", [])
+            if not contracts and components:
+                suggestion = "补充 Contract 实体并关联 Component"
+                check_results[check] = _build_check_result(
+                    "warning",
+                    "契约完备度检查有警告",
+                    warnings=[
+                        {
+                            "code": "MISSING_CONTRACT",
+                            "message": "检测到组件但未发现契约",
+                            "suggestion": suggestion,
+                        }
+                    ],
+                )
+                suggestion_index = _append_suggestion(
+                    suggestions, suggestion, suggestion_index
+                )
+            else:
+                check_results[check] = _build_check_result(
+                    "passed", "契约检查通过"
+                )
+            continue
+
+        if check == "references":
+            relation_query: dict[str, Any] = (
+                {"proposal_id": {"$in": [target_pid, ""]}} if target_pid else {"proposal_id": ""}
+            )
+            relations = await adapter.relations.find(relation_query, {"_id": 0}).to_list(
+                length=None
+            )
+            dangling: list[dict[str, Any]] = []
+            if relations:
+                for rel in relations:
+                    if rel.get("rel_type") != "REFERENCES":
+                        continue
+                    target_key = (
+                        rel.get("to_project", ""),
+                        rel.get("to_id", ""),
+                    )
+                    if target_key not in entity_map:
+                        dangling.append(
+                            {
+                                "code": "DANGLING_REFERENCE",
+                                "entity_id": rel.get("from_id"),
+                                "message": "引用目标不存在",
+                                "details": {
+                                    "to_project": rel.get("to_project"),
+                                    "to_id": rel.get("to_id"),
+                                },
+                            }
+                        )
+            if not relations:
+                check_results[check] = _build_check_result(
+                    "warning",
+                    "relations 为空，无法校验引用",
+                    warnings=[
+                        {
+                            "code": "RELATIONS_EMPTY",
+                            "message": "关系数据缺失",
+                            "suggestion": "先执行修复或补齐关系解析",
+                        }
+                    ],
+                )
+            elif dangling:
+                check_results[check] = _build_check_result(
+                    "warning",
+                    "存在悬空引用",
+                    dangling_count=len(dangling),
+                    warnings=dangling,
+                )
+            else:
+                check_results[check] = _build_check_result(
+                    "passed", "DSL 引用正确", dangling_count=0
+                )
+            continue
+
+        if check == "adr_completeness":
+            adrs = by_type.get("adr", [])
+            warnings: list[dict[str, Any]] = []
+            for adr in adrs:
+                data = adr.get("data") or {}
+                if not isinstance(data, dict):
+                    data = {}
+                if not data.get("status"):
+                    warnings.append(
+                        {
+                            "code": "ADR_MISSING_STATUS",
+                            "entity_id": adr.get("id"),
+                            "message": "ADR 缺少 status 字段",
+                            "suggestion": "补充 ADR.status",
+                        }
+                    )
+                if not data.get("context") or not data.get("decision"):
+                    warnings.append(
+                        {
+                            "code": "ADR_INCOMPLETE",
+                            "entity_id": adr.get("id"),
+                            "message": "ADR 缺少 context 或 decision",
+                            "suggestion": "补充 ADR.context/decision",
+                        }
+                    )
+            if not adrs and target_pid:
+                suggestion = "创建 ADR 记录架构变更"
+                warnings.append(
+                    {
+                        "code": "MISSING_ADR",
+                        "message": "未检测到 ADR",
+                        "suggestion": suggestion,
+                    }
+                )
+                suggestion_index = _append_suggestion(
+                    suggestions, suggestion, suggestion_index
+                )
+            if warnings:
+                for warn in warnings:
+                    suggestion_index = _append_suggestion(
+                        suggestions, warn.get("suggestion"), suggestion_index
+                    )
+                check_results[check] = _build_check_result(
+                    "warning",
+                    "ADR 完备度检查存在警告",
+                    warnings=warnings,
+                )
+            else:
+                check_results[check] = _build_check_result(
+                    "passed", "ADR 完备度检查通过"
+                )
+            continue
+
+        if check == "checklist":
+            checklist = None
+            if target_pid:
+                feat = await adapter.feats.find_one({"id": target_pid}, {"_id": 0})
+                checklist = feat.get("checklist") if feat else None
+            if not checklist:
+                check_results[check] = _build_check_result(
+                    "warning",
+                    "未找到 checklist",
+                    warnings=[
+                        {
+                            "code": "CHECKLIST_MISSING",
+                            "message": "feat 未生成 checklist",
+                            "suggestion": "执行 c4a_store_feat_checklist(generate)",
+                        }
+                    ],
+                )
+            else:
+                items = checklist.get("items") or []
+                total = len(items)
+                completed = len(
+                    [
+                        item
+                        for item in items
+                        if item.get("status") in {"done", "completed", "success"}
+                    ]
+                )
+                blocked = [
+                    item
+                    for item in items
+                    if item.get("status") == "blocked" or item.get("blocked_reason")
+                ]
+                percentage = int((completed / total) * 100) if total else 0
+                check_results[check] = _build_check_result(
+                    "passed",
+                    "Checklist 已生成",
+                    progress={
+                        "completed": completed,
+                        "total": total,
+                        "percentage": percentage,
+                    },
+                    blocked=blocked,
+                )
+            continue
+
+        check_results[check] = _build_check_result(
+            "warning", f"未知检查项: {check}"
+        )
+
+    passed = sum(1 for result in check_results.values() if result["status"] == "passed")
+    warnings = sum(1 for result in check_results.values() if result["status"] == "warning")
+    errors = sum(1 for result in check_results.values() if result["status"] == "error")
+    if errors > 0:
+        status = "failed"
+    elif warnings > 0:
+        status = "warnings"
+    else:
+        status = "passed"
+
     return {
         "success": True,
-        "summary": summary,
+        "proposal_id": proposal_id,
+        "summary": {
+            "passed": passed,
+            "warnings": warnings,
+            "errors": errors,
+            "status": status,
+        },
         "checks": check_results,
-        "suggestions": [],
+        "suggestions": suggestions,
     }

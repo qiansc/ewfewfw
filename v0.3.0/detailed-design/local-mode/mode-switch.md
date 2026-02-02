@@ -11,7 +11,7 @@ mode: local
 # Server 模式
 mode: server
 server:
-  url: http://localhost:8050
+  url: http://localhost:8051
 ```
 
 ### 5.2 切换流程

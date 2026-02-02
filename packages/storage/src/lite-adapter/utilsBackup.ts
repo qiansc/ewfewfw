@@ -87,7 +87,7 @@ export async function backup(
              m.status, m.content_hash, m.created_at, m.updated_at
       FROM entities e
       JOIN metadata m ON e.source_project = m.source_project
-        AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+        AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
       ${statusCondition}
     `).all() as Array<{
       id: string;

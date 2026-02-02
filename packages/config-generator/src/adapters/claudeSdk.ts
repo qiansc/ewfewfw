@@ -8,6 +8,10 @@ import { writeFileContent, fileExists, joinPath, readFileContent, ensureDir, cle
 import { dirname } from "node:path";
 import { logger } from "../utils/logger.js";
 import { expandToolPatterns, toClaudeSdkToolNames } from "../toolResolver.js";
+import {
+  loadSkillTemplateContext,
+  renderSkillTemplate,
+} from "../utils/skillTemplate.js";
 
 /**
  * 解析后的 Skill（prompt 已读取）
@@ -28,6 +32,7 @@ async function resolveSkills(
   baseDir: string
 ): Promise<Record<string, ResolvedSkill>> {
   const resolved: Record<string, ResolvedSkill> = {};
+  const context = await loadSkillTemplateContext(baseDir);
 
   for (const [name, skill] of Object.entries(skills)) {
     let prompt: string;
@@ -43,6 +48,8 @@ async function resolveSkills(
     } else {
       prompt = skill.prompt || "";
     }
+
+    prompt = renderSkillTemplate(prompt, context);
 
     resolved[name] = {
       description: skill.description,

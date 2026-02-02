@@ -3,7 +3,7 @@
 
 ### 3.1 `c4a_store_save`（保存/更新实体）
 
-- **输入（建议）**
+- **输入（定义）**
   - `type: "system" | "container" | "component" | "adr" | "contract" | "product" | "process" | "sor"`：实体类型
   - `data?: object`：实体内容（业务数据对象，与 `content` 二选一）
   - `content?: string`：实体内容（YAML/JSON 字符串，与 `data` 二选一，用于 Remote 模式的文件流传输）
@@ -22,7 +22,7 @@
   - `skip_adr_check?: boolean = false`：跳过 ADR 检查（需要特殊权限，用于系统级操作）
   - `ignore_concurrent_warning?: boolean = false`：忽略并发修改警告（用户已确认继续修改）
   - `force_save?: boolean = false`：强制保存（跳过所有警告，需要特殊权限）
-- **返回（JSON，建议）**
+- **返回（JSON，定义）**
   - `success: boolean`
   - `id: string`
   - `status: "draft" | "approved" | "published" | "deprecated" | "archived"`
@@ -98,6 +98,15 @@ interface Warning {
 }
 ```
 
+**Server 端实现说明（2026-02-02）**：
+- 当 `proposal_id` 非空且主分支存在同名实体时，Server 端将 feat 实体 `status` 置为 `archived`（软删除）
+- 物理删除仅发生在：
+  - feat 内新建的实体
+  - 主分支实体（`proposal_id=""`）
+- `data`/`content` 互斥校验已在 Server 端执行（使用 `content` 时要求同时提供 `format`）
+- 当 `id` 缺失时，Server 端按命名规则自动生成（语义化或序号 ID）
+- ADR 检查已在 Server 端实现，支持 `enforce_adr` + `adr_policy`（由 MCP 端读取项目配置传入）
+
 **内部行为（副作用）**：
 
 保存实体时，系统会自动执行以下操作：
@@ -106,6 +115,7 @@ interface Warning {
 |------|------|---------|
 | **引用自动解析** | 解析 `references` 字段中的简单 ID 为完整引用格式，创建 `REFERENCES` 关系 | [cross-reference.md#1.10](../data-ops/cross-reference.md#110-保存时的自动解析) |
 | **悬空引用处理** | 引用的实体不存在时创建悬空引用（`resolved: false`），目标实体创建后自动解析 | [cross-reference.md#1.11](../data-ops/cross-reference.md#111-悬空引用处理) |
+| **层级关系写入** | 根据 `data.system_id` / `data.container_id` 自动写入 `CONTAINS` 关系（System→Container→Component） | [cross-reference.md#1101-保存时的层级关系写入](../data-ops/cross-reference.md#1101-保存时的层级关系写入) |
 | **content_hash 计算** | 自动计算并存储内容哈希（SHA-256），用于同步时的冲突检测 | [sync-export.md#2.3](../data-ops/sync-export.md#23-冲突检测算法) |
 
 > **注意**：这些副作用对调用者透明，但会影响数据库中的关系数据。Agent 无需手动处理引用解析。
@@ -157,7 +167,7 @@ interface Warning {
 
 ### 3.2 `c4a_store_read`（读取实体/列表）
 
-- **输入（建议）**
+- **输入（定义）**
   - `id?: string`
   - `format?: "object" | "yaml" | "json"`：返回格式（默认 `"object"`）
     - `"object"`：返回业务对象（用于程序处理）
@@ -170,7 +180,7 @@ interface Warning {
   - `limit?: number`
   - `include_relations?: boolean`
   - `filter_relations?: object`：关系过滤条件（仅当 `include_relations=true` 时有效）
-- **返回（JSON，建议）**
+- **返回（JSON，定义）**
   - 当 `format="object"`（默认）：单实体或实体列表（按 `id`/`filter` 决定）
   - 当 `format="yaml"` 或 `"json"`：
     ```typescript
@@ -243,7 +253,7 @@ SELECT * FROM ranked WHERE rn = 1;
 
 ### 3.3 `c4a_store_list`（列出实体概要）
 
-- **输入（建议）**
+- **输入（定义）**
   - `filter?: object`：通用过滤条件
   - `type?: "system" | "container" | "component" | "adr" | "product" | "process" | "sor" | "contract" | "all"`：类型筛选
   - `project_id?: string`：按项目 ID 筛选（可选）
@@ -254,7 +264,7 @@ SELECT * FROM ranked WHERE rn = 1;
   - `offset?: number = 0`：分页偏移量
   - `group_by?: "type" | "status"`：分组统计（可选）
   - `count_only?: boolean = false`：仅返回数量统计，不返回实体列表（大型项目推荐）
-- **返回（JSON，建议）**
+- **返回（JSON，定义）**
   - 当 `count_only=true` 时：
     ```typescript
     { total: number; by_type?: Record<string, number>; by_status?: Record<string, number> }
@@ -285,11 +295,11 @@ SELECT * FROM ranked WHERE rn = 1;
 
 ### 3.4 `c4a_store_delete`（删除实体）
 
-- **输入（建议）**
+- **输入（定义）**
   - `id: string`：实体 ID（必需）
   - `proposal_id?: string | null`：feat/提案隔离（默认 null 表示主分支）
   - `force?: boolean = false`：强制删除（跳过关联检查，需要特殊权限）
-- **返回（JSON，建议）**
+- **返回（JSON，定义）**
   - `success: boolean`
   - `id: string`
   - `deleted_relations?: number`：级联删除的关系数量
@@ -357,4 +367,3 @@ SELECT * FROM ranked WHERE rn = 1;
   }
 }
 ```
-

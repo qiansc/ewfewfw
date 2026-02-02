@@ -55,7 +55,7 @@ function buildReferenceLookup(
       SELECT e.id, e.source_project, e.scope, m.source_repo
       FROM entities e
       JOIN metadata m ON e.source_project = m.source_project
-        AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+        AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
       WHERE e.id = ?
         AND (e.proposal_id IS NULL OR e.proposal_id = '' OR e.proposal_id = ?)
     `).all(id, dbProposalId) as Array<{
@@ -290,6 +290,35 @@ export function parseRelations(
     }
   }
 
+  // 自动建立层级关系：System CONTAINS Container / Container CONTAINS Component
+  if (entityType === 'container') {
+    const systemId =
+      (typeof (data as Record<string, unknown>).system_id === 'string'
+        ? (data as Record<string, unknown>).system_id
+        : typeof (data as Record<string, unknown>).system === 'string'
+          ? (data as Record<string, unknown>).system
+          : isPlainObject((data as Record<string, unknown>).system)
+            ? ((data as Record<string, unknown>).system as Record<string, unknown>).id
+            : null) as string | null;
+    if (systemId) {
+      addIncoming(systemId, 'CONTAINS');
+    }
+  }
+
+  if (entityType === 'component') {
+    const containerId =
+      (typeof (data as Record<string, unknown>).container_id === 'string'
+        ? (data as Record<string, unknown>).container_id
+        : typeof (data as Record<string, unknown>).container === 'string'
+          ? (data as Record<string, unknown>).container
+          : isPlainObject((data as Record<string, unknown>).container)
+            ? ((data as Record<string, unknown>).container as Record<string, unknown>).id
+            : null) as string | null;
+    if (containerId) {
+      addIncoming(containerId, 'CONTAINS');
+    }
+  }
+
   const systemData = isPlainObject(data.system) ? (data.system as Record<string, unknown>) : null;
   const sorData = isPlainObject(data.sor) ? (data.sor as Record<string, unknown>) : null;
   const correspondsTo =
@@ -452,23 +481,35 @@ export function persistRelations(
 
   if (proposalId) {
     const mainOutgoing = db.prepare(`
-      SELECT from_project, from_id, to_project, to_id, rel_type, properties
+      SELECT
+        IFNULL(from_project, '') as from_project,
+        from_id,
+        IFNULL(to_project, '') as to_project,
+        to_id,
+        rel_type,
+        properties
       FROM relations
       WHERE (proposal_id IS NULL OR proposal_id = '')
         AND IFNULL(from_project, '') = ?
         AND from_id = ?
         AND (status IS NULL OR status != 'deleted')
     `).all(dbSourceProject, entityId) as Array<{
-      from_project: string | null;
+      from_project: string;
       from_id: string;
-      to_project: string | null;
+      to_project: string;
       to_id: string;
       rel_type: string;
       properties: string | null;
     }>;
 
     const mainConsumers = db.prepare(`
-      SELECT from_project, from_id, to_project, to_id, rel_type, properties
+      SELECT
+        IFNULL(from_project, '') as from_project,
+        from_id,
+        IFNULL(to_project, '') as to_project,
+        to_id,
+        rel_type,
+        properties
       FROM relations
       WHERE (proposal_id IS NULL OR proposal_id = '')
         AND IFNULL(to_project, '') = ?
@@ -476,9 +517,9 @@ export function persistRelations(
         AND rel_type = 'DEPENDS_ON'
         AND (status IS NULL OR status != 'deleted')
     `).all(dbSourceProject, entityId) as Array<{
-      from_project: string | null;
+      from_project: string;
       from_id: string;
-      to_project: string | null;
+      to_project: string;
       to_id: string;
       rel_type: string;
       properties: string | null;

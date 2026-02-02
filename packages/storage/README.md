@@ -19,7 +19,7 @@ Server 模式通过 storage-backend（Python）访问 MongoDB/Neo4j/Milvus。配
 ```yaml
 mode: server
 server:
-  url: http://localhost:8055
+  url: http://localhost:8051
 ```
 
 使用 `getAdapter` 获取适配器：

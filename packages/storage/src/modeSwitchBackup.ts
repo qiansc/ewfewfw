@@ -176,7 +176,7 @@ export class LocalBackup {
              m.source_repo, m.status, m.content_hash, m.created_at, m.updated_at
       FROM entities e
       JOIN metadata m ON e.source_project = m.source_project
-        AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+        AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
     `).all() as RawEntity[];
 
     // 转换为导出格式（修复 legacy 字段）
@@ -218,9 +218,9 @@ export class LocalBackup {
     interface RawRelation {
       id: string;
       proposal_id: string | null;
-      from_project: string | null;
+      from_project: string;
       from_id: string;
-      to_project: string | null;
+      to_project: string;
       to_id: string;
       rel_type: string;
       status: string | null;
@@ -228,7 +228,16 @@ export class LocalBackup {
     }
 
     const rawRelations = db.prepare(`
-      SELECT id, proposal_id, from_project, from_id, to_project, to_id, rel_type, status, properties
+      SELECT
+        id,
+        proposal_id,
+        IFNULL(from_project, '') as from_project,
+        from_id,
+        IFNULL(to_project, '') as to_project,
+        to_id,
+        rel_type,
+        status,
+        properties
       FROM relations
     `).all() as RawRelation[];
 

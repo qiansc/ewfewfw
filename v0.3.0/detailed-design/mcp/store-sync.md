@@ -7,14 +7,14 @@
 >
 > **Server/Remote 模式**：MCP 服务运行在独立进程（Docker 容器或远程服务器），无法访问用户本地 `.context/` 目录。这些模式下使用 `c4a_store_plan_sync` 实现同步（见 3.5.1 节）。
 
-- **输入（建议）**
+- **输入（定义）**
   - `direction: "import" | "export"`
   - `status_filter?: "published" | "approved" | "all" = "published"`：按实体状态筛选
   - `path?: string = ".context"`（⚠️ 需路径安全校验）
   - `format?: "yaml" | "json" = "yaml"`（仅 export 时使用）
   - `mode?: "incremental" | "full" = "incremental"`
   - `conflict_policy?: "warn" | "skip" | "override" | "prompt" = "skip"`（仅 export 时使用）
-- **返回（JSON，建议）**
+- **返回（JSON，定义）**
   - `success: boolean`
   - `stats: { scanned; created; updated; skipped; conflicted; failed }`
   - `details?: object[]`

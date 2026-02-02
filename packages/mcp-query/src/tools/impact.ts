@@ -50,6 +50,7 @@ export async function queryImpactHandler(
       degraded: true,
       degraded_reason: "LOCAL_MODE_SIMPLIFIED",
       degraded_message: "Local 模式使用简化版影响分析，仅基于依赖关系遍历",
+      max_depth_allowed: 1,
       items: result.nodes,
       suggestion: "如需完整的影响分析（含变更类型推断），请使用 Server 模式",
     };

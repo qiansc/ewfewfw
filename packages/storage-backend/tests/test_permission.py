@@ -149,3 +149,27 @@ async def test_cross_project_publish_check():
 
     assert result["allowed"] is False
     assert result["missing"] == ["infra"]
+
+
+@pytest.mark.asyncio
+async def test_allow_project_without_permissions(monkeypatch):
+    monkeypatch.setenv("C4A_PERMISSION_ALLOW_EMPTY", "true")
+    collection = FakeCollection(
+        [
+            {"project_id": "demo", "user_id": "alice", "role": "admin"},
+        ]
+    )
+    service = PermissionService(FakeMongoDBAdapter(collection))
+    assert await service.check_permission("bob", "new-project", "write") is True
+
+
+@pytest.mark.asyncio
+async def test_disallow_project_without_permissions(monkeypatch):
+    monkeypatch.setenv("C4A_PERMISSION_ALLOW_EMPTY", "false")
+    collection = FakeCollection(
+        [
+            {"project_id": "demo", "user_id": "alice", "role": "admin"},
+        ]
+    )
+    service = PermissionService(FakeMongoDBAdapter(collection))
+    assert await service.check_permission("bob", "new-project", "write") is False

@@ -9,6 +9,20 @@ import type { EntityType, EntityStatus, OutputFormat, Entity, Relation } from '.
 // ============================================================
 
 /**
+ * ADR 缺失时的行为
+ */
+export type ADROnMissing = 'error' | 'warning' | 'ignore';
+
+/**
+ * ADR 策略配置
+ */
+export interface ADRPolicyConfig {
+  enforce?: boolean;
+  scope?: Array<'system' | 'container' | 'component'>;
+  on_missing?: ADROnMissing;
+}
+
+/**
  * 保存实体参数
  * 设计文档: store-crud.md §3.1
  */
@@ -21,6 +35,7 @@ export interface SaveParams {
   source_project?: string;
   proposal_id?: string | null;
   enforce_adr?: boolean;
+  adr_policy?: ADRPolicyConfig;
   skip_adr_check?: boolean;
   ignore_concurrent_warning?: boolean;
   force_save?: boolean;

@@ -149,12 +149,12 @@ c4a init  # 选择 mode: local
 # 成员 B: 使用团队共享服务
 c4a install server
 cd team-project
-c4a init  # 选择 mode: server, url: https://c4a.team.com:8050
+c4a init  # 选择 mode: server, url: https://c4a.team.com:8055
 
 # 成员 C: 仅使用远程服务
 # 无需安装本地模式
 cd team-project
-c4a init  # 选择 mode: remote, url: https://c4a.team.com:8050
+c4a init  # 选择 mode: remote, url: https://c4a.team.com:8055
 ```
 
 **日常使用**：

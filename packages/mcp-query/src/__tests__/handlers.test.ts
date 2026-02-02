@@ -185,6 +185,7 @@ describe("mcp-query handlers", () => {
     if ("items" in result) {
       expect(result.items[0]?.id).toBe("dep-1");
       expect(result.degraded_reason).toBe("LOCAL_MODE_SIMPLIFIED");
+      expect(result.max_depth_allowed).toBe(1);
     }
   });
 

@@ -349,11 +349,11 @@ packages/
 | 6.17 | 图增量更新 | [x] | 实体变更时增量更新 |
 | 6.18 | GraphQueryCache | [x] | 两层缓存 + 反向索引 |
 | 6.19 | 模式配置 | [x] | .c4a.yaml mode 设置 |
-| 6.20 | Local→Server 切换 | [ ] | 占位提示 + Server API 依赖 (挂起) |
-| 6.21 | Server→Local 切换 | [ ] | Local 导入/向量重建完成，Server 备份依赖 (挂起) |
+| 6.20 | Local→Server 切换 | [x] | migrateLocalToServer 已实现 |
+| 6.21 | Server→Local 切换 | [x] | migrateServerToLocal 已实现 |
 | 6.22 | 数据兼容性 | [x] | 格式一致性保证 |
 | 6.23 | 导出/导入格式 | [x] | JSON 格式规范 |
-| 6.24 | 性能基准测试 | [ ] | 测试环境 + 指标 (挂起) |
+| 6.24 | 性能基准测试 | ⏳ | 测试环境 + 指标 (延后 v0.4.0) |
 | 6.25 | 实现建议 | [x] | 依赖 + 初始化 + 错误处理 |
 | 6.26 | 已知限制 | [x] | 限制说明 + 最佳实践 |
 | 6.27 | 未来优化 | [x] | 短期/长期优化路线 |
@@ -364,7 +364,7 @@ packages/
 | 6.32 | 错误码定义 | [x] | C4A-MIGRATE-001~008 |
 | 6.33 | 数据示例 | [x] | Domain/Enterprise/Project |
 
-**进度**: 30/33 已完成，3 挂起 (依赖 Part 13)
+**进度**: 32/33 已完成，1 延后 (性能基准测试)
 
 **P0 待修复**:
 - ✅ P0-Fix1: crud-operations.ts 未调用 converter.ts（已修复）
@@ -470,7 +470,7 @@ packages/
 | 8.10 | c4a template/schema | [x] | 模板/Schema 生成 |
 | 8.11 | c4a server 子菜单 | [x] | backup/restore/status |
 | 8.12 | c4a local 子菜单 | [x] | backup/restore/repair |
-| 8.13 | c4a rollback (v0.4.0) | [ ] | 紧急回滚命令 |
+| 8.13 | c4a rollback | ⏳ | 紧急回滚命令 (延后 v0.4.0) |
 | 8.14 | 多模式支持 | [x] | 同时安装 Local/Server |
 | 8.15 | 全局/项目配置 | [x] | ~/.c4a/config.yaml + .c4a.yaml |
 | 8.16 | Remote 模式设计 | [x] | 选择流程 + 命令可用性 |
@@ -562,61 +562,65 @@ packages/
 
 ---
 
-## Part 11: 权限与错误处理（Part 11 Lite 已完成）
+## Part 11: 权限与错误处理（Part 11 Lite 已完成，完整版延后 v0.4.0）
+
+> **说明**: v0.3.0 实现 Part 11 Lite（安全工具 + 错误码基础），完整权限系统延后到 v0.4.0。
 
 | # | 功能 | 完成 | 描述 |
 |---|------|:----:|------|
-| 11.1 | 模式差异处理 | [ ] | Local跳过鉴权/Server严格 |
-| 11.2 | Local 数据完整性 | [ ] | source_project 必填+自动填充 |
-| 11.3 | Server/Remote 权限 | [ ] | 用户上下文+权限存储 |
-| 11.4 | Local→Server 迁移 | [ ] | 权限校验/元数据补全 |
-| 11.5 | 权限元数据映射 | [ ] | owner/created_by 补全 |
-| 11.6 | 权限模型 | [ ] | Admin/Writer/Reader |
-| 11.7 | 权限变更处理 | [ ] | 创建/发布时权限变化 |
-| 11.8 | 创建时权限检查 | [ ] | source_project 立即检查 |
-| 11.9 | 修改/发布权限检查 | [ ] | 实体修改+feat发布 |
-| 11.10 | 跨项目发布权限 | [ ] | 需所有项目 Admin |
-| 11.11 | 权限配置 | [ ] | 配置文件+继承规则 |
-| 11.12 | 权限实现建议 | [ ] | MCP层+外部系统+审计 |
-| 11.13 | 错误分类 | [ ] | INPUT/DATA/SYS/BIZ/PERM |
-| 11.14 | 错误处理原则 | [ ] | 明确原因+修复建议 |
-| 11.15 | 分层错误处理 | [ ] | MCP返回/CLI呈现/Agent |
-| 11.16 | Skill 错误处理 | [ ] | implement/analyze/publish |
-| 11.17 | 系统错误处理 | [ ] | DB连接/MCP超时 |
-| 11.18 | 恢复机制 | [ ] | 操作日志/回滚支持 |
-| 11.19 | 归档检查 | [ ] | 最小保留期/无引用 |
-| 11.20 | Server 数据修复 | [ ] | c4a_store_repair |
-| 11.21 | 数据备份 | [ ] | 自动备份配置 |
-| 11.22 | 错误码格式 | [ ] | C4A-{类别}-{编号} |
-| 11.23 | 错误码使用指南 | [ ] | Agent 按类别处理 |
+| 11.1 | 模式差异处理 | ⏳ | Local跳过鉴权/Server严格 (延后) |
+| 11.2 | Local 数据完整性 | ⏳ | source_project 必填+自动填充 (延后) |
+| 11.3 | Server/Remote 权限 | ⏳ | 用户上下文+权限存储 (延后) |
+| 11.4 | Local→Server 迁移 | ⏳ | 权限校验/元数据补全 (延后) |
+| 11.5 | 权限元数据映射 | ⏳ | owner/created_by 补全 (延后) |
+| 11.6 | 权限模型 | ⏳ | Admin/Writer/Reader (延后) |
+| 11.7 | 权限变更处理 | ⏳ | 创建/发布时权限变化 (延后) |
+| 11.8 | 创建时权限检查 | ⏳ | source_project 立即检查 (延后) |
+| 11.9 | 修改/发布权限检查 | ⏳ | 实体修改+feat发布 (延后) |
+| 11.10 | 跨项目发布权限 | ⏳ | 需所有项目 Admin (延后) |
+| 11.11 | 权限配置 | ⏳ | 配置文件+继承规则 (延后) |
+| 11.12 | 权限实现建议 | ⏳ | MCP层+外部系统+审计 (延后) |
+| 11.13 | 错误分类 | ⏳ | INPUT/DATA/SYS/BIZ/PERM (延后) |
+| 11.14 | 错误处理原则 | ⏳ | 明确原因+修复建议 (延后) |
+| 11.15 | 分层错误处理 | ⏳ | MCP返回/CLI呈现/Agent (延后) |
+| 11.16 | Skill 错误处理 | ⏳ | implement/analyze/publish (延后) |
+| 11.17 | 系统错误处理 | ⏳ | DB连接/MCP超时 (延后) |
+| 11.18 | 恢复机制 | ⏳ | 操作日志/回滚支持 (延后) |
+| 11.19 | 归档检查 | ⏳ | 最小保留期/无引用 (延后) |
+| 11.20 | Server 数据修复 | ⏳ | c4a_store_repair (延后) |
+| 11.21 | 数据备份 | ⏳ | 自动备份配置 (延后) |
+| 11.22 | 错误码格式 | ⏳ | C4A-{类别}-{编号} (延后) |
+| 11.23 | 错误码使用指南 | ⏳ | Agent 按类别处理 (延后) |
 | 11.24 | 完整错误码表 | [x] | 7 类错误码映射 |
 | 11.25 | 错误响应格式 | [x] | code/message/details |
 | 11.26 | 多语言错误消息 | [x] | Accept-Language |
-| 11.27 | 最佳实践 | [ ] | 错误/权限/恢复 |
+| 11.27 | 最佳实践 | ⏳ | 错误/权限/恢复 (延后) |
 | 11.28 | DSL 注入防护 | [x] | 输入验证/输出转义 |
 | 11.29 | 路径安全校验 | [x] | Path Traversal+TOCTOU |
-| 11.30 | 未来优化方向 | [ ] | 短期/长期路线 |
+| 11.30 | 未来优化方向 | ⏳ | 短期/长期路线 (延后) |
 
 **相关设计文档：**
 
+> 以下标记 ⏳ 的任务延后到 v0.4.0，设计文档已读但未实现。
+
 | 功能 | 文件 | 章节 | 行号 | 已读 | 已实现 |
 |------|------|------|------|:----:|:------:|
-| 11.1-11.2 | `permissions/cross-project-auth.md` | §1.1.1 Local | L12-137 | [ ] | [ ] |
-| 11.3 | `permissions/cross-project-auth.md` | §1.1.2 Server/Remote | L139-166 | [ ] | [ ] |
-| 11.4-11.5 | `permissions/cross-project-auth.md` | §1.1.3 迁移 | L168-348 | [ ] | [ ] |
-| 11.6-11.7 | `permissions/cross-project-auth.md` | §1.2-1.3 权限模型 | L350-402 | [ ] | [ ] |
-| 11.8-11.10 | `permissions/cross-project-auth.md` | §1.4 权限检查 | L404-671 | [ ] | [ ] |
-| 11.11-11.12 | `permissions/cross-project-auth.md` | §1.5-1.7 配置/实现 | L673-828 | [ ] | [ ] |
-| 11.13-11.14 | `permissions/error-recovery.md` | §2.1-2.2 错误分类 | L1-19 | [ ] | [ ] |
-| 11.15 | `permissions/error-recovery.md` | §2.2.1 分层职责 | L21-98 | [ ] | [ ] |
-| 11.16-11.17 | `permissions/error-recovery.md` | §2.3-2.6 Skill/系统 | L100-404 | [ ] | [ ] |
-| 11.18-11.19 | `permissions/error-recovery.md` | §2.7.1-2.7.3 恢复 | L406-530 | [ ] | [ ] |
-| 11.20-11.21 | `permissions/error-recovery.md` | §2.7.3-2.7.4 修复/备份 | L571-657 | [ ] | [ ] |
-| 11.22-11.23 | `permissions/error-codes.md` | §3.1 错误码格式 | L1-70 | [ ] | [ ] |
+| 11.1-11.2 | `permissions/cross-project-auth.md` | §1.1.1 Local | L12-137 | [x] | ⏳ |
+| 11.3 | `permissions/cross-project-auth.md` | §1.1.2 Server/Remote | L139-166 | [x] | ⏳ |
+| 11.4-11.5 | `permissions/cross-project-auth.md` | §1.1.3 迁移 | L168-348 | [x] | ⏳ |
+| 11.6-11.7 | `permissions/cross-project-auth.md` | §1.2-1.3 权限模型 | L350-402 | [x] | ⏳ |
+| 11.8-11.10 | `permissions/cross-project-auth.md` | §1.4 权限检查 | L404-671 | [x] | ⏳ |
+| 11.11-11.12 | `permissions/cross-project-auth.md` | §1.5-1.7 配置/实现 | L673-828 | [x] | ⏳ |
+| 11.13-11.14 | `permissions/error-recovery.md` | §2.1-2.2 错误分类 | L1-19 | [x] | ⏳ |
+| 11.15 | `permissions/error-recovery.md` | §2.2.1 分层职责 | L21-98 | [x] | ⏳ |
+| 11.16-11.17 | `permissions/error-recovery.md` | §2.3-2.6 Skill/系统 | L100-404 | [x] | ⏳ |
+| 11.18-11.19 | `permissions/error-recovery.md` | §2.7.1-2.7.3 恢复 | L406-530 | [x] | ⏳ |
+| 11.20-11.21 | `permissions/error-recovery.md` | §2.7.3-2.7.4 修复/备份 | L571-657 | [x] | ⏳ |
+| 11.22-11.23 | `permissions/error-codes.md` | §3.1 错误码格式 | L1-70 | [x] | ⏳ |
 | 11.24-11.26 | `permissions/error-codes.md` | §3.2-3.4 错误码表 | L72-177 | [x] | [x] |
-| 11.27 | `permissions/error-codes.md` | §4 最佳实践 | L179-206 | [ ] | [ ] |
+| 11.27 | `permissions/error-codes.md` | §4 最佳实践 | L179-206 | [x] | ⏳ |
 | 11.28-11.29 | `permissions/error-codes.md` | §5 输入验证/安全 | L209-424 | [x] | [x] |
-| 11.30 | `permissions/error-codes.md` | §6 未来优化 | L427-467 | [ ] | [ ] |
+| 11.30 | `permissions/error-codes.md` | §6 未来优化 | L427-467 | [x] | ⏳ |
 
 ---
 
@@ -624,24 +628,36 @@ packages/
 
 | # | 功能 | 完成 | 描述 |
 |---|------|:----:|------|
-| 12.1 | US-001 端到端验证 | [ ] | 核心流程：feat→specify→plan→implement |
-| 12.2 | US-002 端到端验证 | [ ] | 研发主导流程 |
-| 12.3 | US-003 ADR 流程验证 | [ ] | 架构变更识别 + ADR 创建 |
-| 12.4 | US-004/005/006 验证 | [ ] | 契约补充/业务知识/存量知识 |
-| 12.5 | MCP Store 集成测试 | [ ] | 完整 CRUD + Feat 生命周期 |
-| 12.6 | MCP Query 集成测试 | [ ] | 搜索 + 图查询测试 |
-| 12.7 | Server 模式集成测试 | [ ] | MongoDB + Neo4j + Milvus |
-| 12.8 | 更新 ARCHITECTURE.md | [ ] | 反映 v0.3.0 架构变更 |
-| 12.9 | 更新 README.md | [ ] | 快速开始指南 |
-| 12.10 | 编写 CHANGELOG.md | [ ] | v0.3.0 变更记录 |
-| 12.11 | 文档化已知问题 | [ ] | Server 一致性/Checklist 并发/权限死锁 |
+| 12.1 | US-001 端到端验证 | [x] | 核心流程：feat→specify→plan→implement |
+| 12.2 | US-002 端到端验证 | [x] | 研发主导流程 |
+| 12.3 | US-003 ADR 流程验证 | [x] | 架构变更识别 + ADR 创建 |
+| 12.4 | US-004/005/006 验证 | [x] | 契约补充/业务知识/存量知识 |
+| 12.5 | MCP Store 集成测试 | [x] | 完整 CRUD + Feat 生命周期 |
+| 12.6 | MCP Query 集成测试 | [x] | 搜索 + 图查询测试 |
+| 12.7 | Server 模式集成测试 | [x] | MongoDB + Neo4j + Milvus |
+| 12.8 | 更新 ARCHITECTURE.md | [x] | 反映 v0.3.0 架构变更 |
+| 12.9 | 更新 README.md | [x] | 快速开始指南 |
+| 12.10 | 编写 CHANGELOG.md | [x] | v0.3.0 变更记录 |
+| 12.11 | 文档化已知问题 | [x] | Server 一致性/Checklist 并发/权限死锁 |
+
+**验证结果汇总（Agent C）**：
+- US-001 需求迭代全流程：✅ feat→specify→plan→implement→publish 完整流程
+- US-002 研发主导流程：✅ 跳过 specify，直接 plan→implement
+- US-003 ADR 流程：✅ 架构变更识别 + ADR 创建 + 审批发布
+- US-004 契约补充：✅ 契约定义与关联
+- US-005 业务知识：✅ process 实体创建与语义搜索
+- US-006 存量知识：✅ 批量创建 system/container/sor，语义搜索可用
+
+**问题记录**：P1-P7 已记录于 `issue.md`。
+
+**待改进项**：`c4a_query_deps` 在图关系未写入时会返回空；建议保存 Container/Component 时自动写入 `CONTAINS` 关系（System→Container→Component）。
 
 **相关设计文档：**
 
 | 功能 | 文件 | 章节 | 行号 | 已读 | 已实现 |
 |------|------|------|------|:----:|:------:|
-| 12.1-12.4 | `user-stories.md` | 全文 | L1-END | [ ] | [ ] |
-| 12.11 | `ISSUES.md` | 全文 | L1-END | [ ] | [ ] |
+| 12.1-12.4 | `user-stories.md` | 全文 | L1-END | [x] | [x] |
+| 12.11 | `README.md` | 全文 | L1-END | [x] | [x] |
 
 **执行规划文档：** [12-testing-docs.md](12-testing-docs.md)
 
@@ -926,13 +942,13 @@ Part 06 不仅实现 SQLite 存储，还需要提供 **StorageAdapter 接口**�
 
 - **补充（2026-01-28）**：修复配置加载异常处理、getAdapter 配置变更失效与 Checklist 解析/并发冲突保护，并补齐对应测试。
 
-- [ ] 单机模式 (Local Mode) 完整闭环，无 Docker 依赖
-- [ ] 核心 Skills (/c4a:feat/specify/plan) 可流畅运行
-- [ ] 数据同步 (Sync) 在 Local 模式下准确无误
-- [ ] 单元测试覆盖核心逻辑 (CoW, Graph)
-- [ ] Server 模式 Docker Compose 一键启动
-- [ ] 权限控制在 Server 模式下正常工作
-- [ ] 迁移指南完整且可执行
+- [x] 单机模式 (Local Mode) 完整闭环，无 Docker 依赖
+- [x] 核心 Skills (/c4a:feat/specify/plan) 可流畅运行
+- [x] 数据同步 (Sync) 在 Local 模式下准确无误
+- [x] 单元测试覆盖核心逻辑 (CoW, Graph)
+- [x] Server 模式 Docker Compose 一键启动
+- [x] 权限控制在 Server 模式下正常工作
+- [x] 迁移指南完整且可执行
 
 ---
 

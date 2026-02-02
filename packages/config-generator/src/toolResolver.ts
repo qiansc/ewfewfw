@@ -39,15 +39,7 @@ const KNOWN_TOOLS: Record<string, string[]> = {
   ],
   c4a_visual: [
     "c4a_visual_generate",
-    "c4a_visual_render",
-    "c4a_visual_list_templates",
-    "c4a_visual_render_template",
-    "c4a_visual_save",
-    "c4a_visual_get_reference",
     "c4a_visual_render_c4",
-    "c4a_visual_cleanup",
-    "c4a_visual_storage_stats",
-    "c4a_visual_get_style",
   ],
 };
 

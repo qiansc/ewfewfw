@@ -171,18 +171,20 @@ export class InMemoryGraph {
         )
         : db.prepare(query).all()
     ) as Array<{
-      from_project: string | null;
+      from_project: string;
       from_id: string;
-      to_project: string | null;
+      to_project: string;
       to_id: string;
       rel_type: string;
     }>;
 
     for (const rel of relations) {
+      const fromProject = rel.from_project === '' ? null : rel.from_project;
+      const toProject = rel.to_project === '' ? null : rel.to_project;
       this.addRelation(
-        rel.from_project || null,
+        fromProject,
         rel.from_id,
-        rel.to_project || null,
+        toProject,
         rel.to_id,
         rel.rel_type
       );

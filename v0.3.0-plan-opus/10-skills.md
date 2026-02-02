@@ -89,6 +89,7 @@ Part 10 实现 Skills 体系，包括 7 个公开 Skills（5 个工作流 + 2 �
 | 10.36 | prompts/c4a.md 更新 | [x] | Skills 路由逻辑 |
 | 10.37 | CLAUDE.md 更新 | [x] | Skills 使用指南 |
 | 10.38 | 单元测试 | [x] | Skill 文件格式验证 |
+| 10.39 | Claude Code Skills 注册 | [ ] | `.mcp.json` 与 `.claude/settings.local.json` 对齐 |
 
 ---
 
@@ -139,6 +140,8 @@ Part 10 实现 Skills 体系，包括 7 个公开 Skills（5 个工作流 + 2 �
 | Agent 提示词 | `prompts/c4a.md` | Skills 路由逻辑 | ✅ |
 | 项目文档 | `CLAUDE.md` | Skills 使用指南 | ✅ |
 | 测试文件 | `prompts/__tests__/skill-format.test.ts` | Skill 文件格式验证 | ✅ |
+| 配置文件 | `.mcp.json` | Claude Code MCP 服务配置更新 | ⏳ |
+| 配置文件 | `.claude/settings.local.json` | enabledMcpjsonServers 对齐 | ⏳ |
 
 ---
 

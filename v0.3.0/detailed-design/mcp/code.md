@@ -1,5 +1,14 @@
 # 知识采集类：`c4a_extract_*`（c4a-extract-mcp）
 
+## 2.0 路径限制与环境变量
+
+- `C4A_EXTRACT_ROOT`：限制 `path` 只能在该目录内（越界直接拒绝）
+- `C4A_CODE_ROOT`：通用根目录（当未设置 `C4A_EXTRACT_ROOT` 时生效）
+- **优先级**：`C4A_EXTRACT_ROOT` → `C4A_CODE_ROOT` → 不限制
+- **Tree-sitter WASM 通用命名**：`C4A_TREE_SITTER_{LANG}_WASM`
+  - `LANG` 与工具语言标识一致（如 `go`、`python`）
+  - 也可使用 `C4A_TREE_SITTER_WASM_DIR` 指定统一目录
+
 ## 2.1 `c4a_extract_interfaces`（从代码中提取接口/类型/类）
 
 - **输入**

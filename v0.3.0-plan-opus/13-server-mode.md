@@ -279,6 +279,9 @@ Server Mode 模块实现团队协作的服务器模式，包括：
 
 ServerAdapter 当前使用的 HTTP 路径：/entities/*、/search、/graph/*、/feat/*、/utils/*、/sync*，storage-backend 路由建议保持一致（见 server-adapter.ts (line 182)）。
 
+**补充（2026-02-02）**：
+- `/feat/checklist` 的 `generate` 需支持可选 `items`，用于一次性生成带任务的 checklist
+
 
 1. 阅读设计文档：
    - v0.3.0/architecture.md §1.1（Server 模式：Python 封装数据库访问）
@@ -671,6 +674,7 @@ ServerAdapter 当前使用的 HTTP 路径：/entities/*、/search、/graph/*、/
    - checkWrite(): 检查写权限
    - checkApprove(): 检查批准权限
    - listPermissions(): 列出项目权限
+   - **补充**：空权限表的 dev/test 处理（`C4A_PERMISSION_ALLOW_EMPTY`）
 
    ```python
    class PermissionService:
@@ -680,6 +684,11 @@ ServerAdapter 当前使用的 HTTP 路径：/entities/*、/search、/graph/*、/
        async def check_permission(
            self, user_id: str, project_id: str, action: str
        ) -> bool:
+           if os.getenv("C4A_PERMISSION_ALLOW_EMPTY") == "true":
+               total = await self.permissions.count_documents({})
+               if total == 0:
+                   return True
+
            permission = await self.permissions.find_one({
                "user_id": user_id,
                "project_id": project_id,

@@ -33,4 +33,6 @@ export function now(): string {
   return new Date().toISOString();
 }
 
+export * from "./id.js";
 export * from "./security.js";
+export * from "./hash.js";

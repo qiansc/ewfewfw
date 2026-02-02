@@ -22,7 +22,7 @@ export async function handleBackup(params: {
     typeof options.format === "string" && ["tar.gz", "json"].includes(options.format)
       ? options.format
       : "tar.gz";
-  const client = createMcpClient({ baseUrl: config?.server?.url, transport: "stdio" });
+  const client = createMcpClient({ baseUrl: config?.server?.url, transport: "http" });
   io.log("正在备份服务器数据...");
   const result = await client.request<{
     success: boolean;
@@ -104,7 +104,7 @@ export async function handleRestore(params: {
     typeof options["conflict-policy"] === "string" ? options["conflict-policy"] : "skip";
   const validateChecksums =
     typeof options["validate-checksums"] === "string" ? options["validate-checksums"] !== "false" : true;
-  const client = createMcpClient({ baseUrl: config?.server?.url, transport: "stdio" });
+  const client = createMcpClient({ baseUrl: config?.server?.url, transport: "http" });
   io.log("正在恢复服务器数据...");
   const result = await client.request<{
     success: boolean;

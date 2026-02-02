@@ -22,6 +22,14 @@ export interface StoreFeatChecklistInput {
   action: ChecklistAction;
   feat_id: string;
   source?: "technical_spec";
+  items?: Array<{
+    id: string;
+    title?: string;
+    status?: string;
+    type?: string;
+    entity_id?: string;
+    assignee?: string;
+  }>;
   patches?: ChecklistPatch[];
   validate?: boolean;
 }
@@ -47,6 +55,7 @@ export async function storeFeatChecklistHandler(
     action: args.action,
     feat_id: args.feat_id,
     source: args.source,
+    items: args.items,
     patches: args.patches,
     validate: args.validate ?? true,
   });

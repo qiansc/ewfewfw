@@ -99,7 +99,7 @@ export async function statusCommand(
   const serverUrl = mode === "server" ? projectConfig?.server?.url : undefined;
   const baseUrl = remoteUrl ?? serverUrl;
   const transport: McpTransport =
-    mode === "remote" ? "http" : mode === "server" ? "stdio" : "local";
+    mode === "remote" || mode === "server" ? "http" : "local";
 
   let listResult: ListResult | null = null;
   let listError: unknown = null;

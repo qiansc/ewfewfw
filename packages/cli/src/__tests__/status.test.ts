@@ -17,7 +17,7 @@ describe("statusCommand", () => {
           project_id: "demo",
           repo_id: "acme/demo",
           mode: "remote",
-          remote: { url: "https://c4a.example.com:8050" },
+          remote: { url: "https://c4a.example.com:8055" },
           skills: { cursor: true, claude: false, opencode: true },
         }) satisfies ProjectConfig,
       createMcpClient: (_options: { baseUrl?: string; transport?: McpTransport }): McpClientLike => ({

@@ -49,11 +49,7 @@ export class SQLiteStore {
   private ftsEnabled: boolean = false;
 
   private constructor(config: SQLiteStoreConfig = {}) {
-    this.config = {
-      dbPath: config.dbPath || join(process.cwd(), '.context', 'c4a.db'),
-      readonly: config.readonly || false,
-      busyTimeout: config.busyTimeout || 5000,
-    };
+    this.config = SQLiteStore.normalizeConfig(config);
 
     // 确保目录存在
     const dbDir = dirname(this.config.dbPath);
@@ -78,6 +74,22 @@ export class SQLiteStore {
     if (!this.config.readonly) {
       this.createTables();
     }
+  }
+
+  private static normalizeConfig(config: SQLiteStoreConfig = {}): Required<SQLiteStoreConfig> {
+    return {
+      dbPath: config.dbPath ?? join(process.cwd(), '.context', 'c4a.db'),
+      readonly: config.readonly ?? false,
+      busyTimeout: config.busyTimeout ?? 5000,
+    };
+  }
+
+  private isConfigCompatible(config: Required<SQLiteStoreConfig>): boolean {
+    return (
+      this.config.dbPath === config.dbPath &&
+      this.config.readonly === config.readonly &&
+      this.config.busyTimeout === config.busyTimeout
+    );
   }
 
   /**
@@ -131,6 +143,23 @@ export class SQLiteStore {
    */
   private createFtsTables(): void {
     try {
+      const buildSearchText = (prefix: string): string =>
+        [
+          `COALESCE(json_extract(${prefix}.data, '$.name'), '')`,
+          `COALESCE(json_extract(${prefix}.data, '$.description'), '')`,
+          `COALESCE(json_extract(${prefix}.data, '$.tags'), '')`,
+          `COALESCE(json_extract(${prefix}.data, '$.adr.title'), '')`,
+          `COALESCE(json_extract(${prefix}.data, '$.context'), '')`,
+          `COALESCE(json_extract(${prefix}.data, '$.decision'), '')`,
+          `COALESCE(json_extract(${prefix}.data, '$.consequences.positive'), '')`,
+          `COALESCE(json_extract(${prefix}.data, '$.consequences.negative'), '')`,
+          `COALESCE(json_extract(${prefix}.data, '$.consequences.neutral'), '')`,
+          `COALESCE(json_extract(${prefix}.data, '$.alternatives'), '')`,
+          `COALESCE(json_extract(${prefix}.data, '$.process.name'), '')`,
+          `COALESCE(json_extract(${prefix}.data, '$.process.description'), '')`,
+          `COALESCE(json_extract(${prefix}.data, '$.process.tags'), '')`,
+        ].join(" || ' ' || ");
+
       this.db.exec(`
         CREATE VIRTUAL TABLE IF NOT EXISTS entities_fts USING fts5(
           entity_id UNINDEXED,
@@ -149,9 +178,7 @@ export class SQLiteStore {
             NEW.id,
             NEW.source_project,
             NEW.proposal_id,
-            COALESCE(json_extract(NEW.data, '$.name'), '') || ' ' ||
-            COALESCE(json_extract(NEW.data, '$.description'), '') || ' ' ||
-            COALESCE(json_extract(NEW.data, '$.tags'), '');
+            ${buildSearchText('NEW')};
         END;
       `);
 
@@ -167,9 +194,7 @@ export class SQLiteStore {
             NEW.id,
             NEW.source_project,
             NEW.proposal_id,
-            COALESCE(json_extract(NEW.data, '$.name'), '') || ' ' ||
-            COALESCE(json_extract(NEW.data, '$.description'), '') || ' ' ||
-            COALESCE(json_extract(NEW.data, '$.tags'), '');
+            ${buildSearchText('NEW')};
         END;
       `);
 
@@ -181,6 +206,17 @@ export class SQLiteStore {
             AND source_project = OLD.source_project
             AND proposal_id = OLD.proposal_id;
         END;
+      `);
+
+      this.db.exec(`
+        DELETE FROM entities_fts;
+        INSERT INTO entities_fts(entity_id, source_project, proposal_id, search_text)
+        SELECT
+          e.id,
+          e.source_project,
+          e.proposal_id,
+          ${buildSearchText('e')}
+        FROM entities e;
       `);
     } catch {
       this.ftsEnabled = false;
@@ -365,6 +401,12 @@ export class SQLiteStore {
       CREATE INDEX IF NOT EXISTS idx_relations_type ON relations(rel_type);
     `);
 
+    this.db.exec(`
+      UPDATE relations SET proposal_id = '' WHERE proposal_id IS NULL;
+      UPDATE relations SET from_project = '' WHERE from_project IS NULL;
+      UPDATE relations SET to_project = '' WHERE to_project IS NULL;
+    `);
+
     try {
       this.db.exec(`ALTER TABLE relations ADD COLUMN status TEXT DEFAULT 'active';`);
     } catch {
@@ -461,6 +503,8 @@ export class SQLiteStore {
 
       CREATE INDEX IF NOT EXISTS idx_graph_cache_expires ON graph_cache(expires_at);
     `);
+
+    this.cleanupGraphCache();
 
     // 全文搜索索引表（USearch 降级方案）
     // 设计文档: sqlite-schema.md §2.3.2
@@ -575,6 +619,13 @@ export class SQLiteStore {
         this.closeInstance();
         process.exit(0);
       });
+    } else if (config) {
+      const normalized = SQLiteStore.normalizeConfig(config);
+      if (!this.instance.isConfigCompatible(normalized)) {
+        throw new Error(
+          'SQLiteStore 已初始化，新的配置与当前实例不一致。请先调用 close() 或 closeInstance() 重新初始化。'
+        );
+      }
     }
     return this.instance;
   }
@@ -602,6 +653,17 @@ export class SQLiteStore {
   }
 
   /**
+   * 清理过期图查询缓存
+   */
+  cleanupGraphCache(now: string = new Date().toISOString()): void {
+    this.db
+      .prepare(
+        `DELETE FROM graph_cache WHERE expires_at IS NOT NULL AND expires_at <= ?`
+      )
+      .run(now);
+  }
+
+  /**
    * 获取原生数据库对象 (用于高级操作)
    */
   getDatabase(): Database {
@@ -622,7 +684,7 @@ export class SQLiteStore {
       SELECT e.id, e.source_project, e.proposal_id, e.data, m.status
       FROM entities e
       JOIN metadata m ON e.source_project = m.source_project
-        AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+        AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
       WHERE m.status NOT IN ('archived', 'deprecated')
     `);
 

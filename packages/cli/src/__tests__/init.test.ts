@@ -62,7 +62,7 @@ describe("initCommand", () => {
       process.chdir(dir);
       try {
         const prompter = createPrompter({
-          inputs: ["my-project", "", "https://c4a.example.com:8050"],
+          inputs: ["my-project", "", "https://c4a.example.com:8055"],
           confirms: [false, false],
           selects: ["remote", "cursor"],
         });
@@ -77,12 +77,12 @@ describe("initCommand", () => {
         expect(projectConfig?.project_id).toBe("my-project");
         expect(projectConfig?.repo_id).toBe("https://github.com/company/my-repo");
         expect(projectConfig?.mode).toBe("remote");
-        expect(projectConfig?.remote?.url).toBe("https://c4a.example.com:8050");
+        expect(projectConfig?.remote?.url).toBe("https://c4a.example.com:8055");
 
         const cursorConfigPath = join(dir, ".cursor", "mcp.json");
         const cursorConfig = JSON.parse(await readFile(cursorConfigPath, "utf-8"));
         expect(cursorConfig.mcpServers["c4a-store-mcp"].url).toBe(
-          "https://c4a.example.com:8050/mcp"
+          "https://c4a.example.com:8055/mcp"
         );
 
         const rulesContent = await readFile(join(dir, ".cursorrules"), "utf-8");

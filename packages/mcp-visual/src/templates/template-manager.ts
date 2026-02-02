@@ -3,6 +3,7 @@
  *
  * 支持变量替换（Handlebars）和模板继承
  */
+import { safeReadFile } from "@c4a/core/utils";
 import Handlebars from "handlebars";
 import { parse as parseYaml } from "yaml";
 import { config } from "../config.js";
@@ -12,7 +13,7 @@ import type {
   TemplateCategory,
   RenderTemplateResult,
 } from "../types/index.js";
-import { readFile, readdir } from "fs/promises";
+import { readdir } from "fs/promises";
 import { join, resolve } from "path";
 import { existsSync } from "fs";
 
@@ -44,7 +45,7 @@ export async function loadIndex(): Promise<TemplateIndex> {
   }
 
   try {
-    const content = await readFile(indexPath, "utf-8");
+    const content = (await safeReadFile("templates.yaml", templatesPath)).toString("utf-8");
     indexCache = parseYaml(content) as TemplateIndex;
     return indexCache;
   } catch {
@@ -139,7 +140,7 @@ export async function getTemplate(templateId: string): Promise<string> {
     throw new Error(`Template file not found: ${templatePath}`);
   }
 
-  const content = await readFile(templatePath, "utf-8");
+  const content = (await safeReadFile(templateDef.file, templatesPath)).toString("utf-8");
 
   // 处理模板继承
   const processedContent = await processInheritance(content, templatesPath);
@@ -163,8 +164,7 @@ async function processInheritance(
     return content;
   }
 
-  const parentPath = join(basePath, extendsMatch[1]);
-  const parentContent = await readFile(parentPath, "utf-8");
+  const parentContent = (await safeReadFile(extendsMatch[1], basePath)).toString("utf-8");
 
   // 移除 extends 头部
   const childContent = content.replace(extendsMatch[0], "");

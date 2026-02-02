@@ -33,7 +33,7 @@ describe('validateConfig', () => {
       project_id: 'my-project',
       mode: 'server',
       server: {
-        url: 'http://localhost:8050',
+        url: 'http://localhost:8055',
       },
     };
     const result = validateConfig(config);
@@ -47,7 +47,7 @@ describe('validateConfig', () => {
       project_id: 'my-project',
       mode: 'remote',
       remote: {
-        url: 'https://c4a.example.com:8050',
+        url: 'https://c4a.example.com:8055',
       },
     };
     const result = validateConfig(config);

@@ -35,37 +35,32 @@
 
 | 任务 | 功能 | 实现文件 | 状态 |
 |------|------|----------|:----:|
-| 3.11 | c4a_store_feat_lifecycle | `tools/store/featLifecycle.ts` | ✅ |
-| 3.12 | c4a_store_feat_merge | `tools/store/featMerge.ts` | ✅ |
+| 3.11 | c4a_store_feat_lifecycle | `tools/featLifecycle.ts` | ✅ |
+| 3.12 | c4a_store_feat_merge | `tools/featMerge.ts` | ✅ |
 
 **相关修改**：
-- `store/adapter.ts` - 添加 `featLifecycle()` 和 `featMerge()` 方法及类型
-- `store/lite-adapter.ts` - LiteAdapter 实现 feat 相关方法
-- `store/sqlite-store.ts` - 添加 `feats` 表
+- `storage/adapter.ts` - 添加 `featLifecycle()` 和 `featMerge()` 方法及类型
+- `storage/lite-adapter.ts` - LiteAdapter 实现 feat 相关方法
+- `storage/sqlite-store.ts` - 添加 `feats` 表
 
 ### 多库一致性 (3.13)
 
 | 任务 | 功能 | 实现文件 | 状态 |
 |------|------|----------|:----:|
-| 3.13 | Server 多库一致性 | `store/multi-store-sync.ts` | ✅ |
+| 3.13 | Server 多库一致性 | `storage-backend/` | ✅ |
 
 **处理方式**：
 
 3.13 是 Server 模式特有的功能，核心原则是 **MongoDB 是单一权威源**，Neo4j 和 Milvus 是派生索引。
 
-**已创建**：`multi-store-sync.ts` 提供以下功能：
-- 同步状态类型定义 (`SyncStatus`, `PendingSyncRecord`)
-- 降级模式常量和检查函数
-- 部分同步警告生成
-- 合并结果构建辅助函数
+**已实现**：`storage-backend` Python 服务提供以下功能：
+- MongoDB 作为权威数据源
+- Neo4j 关系图自动同步
+- Milvus 向量索引自动同步
+- 降级模式处理（单库不可用时继续服务）
+- repair API 支持重建索引
 
 **Local 模式不需要此功能**：SQLite 单库事务保证 ACID，所有数据在同一个事务中写入。
-
-**Server 模式（未来实现）需要**：
-1. 在 `ServerAdapter.featMerge()` 中使用这些工具函数
-2. 实现 `pendingSync` 集合管理
-3. 实现 Neo4j/Milvus 同步逻辑
-4. 实现定时修复任务
 
 ---
 
@@ -157,7 +152,7 @@ packages/mcp-dsl/src/
 
 ## 注意事项
 
-1. **所有 MCP 工具必须通过 StorageAdapter**：不要直接调用 Python mcp-data
+1. **所有 MCP 工具必须通过 StorageAdapter**：不要直接调用 Python storage-backend
 2. **Local 模式已可用**：LiteAdapter + SQLiteStore 提供完整的本地存储能力
 3. **Server 模式已实现**：ServerAdapter 通过 storage-backend HTTP API
-4. **lite-adapter.ts 需要重构**：文件已超过 1500 行，需要按功能拆分
+4. **lite-adapter 已拆分**：目录 `lite-adapter/` 包含 25 个模块文件，最大文件 791 行

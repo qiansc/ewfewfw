@@ -48,7 +48,7 @@ export async function validate(
       SELECT e.id, e.type, e.data, m.status
       FROM entities e
       JOIN metadata m ON e.source_project = m.source_project
-        AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+        AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
       WHERE ${proposalClause}
     `).all(
       ...(dbProposalId === '' ? [] : [dbProposalId])
@@ -218,7 +218,7 @@ function loadEntitiesForScope(
     SELECT e.id, e.type, e.data, m.status
     FROM entities e
     JOIN metadata m ON e.source_project = m.source_project
-      AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+      AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
     WHERE (e.proposal_id IS NULL OR e.proposal_id = '')
       AND e.id IN (${placeholders})
   `).all(...missingIds) as Array<{ id: string; type: string; data: string; status: string }>;

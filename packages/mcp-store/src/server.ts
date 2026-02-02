@@ -4,6 +4,7 @@
  * 本文件只注册 mcp-tools.md 中定义的 c4a_store_* 工具
  */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { errorToMcpResponse, type McpErrorResponse } from "@c4a/core/types";
 import { getAdapter } from "@c4a/storage";
 import {
   StoreSaveInputSchema,
@@ -507,29 +508,6 @@ export function createServer(): McpServer {
   return server;
 }
 
-interface ErrorResponse {
-  code: string;
-  message: string;
-  details?: {
-    field?: string;
-    expected?: string;
-    actual?: string;
-    suggestion?: string;
-  };
-  timestamp: string;
-  request_id?: string;
-  recoverable_actions?: Array<{
-    action: string;
-    label: string;
-    params?: object;
-  }>;
-}
-
-function buildErrorResponse(error: unknown): ErrorResponse {
-  const message = error instanceof Error ? error.message : String(error);
-  return {
-    code: "C4A-STORE-001",
-    message,
-    timestamp: new Date().toISOString(),
-  };
+function buildErrorResponse(error: unknown): McpErrorResponse {
+  return errorToMcpResponse(error);
 }

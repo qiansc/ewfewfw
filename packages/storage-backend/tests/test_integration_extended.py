@@ -346,9 +346,18 @@ def test_feat_and_utils_flow(monkeypatch, tmp_path: Path):
     response = client.post("/feat/lifecycle", json={"action": "create", "feat_id": "feat-1"})
     assert response.status_code == 200
 
-    response = client.post("/feat/checklist", json={"action": "generate", "feat_id": "feat-1"})
+    response = client.post(
+        "/feat/checklist",
+        json={
+            "action": "generate",
+            "feat_id": "feat-1",
+            "items": [{"id": "task-1", "title": "Init", "status": "pending"}],
+        },
+    )
     assert response.status_code == 200
-    assert response.json()["success"] is True
+    payload = response.json()
+    assert payload["success"] is True
+    assert payload["checklist"]["items"][0]["id"] == "task-1"
 
     response = client.post(
         "/feat/workflow-step",

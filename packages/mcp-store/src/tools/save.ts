@@ -5,7 +5,8 @@
  * 基于设计文档：v0.3.0/detailed-design/mcp/store-crud.md §3.1
  */
 import type { StoreSaveInput, StoreSaveResult } from "../schemas.js";
-import { getAdapter } from "@c4a/storage";
+import { StoreSaveInputSchemaWithRefine } from "../schemas.js";
+import { getAdapter, loadConfig } from "@c4a/storage";
 
 /**
  * c4a_store_save 处理函数
@@ -16,6 +17,8 @@ import { getAdapter } from "@c4a/storage";
  * @returns 保存结果
  */
 export async function storeSaveHandler(args: StoreSaveInput): Promise<StoreSaveResult> {
+  const parsed = StoreSaveInputSchemaWithRefine.parse(args);
+  const config = loadConfig();
   const adapter = await getAdapter();
 
   // 确保适配器已初始化
@@ -23,17 +26,18 @@ export async function storeSaveHandler(args: StoreSaveInput): Promise<StoreSaveR
 
   // 调用 StorageAdapter.save()
   const result = await adapter.save({
-    type: args.type,
-    data: args.data,
-    content: args.content,
-    format: args.format,
-    id: args.id,
-    source_project: args.source_project,
-    proposal_id: args.proposal_id,
-    enforce_adr: args.enforce_adr,
-    skip_adr_check: args.skip_adr_check,
-    ignore_concurrent_warning: args.ignore_concurrent_warning,
-    force_save: args.force_save,
+    type: parsed.type,
+    data: parsed.data,
+    content: parsed.content,
+    format: parsed.format,
+    id: parsed.id,
+    source_project: parsed.source_project,
+    proposal_id: parsed.proposal_id,
+    enforce_adr: parsed.enforce_adr,
+    adr_policy: config.adr_policy,
+    skip_adr_check: parsed.skip_adr_check,
+    ignore_concurrent_warning: parsed.ignore_concurrent_warning,
+    force_save: parsed.force_save,
   });
 
   return {

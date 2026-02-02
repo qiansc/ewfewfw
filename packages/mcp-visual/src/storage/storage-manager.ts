@@ -17,8 +17,8 @@ import type {
 
 // 存储路径映射
 const STORAGE_PATHS: Record<StorageMode, string> = {
-  cache: "cache/visual/temp",
-  permanent: "assets/images",
+  cache: "cache/images",
+  permanent: "images",
   report: "reports",
 };
 

@@ -16,7 +16,7 @@ describe('ServerAdapter http client', () => {
     (globalThis as unknown as { fetch: typeof fetch }).fetch = withPreconnect(async () => {
       throw new Error('connection refused');
     });
-    const adapter = new ServerAdapter({ url: 'http://localhost:8050', retries: 0, timeout: 10 });
+    const adapter = new ServerAdapter({ url: 'http://localhost:8055', retries: 0, timeout: 10 });
     await expect(adapter.initialize()).rejects.toThrow(/health check failed/i);
   });
 

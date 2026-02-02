@@ -28,6 +28,12 @@
 └─────────┘     └─────────┘
 ```
 
+## 统一约定
+
+- 命令统一使用 `bun run` / `bunx`（禁止 pnpm/npm/yarn）。
+- Python 测试按仓库约定使用 venv，激活命令统一为 `. .venv/bin/activate`。
+- 每个 Agent 完成后 **及时更新** `summary.md` 对应条目。
+
 ---
 
 ## Agent A: 测试基线验证
@@ -36,10 +42,10 @@
 
 ### 任务清单
 
-- [ ] A.1 运行 TypeScript 全量测试
-- [ ] A.2 运行 Python storage-backend 测试
-- [ ] A.3 运行类型检查
-- [ ] A.4 运行构建验证
+- [x] A.1 运行 TypeScript 全量测试
+- [x] A.2 运行 Python storage-backend 测试
+- [x] A.3 运行类型检查
+- [x] A.4 运行构建验证
 
 ### 执行命令
 
@@ -49,7 +55,7 @@ bun run test
 
 # A.2 Python storage-backend 测试
 cd packages/storage-backend
-python3 -m venv .venv && source .venv/bin/activate
+python3 -m venv .venv && . .venv/bin/activate
 python -m pip install -e ".[dev]"
 python -m pytest
 
@@ -100,6 +106,7 @@ bun run build
 1. **包结构**
    ```
    packages/
+   ├── config-generator/ # 配置生成器
    ├── core/           # 共享核心库
    ├── storage/        # 存储适配层
    ├── cli/            # 用户 CLI
@@ -168,7 +175,7 @@ bun run build
 ### Changed
 - 存储层重构为 StorageAdapter 接口
 - MCP 工具重命名 (legacy_* → c4a_store_*)
-- 配置系统统一到 .c4a/config.yaml
+- 配置系统统一到 .context/.c4a.yaml
 
 ### Removed
 - Legacy MCP 接口
@@ -186,6 +193,8 @@ bun run build
 1. **Server 模式一致性窗口**：MongoDB 写入后到 Neo4j/Milvus 同步完成前，查询可能返回过期数据
 2. **Checklist 并发行为**：多人同时编辑时采用 Last Write Wins 策略
 3. **跨项目权限死锁**：发布前需确认所有涉及项目的权限状态
+
+建议同步给出 **规避方案**（如：在读操作前增加短暂延迟、明确操作串行化、发布前做权限预检）。
 
 ### 验收标准
 
@@ -253,6 +262,8 @@ bun run build
 - [ ] Technical Spec 生成完整
 - [ ] Checklist 生成并可追踪
 - [ ] 发布后实体状态变为 published
+
+**异常处理**：若 Skill 不可用或步骤失败，记录失败原因与复现步骤，补充到 issue.md 或 summary.md。
 
 ### C.2 US-002: 研发主导流程
 
@@ -365,10 +376,10 @@ c4a status
 
 ### 任务清单
 
-- [ ] D.1 补充 MCP Store 集成测试
-- [ ] D.2 补充 MCP Query 集成测试
-- [ ] D.3 Server 模式集成测试
-- [ ] D.4 模式切换测试
+- [x] D.1 补充 MCP Store 集成测试
+- [x] D.2 补充 MCP Query 集成测试
+- [x] D.3 Server 模式集成测试
+- [x] D.4 模式切换测试
 
 ### D.1 MCP Store 集成测试
 

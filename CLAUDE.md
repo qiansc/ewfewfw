@@ -2,7 +2,12 @@
 
 ---
 
-知识管理平台，为 AI Agent 提供知识的生产与消费能力。
+AI 原生的架构知识管理平台。以 AI Agent 为一等公民，提供架构知识的生产与消费能力。
+
+**核心理念**：
+- **知识抽象模型**：8 种实体类型（System, Container, Component, ADR, Contract, Product, Process, SoR）
+- **Feat 分支隔离**：类似 Git 分支，支持并行开发和知识演进
+- **三种工作模式**：Local（单机 SQLite）、Server（团队协作）、Remote（云端托管）
 
 ## 项目结构
 
@@ -251,9 +256,12 @@ python -m pytest
 
 ## 核心概念
 
-- **C4A DSL**: 架构描述语言，描述 System/Container/Component 及其关系
-- **ADR**: 架构决策记录，记录技术决策及其上下文
-- **契约**: API/消息契约 (OpenAPI, AsyncAPI, Proto)
+- **知识抽象模型**: 8 种实体类型
+  - **架构层**：System（系统）、Container（容器）、Component（组件）
+  - **决策层**：ADR（架构决策记录）、Contract（API/消息契约）
+  - **业务层**：Product（产品）、Process（流程）、SoR（记录系统）
+- **Feat 分支**: 类似 Git 分支的知识隔离机制，支持并行开发
+- **Checklist**: Feat 内的任务追踪，支持 DSL/代码/测试/文档等任务类型
 - **MCP**: Model Context Protocol，Agent 工具调用协议
 - **external**: DSL 中标记外部系统/容器/组件的属性
 

@@ -32,8 +32,9 @@ async function fetchChecklist(featId: string): Promise<ChecklistResult> {
     }
   }
 
-  const baseUrl = mode === "remote" ? projectConfig?.remote?.url : undefined;
-  const transport: McpTransport = mode === "server" ? "stdio" : "http";
+  const baseUrl =
+    mode === "remote" ? projectConfig?.remote?.url : projectConfig?.server?.url;
+  const transport: McpTransport = "http";
   const client = new McpClient({ baseUrl, transport });
   return await client.request<ChecklistResult>("c4a_store_feat_checklist", {
     action: "get",

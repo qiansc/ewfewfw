@@ -1,19 +1,40 @@
-# C4A v0.2 工程架构
+# C4A v0.3.0 工程架构
 
-> **注意**：本文档描述的是 v0.2 的实现架构。
+> **注意**：本文档描述的是 v0.3.0 的实现架构。
 >
-> **v0.3.0 设计文档**请查看 [v0.3.0/architecture.md](docs/v0.3.0/architecture.md)
+> **设计文档**请查看 [v0.3.0/architecture.md](v0.3.0/architecture.md)
 >
 ---
 
 ## 概述
 
-C4A v0.2 采用 **MCP (Model Context Protocol) + Agent** 架构，完全围绕 AI Agent 设计：
+C4A 是 AI 原生的架构知识管理平台，以 AI Agent 为一等公民。
 
-- **Agent**：OpenCode 驱动，使用 prompts/ 中定义的角色
-- **MCP 服务**：三个独立的 MCP Server，提供工具能力
-- **存储层**：MongoDB（主存储）+ Neo4j（Graph 索引）+ Milvus（Vector 索引）
-- **CLI**：Ink (React for CLI) 交互式菜单
+**核心概念**：
+- **知识抽象模型**：8 种实体类型（System, Container, Component, ADR, Contract, Product, Process, SoR）
+- **Feat 分支**：类似 Git 分支的知识隔离机制，支持并行开发
+- **三种模式**：Local（SQLite + USearch）、Server（MongoDB + Neo4j + Milvus）、Remote（云端托管）
+
+**技术架构**：
+- **Agent**：通过 MCP 协议调用工具，使用 prompts/ 中定义的角色
+- **MCP 服务**：mcp-store/mcp-extract/mcp-query 提供工具能力，mcp-visual 提供可视化服务
+- **存储层**：StorageAdapter 统一接口，屏蔽 Local/Server 差异
+- **CLI**：Ink (React for CLI) 交互式菜单（用户 CLI + 开发者 CLI）
+
+## 包结构
+
+```
+packages/
+├── core/            # 共享核心库
+├── storage/         # 存储适配层
+├── cli/             # 用户 CLI
+├── cli-dev/         # 开发者 CLI
+├── storage-backend/ # Python 后端服务
+├── mcp-store/       # 知识存储 MCP
+├── mcp-query/       # 知识查询 MCP
+├── mcp-extract/     # 知识采集 MCP
+└── mcp-visual/      # 可视化 MCP
+```
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -70,6 +91,11 @@ C4A v0.2 采用 **MCP (Model Context Protocol) + Agent** 架构，完全围绕 A
 | `c4a_query_search` | 语义搜索 C4A 知识库 (Milvus) |
 | `c4a_query_deps` | 查询实体的依赖关系 (Neo4j) |
 | `c4a_query_impact` | 分析实体变更的影响范围 |
+
+### MCP 工具命名
+
+- 已移除 `legacy_*` 接口
+- MCP 工具统一为 `c4a_store_*` / `c4a_query_*` / `c4a_extract_*`
 
 ### MCP 传输协议
 
@@ -132,10 +158,25 @@ packages/cli/
 
 ## 存储架构
 
+**Local 模式**
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      mcp-store                              │
-│                    (知识存储服务)                             │
+│                   StorageAdapter (Local)                    │
+└─────────────────────────────────────────────────────────────┘
+                      │                    │
+                      ▼                    ▼
+               ┌───────────┐        ┌───────────┐
+               │  SQLite   │        │  USearch  │
+               │  元数据   │        │  向量检索  │
+               └───────────┘        └───────────┘
+```
+
+**Server 模式**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   StorageAdapter (Server)                   │
 └─────────────────────────────────────────────────────────────┘
                               │
           ┌───────────────────┼───────────────────┐
@@ -151,8 +192,29 @@ packages/cli/
 | MongoDB | 主存储 | 元数据、ADR、契约、Knowledge |
 | Neo4j | 关系索引 | System/Container/Component 关系图 |
 | Milvus | 语义索引 | Knowledge 向量嵌入 |
+| SQLite | Local 元数据 | 本地模式文档存储 |
+| USearch | Local 向量索引 | 本地语义检索 |
 
 数据写入 MongoDB 后，由 mcp-store 负责同步到 Neo4j 和 Milvus。
+
+**模式切换机制**
+
+通过 `.c4a/config.yaml` 的 `mode` 字段切换 `local/server/remote`，CLI 与 MCP 根据配置选择对应的 StorageAdapter。
+
+## Skills 架构
+
+Skills 以目录形式存放在 `.codex/skills/` 下，每个 Skill 至少包含 `SKILL.md` 描述文件：
+
+```
+.codex/skills/
+└── <skill>/
+    ├── SKILL.md
+    ├── references/    # 可选：设计/说明文档
+    ├── scripts/       # 可选：自动化脚本
+    └── assets/        # 可选：模板/资源
+```
+
+执行流程：Agent 触发 Skill → 读取 `SKILL.md` → 按步骤执行 → 按需读取 references/scripts/assets。
 
 ## 部署模式
 
@@ -188,6 +250,7 @@ packages/cli/
 | CLI 框架 | Ink | React for CLI |
 | DSL 解析 | YAML + Zod | 结构化配置 |
 | 代码提取 | Tree-sitter | 多语言 AST 解析 |
-| 主存储 | MongoDB 7.0 | 文档存储 |
-| Graph 存储 | Neo4j 5.x | 架构关系 |
-| Vector 存储 | Milvus 2.5 | 语义索引 |
+| Local 存储 | SQLite + USearch | 本地文档与向量检索 |
+| Server 主存储 | MongoDB 7.0 | 文档存储 |
+| Server Graph 存储 | Neo4j 5.x | 架构关系 |
+| Server Vector 存储 | Milvus 2.5 | 语义索引 |

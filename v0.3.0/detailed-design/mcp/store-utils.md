@@ -3,12 +3,12 @@
 
 ### 3.11 `c4a_store_read_history`（查询实体变更历史）
 
-- **输入（建议）**
+- **输入（定义）**
   - `entity_id?: string`：查询指定实体的历史
   - `feat_id?: string`：查询指定 Feat 的变更记录
   - `limit?: number = 100`：返回记录数量上限
   - `order?: "asc" | "desc" = "desc"`：按时间排序
-- **返回（JSON，建议）**
+- **返回（JSON，定义）**
   - `items: { feat_id, action, changed_fields, changed_by, changed_at }[]`
 
 **查询示例**：
@@ -64,12 +64,12 @@ c4a_store_read_history({ feat_id: "feat-a002-add-oauth" })
 
 ### 3.13 `c4a_store_backup`（备份数据）
 
-- **输入（建议）**
+- **输入（定义）**
   - `output: string`：备份文件路径（如 `./backup.tar.gz`）
   - `status_filter?: "published" | "approved" | "all" = "published"`：按实体状态筛选备份范围
   - `format?: "tar.gz" | "json" = "tar.gz"`：备份格式
   - `include_metadata?: boolean = true`：是否包含元数据
-- **返回（JSON，建议）**
+- **返回（JSON，定义）**
   - `success: boolean`
   - `file: string`：备份文件路径
   - `size: number`：文件大小（字节）
@@ -111,11 +111,11 @@ c4a_store_read_history({ feat_id: "feat-a002-add-oauth" })
 
 ### 3.14 `c4a_store_restore`（恢复数据）
 
-- **输入（建议）**
+- **输入（定义）**
   - `input: string`：备份文件路径
   - `conflict_policy?: "skip" | "override" | "merge" | "error" = "skip"`：冲突处理策略
   - `validate_checksums?: boolean = true`：是否验证校验和
-- **返回（JSON，建议）**
+- **返回（JSON，定义）**
   - `success: boolean`
   - `format_version: string`：备份格式版本
   - `compatible: boolean`：是否兼容当前版本
@@ -156,11 +156,11 @@ function checkCompatibility(backupVersion: string, currentVersion: string): bool
 
 > **适用模式**：仅 Server 模式（Local 模式使用 SQLite 事务保证一致性，无需此工具）
 
-- **输入（建议）**
+- **输入（定义）**
   - `scope?: "all" | "neo4j" | "milvus" = "all"`：修复范围
   - `dry_run?: boolean = false`：仅检测不修复
   - `entity_ids?: string[]`：指定实体 ID（可选，不指定则扫描全部）
-- **返回（JSON，建议）**
+- **返回（JSON，定义）**
   - `success: boolean`
   - `scanned: number`：扫描的实体数量
   - `inconsistencies: { entity_id: string; issue: string; fixed: boolean }[]`：不一致问题列表
@@ -370,3 +370,8 @@ c4a_store_validate({
 
 ---
 
+**Server 端实现说明（2026-02-02）**：
+- 读取 MongoDB 中 `proposal_id=feat_id` 与主分支（`proposal_id=""`）实体，按 `(source_project,id,type)` 进行 Merge View
+- `references` 检查依赖 relations 集合；若 relations 为空返回 warning（提示先补齐关系解析）
+- `checklist` 检查读取 feats.checklist，若缺失返回 warning
+- 返回结构遵循上方示例，但检查规则为“启发式实现”，不等价于 Local 全量检查

@@ -8,6 +8,10 @@ import { writeFileContent, fileExists, joinPath, readFileContent, ensureDir, cle
 import { dirname } from "node:path";
 import { logger } from "../utils/logger.js";
 import { expandToolPatterns } from "../toolResolver.js";
+import {
+  loadSkillTemplateContext,
+  renderSkillTemplate,
+} from "../utils/skillTemplate.js";
 import { homedir } from "node:os";
 import { existsSync, readFileSync } from "node:fs";
 
@@ -121,6 +125,7 @@ async function resolveSkills(
   baseDir: string
 ): Promise<Record<string, ResolvedSkill>> {
   const resolved: Record<string, ResolvedSkill> = {};
+  const context = await loadSkillTemplateContext(baseDir);
 
   for (const [name, skill] of Object.entries(skills)) {
     let prompt: string;
@@ -136,6 +141,8 @@ async function resolveSkills(
     } else {
       prompt = skill.prompt || "";
     }
+
+    prompt = renderSkillTemplate(prompt, context);
 
     resolved[name] = {
       description: skill.description,

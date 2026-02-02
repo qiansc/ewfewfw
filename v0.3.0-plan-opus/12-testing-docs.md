@@ -83,6 +83,12 @@
 | 12.16 | 文档化 Server 一致性窗口 | P1 | ISSUES.md §A |
 | 12.17 | 文档化 Checklist 并发行为 | P2 | ISSUES.md §C |
 | 12.18 | 文档化权限死锁规避 | P2 | ISSUES.md §D |
+| 12.19 | 修复配置加载路径与环境变量优先级 | P0 | MCP 在子目录启动时仍能读取配置（含 C4A_STORAGE_BACKEND_URL） |
+| 12.20 | 权限初始化/Bootstrap 策略 | P1 | 空权限表的 dev/test 处理 + 授权方式 |
+| 12.21 | 更新 Claude Code MCP 配置映射 | P1 | `.mcp.json` 与 `.claude/settings.local.json` 服务名一致 |
+| 12.22 | dev 模式自动启动 storage-backend | P2 | server 模式配置时自动拉起容器 |
+| 12.23 | Skills 注册流程补齐 | P2 | Claude Code /c4a:* 识别配置 |
+| 12.24 | feat_checklist generate 支持 items | P2 | generate 可一次性创建带任务的清单 |
 
 ---
 
@@ -90,11 +96,12 @@
 
 ### 阶段 1: 核心验证 (P0)
 
-- [ ] 1.1 运行现有测试套件，确保全部通过
+- [x] 1.1 运行现有测试套件，确保全部通过
 - [ ] 1.2 US-001 端到端验证（手动）
 - [ ] 1.3 补充 MCP Store 集成测试
 - [ ] 1.4 更新 ARCHITECTURE.md
 - [ ] 1.5 更新 README.md
+- [ ] 1.6 修复配置加载路径与环境变量优先级（12.19）
 
 ### 阶段 2: 扩展验证 (P1)
 
@@ -105,6 +112,8 @@
 - [ ] 2.5 Server 模式集成测试
 - [ ] 2.6 编写 CHANGELOG.md
 - [ ] 2.7 文档化 Server 一致性窗口
+- [ ] 2.8 权限初始化/Bootstrap 策略（12.20）
+- [ ] 2.9 更新 Claude Code MCP 配置映射（12.21）
 
 ### 阶段 3: 完善收尾 (P2)
 
@@ -113,6 +122,9 @@
 - [ ] 3.3 更新 CLI 帮助文档
 - [ ] 3.4 文档化 Checklist 并发行为
 - [ ] 3.5 文档化权限死锁规避
+- [ ] 3.6 dev 模式自动启动 storage-backend（12.22）
+- [ ] 3.7 Skills 注册流程补齐（12.23）
+- [ ] 3.8 feat_checklist generate 支持 items（12.24）
 
 ---
 

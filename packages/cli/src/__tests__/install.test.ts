@@ -91,7 +91,7 @@ describe("installCommand", () => {
       loadGlobalConfig: async () => ({
         server: {
           installed_at: "2026-01-01T00:00:00Z",
-          url: "http://localhost:8050",
+          url: "http://localhost:8055",
         },
       }),
       saveGlobalConfig: async (config) => {

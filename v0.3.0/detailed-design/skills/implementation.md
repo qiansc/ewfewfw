@@ -291,6 +291,10 @@ mode: main_branch
 }
 ```
 
+> **实现对齐**：config-generator 在生成 Skills 命令时会读取 `.context/feat/current.json`，
+> 或使用环境变量 `C4A_CURRENT_PROPOSAL_ID` / `C4A_CURRENT_PROPOSAL_STATUS` / `C4A_CURRENT_PROPOSAL_TITLE`
+> 渲染模板变量，确保 `{{current_proposal_id}}` 等占位符可用。
+
 #### 3. MCP 工具调用校验
 
 Skill Prompt 必须包含工具调用校验规则：
@@ -464,4 +468,3 @@ C4A 提供以下 Skills 和 Commands 来完成架构知识管理任务：
 4. 性能优化（如有需要）
 
 ---
-

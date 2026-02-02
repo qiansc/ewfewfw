@@ -1,34 +1,19 @@
 /**
  * CLI 错误响应（与 MCP ErrorResponse 对齐）
  */
-
-export interface ErrorResponse {
-  code: string;
-  message: string;
-  details?: {
-    field?: string;
-    expected?: string;
-    actual?: string;
-    suggestion?: string;
-  };
-  timestamp: string;
-  request_id?: string;
-  recoverable_actions?: Array<{
-    action: string;
-    label: string;
-    params?: object;
-  }>;
-}
+import type { ErrorResponse, RecoverableAction } from "@c4a/core/types";
 
 export function buildErrorResponse(
   code: string,
   message: string,
-  details?: ErrorResponse["details"]
+  details?: ErrorResponse["details"],
+  recoverableActions?: RecoverableAction[]
 ): ErrorResponse {
   return {
     code,
     message,
     details,
+    recoverable_actions: recoverableActions,
     timestamp: new Date().toISOString(),
   };
 }
@@ -36,8 +21,9 @@ export function buildErrorResponse(
 export function createCliError(
   code: string,
   message: string,
-  details?: ErrorResponse["details"]
+  details?: ErrorResponse["details"],
+  recoverableActions?: RecoverableAction[]
 ): Error {
-  const response = buildErrorResponse(code, message, details);
+  const response = buildErrorResponse(code, message, details, recoverableActions);
   return new Error(message, { cause: response });
 }

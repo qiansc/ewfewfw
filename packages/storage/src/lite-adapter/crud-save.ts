@@ -8,7 +8,10 @@ import type { EntityStatus, SaveParams, SaveResult, Warning } from '../adapter.j
 import type { AdapterContext } from './types.js';
 import { computeHash, generateSearchText, parseContent } from './helpers.js';
 import { parseRelations, persistRelations, updateGraph, type RelationsChangeSet } from './relations.js';
+import { generateEntityId, getInitialSequence, incrementSequence } from '@c4a/core';
 import * as converter from '@c4a/core';
+
+type Database = ReturnType<typeof import('../sqlite-store.js').SQLiteStore.prototype.getDatabase>;
 
 // ============================================================
 // Diff helpers
@@ -42,6 +45,68 @@ function diffFields(
   }
 
   return diffs;
+}
+
+function resolveDanglingRelations(
+  db: Database,
+  sourceProject: string,
+  entityId: string
+): boolean {
+  const rows = db.prepare(`
+    SELECT id, to_project, properties
+    FROM relations
+    WHERE to_id = ?
+      AND (status IS NULL OR status != 'deleted')
+  `).all(entityId) as Array<{
+    id: string;
+    to_project: string | null;
+    properties: string | null;
+  }>;
+
+  if (rows.length === 0) return false;
+
+  const now = new Date().toISOString();
+  const updateStmt = db.prepare(`
+    UPDATE relations
+    SET to_project = ?, properties = ?, updated_at = ?
+    WHERE id = ?
+  `);
+
+  let updated = false;
+  for (const row of rows) {
+    let props: Record<string, unknown> = {};
+    if (row.properties) {
+      try {
+        props = JSON.parse(row.properties) as Record<string, unknown>;
+      } catch {
+        props = {};
+      }
+    }
+
+    const isDangling =
+      props.resolved === false || props.resolve_status === 'pending';
+    if (!isDangling) continue;
+
+    const toProject = row.to_project ?? '';
+    const targetProject =
+      typeof props.target_project === 'string' ? props.target_project : null;
+    const shouldResolve =
+      toProject === sourceProject || toProject === '' || targetProject === sourceProject;
+
+    if (!shouldResolve) continue;
+
+    delete props.resolved;
+    if (props.resolve_status === 'pending') {
+      delete props.resolve_status;
+    }
+
+    const nextProject = toProject === '' ? sourceProject : toProject;
+    const nextProps = Object.keys(props).length > 0 ? JSON.stringify(props) : null;
+    updateStmt.run(nextProject, nextProps, now, row.id);
+    updated = true;
+  }
+
+  return updated;
 }
 
 type ConvertedEntity = Record<string, unknown> & {
@@ -88,6 +153,147 @@ function isEntityStatus(value: string | null): value is EntityStatus {
   return ['draft', 'approved', 'published', 'deprecated', 'archived'].includes(value);
 }
 
+function getNameForAutoId(type: string, rawData: Record<string, unknown>): string | null {
+  const rootName = pickString(rawData.name as string | null);
+  if (rootName) return rootName;
+  const block = rawData[type];
+  if (isPlainObject(block)) {
+    const blockName = pickString(block.name as string | null);
+    if (blockName) return blockName;
+    if (type === 'adr') {
+      const title = pickString((block as Record<string, unknown>).title as string | null);
+      if (title) return title;
+    }
+  }
+  if (type === 'adr') {
+    return pickString(rawData.title as string | null);
+  }
+  return null;
+}
+
+function resolveSorPerspectiveFromType(sorType: string | null): 'business' | 'technical' | null {
+  if (!sorType) return null;
+  const businessTypes = new Set([
+    'business_rule',
+    'business_data',
+    'report',
+    'communication',
+    'user_interface',
+    'kpi',
+  ]);
+  const technicalTypes = new Set(['non_functional', 'utility', 'message']);
+  if (businessTypes.has(sorType)) return 'business';
+  if (technicalTypes.has(sorType)) return 'technical';
+  return null;
+}
+
+function getPerspectiveForAutoId(
+  type: string,
+  rawData: Record<string, unknown>
+): 'business' | 'technical' | null {
+  const direct = pickString(rawData.perspective as string | null);
+  if (direct === 'business' || direct === 'technical') {
+    return direct;
+  }
+  if (type === 'process') {
+    const block = rawData.process;
+    const processType = isPlainObject(block)
+      ? pickString((block as Record<string, unknown>).process_type as string | null)
+      : pickString(rawData.process_type as string | null);
+    if (processType === 'business' || processType === 'technical') {
+      return processType;
+    }
+  }
+  if (type === 'sor') {
+    const block = rawData.sor;
+    const sorType = isPlainObject(block)
+      ? pickString((block as Record<string, unknown>).sor_type as string | null)
+      : pickString(rawData.sor_type as string | null);
+    return resolveSorPerspectiveFromType(sorType);
+  }
+  return null;
+}
+
+function extractSequenceFromId(id: string, prefix: string): string | null {
+  if (!id.startsWith(`${prefix}-`)) return null;
+  const rest = id.slice(prefix.length + 1);
+  if (prefix === 'adr' || prefix === 'feat') {
+    const match = rest.match(/^([a-z]\d{3})(?:-.+)?$/);
+    return match?.[1] ?? null;
+  }
+  const match = rest.match(/^([a-z]\d{3})$/);
+  return match?.[1] ?? null;
+}
+
+function compareSequence(a: string, b: string): number {
+  const letterDelta = a.charCodeAt(0) - b.charCodeAt(0);
+  if (letterDelta !== 0) return letterDelta;
+  return Number(a.slice(1)) - Number(b.slice(1));
+}
+
+function getNextSequence(db: ReturnType<AdapterContext['store']['getDatabase']>, sourceProject: string, prefix: string): string {
+  const rows = db
+    .prepare('SELECT id FROM entities WHERE source_project = ? AND id LIKE ?')
+    .all(sourceProject, `${prefix}-%`) as Array<{ id: string }>;
+  let maxSequence: string | null = null;
+  for (const row of rows) {
+    const sequence = extractSequenceFromId(row.id, prefix);
+    if (!sequence) continue;
+    if (!maxSequence || compareSequence(sequence, maxSequence) > 0) {
+      maxSequence = sequence;
+    }
+  }
+  return maxSequence ? incrementSequence(maxSequence) : getInitialSequence();
+}
+
+function applyGeneratedId(type: string, rawData: Record<string, unknown>, id: string): void {
+  if (!rawData.id) {
+    rawData.id = id;
+  }
+  const block = rawData[type];
+  if (isPlainObject(block) && !block.id) {
+    (block as Record<string, unknown>).id = id;
+  }
+}
+
+function generateAutoId(
+  db: ReturnType<AdapterContext['store']['getDatabase']>,
+  sourceProject: string,
+  type: string,
+  rawData: Record<string, unknown>
+): string | null {
+  const name = getNameForAutoId(type, rawData);
+  if (!name) return null;
+  switch (type) {
+    case 'system':
+    case 'container':
+    case 'component':
+    case 'product':
+    case 'contract':
+      return generateEntityId(type, name);
+    case 'adr': {
+      const sequence = getNextSequence(db, sourceProject, 'adr');
+      return generateEntityId('adr', name, sequence);
+    }
+    case 'process': {
+      const perspective = getPerspectiveForAutoId('process', rawData);
+      if (!perspective) return null;
+      const prefix = perspective === 'business' ? 'prc-b' : 'prc-t';
+      const sequence = getNextSequence(db, sourceProject, prefix);
+      return generateEntityId('process', name, sequence, perspective);
+    }
+    case 'sor': {
+      const perspective = getPerspectiveForAutoId('sor', rawData);
+      if (!perspective) return null;
+      const prefix = perspective === 'business' ? 'sor-b' : 'sor-t';
+      const sequence = getNextSequence(db, sourceProject, prefix);
+      return generateEntityId('sor', name, sequence, perspective);
+    }
+    default:
+      return null;
+  }
+}
+
 // ============================================================
 // Save 操作
 // ============================================================
@@ -110,11 +316,20 @@ async function doSave(ctx: AdapterContext, params: SaveParams): Promise<SaveResu
   const warnings: Warning[] = [];
   const warningEnabled = !params.force_save;
 
+  const hasData = params.data !== undefined;
+  const hasContent = params.content !== undefined;
+  if (hasData === hasContent) {
+    throw new Error('必须提供 data 或 content 其中之一（不能同时提供或都不提供）');
+  }
+  if (hasContent && params.format === undefined) {
+    throw new Error('使用 content 时必须同时指定 format');
+  }
+
   // 解析数据
   let rawData: Record<string, unknown>;
-  if (params.data) {
+  if (hasData) {
     rawData = params.data;
-  } else if (params.content) {
+  } else if (hasContent) {
     rawData = parseContent(params.content, params.format || 'yaml');
   } else {
     throw new Error('Either data or content must be provided');
@@ -130,16 +345,31 @@ async function doSave(ctx: AdapterContext, params: SaveParams): Promise<SaveResu
       ? ((storedData.metadata as Record<string, unknown>).status as EntityStatus)
       : null;
 
-  // 提取 ID
-  const id = params.id || converted?.id || (rawData.id as string);
-  if (!id) {
-    throw new Error('Entity ID is required');
-  }
-
   const sourceProject = params.source_project || ctx.config.defaultProject;
   const proposalId = params.proposal_id ?? null;
   const dbProposalId = proposalId ?? '';
   const dbSourceProject = sourceProject ?? '';
+
+  // 提取 ID（支持自动生成）
+  let id = params.id || converted?.id || (rawData.id as string);
+  if (!id) {
+    id = generateAutoId(db, dbSourceProject, params.type, rawData) ?? undefined;
+  }
+  if (!id) {
+    throw new Error('Entity ID is required');
+  }
+  applyGeneratedId(params.type, rawData, id);
+
+  if (!params.source_project && !ctx.config.defaultProject && warningEnabled) {
+    warnings.push({
+      code: 'SOURCE_PROJECT_MISSING',
+      message: `实体 ${id} 缺少 source_project，迁移到 Server 模式时可能失败`,
+      severity: 'warning',
+      details: {
+        suggestion: '请在 .c4a.yaml 配置 project_id，或显式指定 source_project',
+      },
+    });
+  }
 
   // 计算 content_hash
   const contentHash = computeHash(storedData);
@@ -147,22 +377,28 @@ async function doSave(ctx: AdapterContext, params: SaveParams): Promise<SaveResu
   // 检查是否存在并读取旧数据
   const existingQuery = dbProposalId === ''
     ? `
-    SELECT e.data as data, m.content_hash, m.created_by, m.updated_by
+    SELECT e.data as data, m.content_hash, m.created_by, m.updated_by, m.status
     FROM entities e
     JOIN metadata m ON e.source_project = m.source_project
-      AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+      AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
     WHERE e.source_project = ? AND e.id = ? AND (e.proposal_id IS NULL OR e.proposal_id = '')
   `
     : `
-    SELECT e.data as data, m.content_hash, m.created_by, m.updated_by
+    SELECT e.data as data, m.content_hash, m.created_by, m.updated_by, m.status
     FROM entities e
     JOIN metadata m ON e.source_project = m.source_project
-      AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+      AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
     WHERE e.source_project = ? AND e.id = ? AND e.proposal_id = ?
   `;
   const existingParams = dbProposalId === '' ? [dbSourceProject, id] : [dbSourceProject, id, dbProposalId];
   const existing = db.prepare(existingQuery).get(...existingParams) as
-    | { data: string; content_hash: string; created_by: string | null; updated_by: string | null }
+    | {
+        data: string;
+        content_hash: string;
+        created_by: string | null;
+        updated_by: string | null;
+        status: string | null;
+      }
     | undefined;
 
   const previousData = existing?.data ? (JSON.parse(existing.data) as Record<string, unknown>) : null;
@@ -186,7 +422,7 @@ async function doSave(ctx: AdapterContext, params: SaveParams): Promise<SaveResu
       SELECT e.proposal_id, m.updated_at, m.updated_by, m.status as entity_status, f.status as feat_status, f.title, f.description
       FROM entities e
       JOIN metadata m ON e.source_project = m.source_project
-        AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+        AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
       LEFT JOIN feats f ON e.proposal_id = f.id
       WHERE e.id = ?
         AND e.source_project = ?
@@ -222,8 +458,55 @@ async function doSave(ctx: AdapterContext, params: SaveParams): Promise<SaveResu
     }
   }
 
-  // 确定状态
-  const status: EntityStatus = requestedStatus ?? (proposalId ? 'draft' : 'published');
+  // 确定状态（已有实体默认沿用当前状态）
+  const existingStatus = isEntityStatus(pickString(existing?.status))
+    ? (existing?.status as EntityStatus)
+    : null;
+  const status: EntityStatus =
+    requestedStatus ?? existingStatus ?? (proposalId ? 'draft' : 'published');
+
+  if (existingStatus && existingStatus !== status) {
+    if (!converter.isValidStatusTransition(existingStatus, status)) {
+      return {
+        success: false,
+        id,
+        status: existingStatus,
+        content_hash: existing?.content_hash ?? contentHash,
+        error: {
+          code: 'C4A-BIZ-001',
+          message: '非法状态流转',
+          details: {
+            from_status: existingStatus,
+            to_status: status,
+            suggestion: '按 draft → approved → published → deprecated → archived 顺序流转',
+          },
+        },
+      } as SaveResult;
+    }
+  }
+
+  if (
+    !proposalId &&
+    existingStatus === 'published' &&
+    status === 'published' &&
+    existing?.content_hash &&
+    existing.content_hash !== contentHash &&
+    !params.force_save
+  ) {
+    return {
+      success: false,
+      id,
+      status: existingStatus,
+      content_hash: existing.content_hash,
+      error: {
+        code: 'C4A-BIZ-001',
+        message: 'published 状态不可直接修改，请通过 feat 变更',
+        details: {
+          suggestion: '创建 feat 分支修改并发布，或先流转为 deprecated',
+        },
+      },
+    } as SaveResult;
+  }
 
   const changeActor =
     (storedData.updated_by as string | undefined) ||
@@ -252,7 +535,7 @@ async function doSave(ctx: AdapterContext, params: SaveParams): Promise<SaveResu
       SELECT DISTINCT r.from_id, r.from_project, e.type, r.proposal_id, r.rel_type
       FROM relations r
       JOIN entities e ON r.from_project = e.source_project
-        AND r.from_id = e.id AND r.proposal_id IS e.proposal_id
+        AND r.from_id = e.id AND r.proposal_id = e.proposal_id
       LEFT JOIN feats f ON r.proposal_id = f.id
       WHERE r.to_id = ?
         AND (r.status IS NULL OR r.status != 'deleted')
@@ -286,14 +569,20 @@ async function doSave(ctx: AdapterContext, params: SaveParams): Promise<SaveResu
   // P1-2.1: ADR 检查逻辑
   // 设计文档: store-crud.md §3.1
   let adrCheck: SaveResult['adr_check'];
-  if (
+  const adrScope = params.adr_policy?.scope?.length
+    ? params.adr_policy.scope
+    : ['system', 'container', 'component'];
+  const shouldCheckAdr =
     !params.skip_adr_check &&
     ['system', 'container', 'component'].includes(params.type) &&
-    status === 'published'
-  ) {
-    // 检查是否存在关联的 ADR
-    const adrQuery = dbProposalId === ''
-      ? `
+    status === 'published' &&
+    (params.enforce_adr || (params.adr_policy?.enforce && adrScope.includes(params.type)));
+  if (shouldCheckAdr) {
+    const onMissing = params.adr_policy?.on_missing ?? (params.enforce_adr ? 'error' : 'warning');
+    if (onMissing !== 'ignore') {
+      // 检查是否存在关联的 ADR
+      const adrQuery = dbProposalId === ''
+        ? `
       SELECT 1 FROM relations r
       JOIN entities e ON r.to_project = e.source_project AND r.to_id = e.id
       WHERE r.from_id = ? AND r.from_project = ?
@@ -302,7 +591,7 @@ async function doSave(ctx: AdapterContext, params: SaveParams): Promise<SaveResu
         AND (r.status IS NULL OR r.status != 'deleted')
         AND (r.proposal_id IS NULL OR r.proposal_id = '')
     `
-      : `
+        : `
       SELECT 1 FROM relations r
       JOIN entities e ON r.to_project = e.source_project AND r.to_id = e.id
       WHERE r.from_id = ? AND r.from_project = ?
@@ -311,41 +600,41 @@ async function doSave(ctx: AdapterContext, params: SaveParams): Promise<SaveResu
         AND (r.status IS NULL OR r.status != 'deleted')
         AND r.proposal_id = ?
     `;
-    const adrParams = dbProposalId === '' ? [id, dbSourceProject] : [id, dbSourceProject, dbProposalId];
-    const hasAdr = db.prepare(adrQuery).get(...adrParams);
+      const adrParams = dbProposalId === '' ? [id, dbSourceProject] : [id, dbSourceProject, dbProposalId];
+      const hasAdr = db.prepare(adrQuery).get(...adrParams);
 
-    if (!hasAdr) {
-      if (params.enforce_adr) {
-        // enforce_adr=true 时，缺少 ADR 返回错误
-        return {
-          success: false,
-          id,
-          status,
-          content_hash: contentHash,
-          error: {
-            code: 'C4A-STORE-ADR-001',
-            message: '发布 system/container/component 需要关联 ADR',
-            details: {
-              entity_id: id,
-              entity_type: params.type,
-              missing_adr: true,
-              suggestion: '请先创建 ADR 记录架构决策，然后通过 REFERENCES 关系关联',
+      if (!hasAdr) {
+        if (onMissing === 'error') {
+          return {
+            success: false,
+            id,
+            status,
+            content_hash: contentHash,
+            error: {
+              code: 'C4A-STORE-ADR-001',
+              message: '发布 system/container/component 需要关联 ADR',
+              details: {
+                entity_id: id,
+                entity_type: params.type,
+                missing_adr: true,
+                suggestion: '请先创建 ADR 记录架构决策，然后通过 REFERENCES 关系关联',
+              },
             },
-          },
-        } as SaveResult;
+          } as SaveResult;
+        }
+        // warning 模式返回检查结果
+        adrCheck = {
+          required: true,
+          passed: false,
+          missing_adr: true,
+          message: '警告：此实体缺少关联的 ADR，建议补充架构决策记录',
+        };
+      } else {
+        adrCheck = {
+          required: true,
+          passed: true,
+        };
       }
-      // 否则返回警告
-      adrCheck = {
-        required: true,
-        passed: false,
-        missing_adr: true,
-        message: '警告：此实体缺少关联的 ADR，建议补充架构决策记录',
-      };
-    } else {
-      adrCheck = {
-        required: true,
-        passed: true,
-      };
     }
   }
 
@@ -423,6 +712,11 @@ async function doSave(ctx: AdapterContext, params: SaveParams): Promise<SaveResu
   // 事务成功后，更新内存图
   if (relationChangeset) {
     updateGraph(ctx, relationChangeset);
+  }
+
+  if (resolveDanglingRelations(db, dbSourceProject, id)) {
+    ctx.graph.load(db, proposalId);
+    ctx.cache.clear();
   }
 
   // 向量索引增量维护（异步执行，不阻塞保存）

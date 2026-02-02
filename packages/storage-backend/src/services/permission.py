@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import os
 from typing import Any
 
 from ..adapters.mongodb import MongoDBAdapter
@@ -8,12 +9,30 @@ from ..models.permission import ProjectPermission, Role
 
 
 class PermissionService:
-    def __init__(self, mongodb: MongoDBAdapter):
+    def __init__(self, mongodb: MongoDBAdapter, allow_empty: bool | None = None):
         self.permissions = mongodb.db["project_permissions"]
+        if allow_empty is None:
+            allow_empty = os.getenv("C4A_PERMISSION_ALLOW_EMPTY", "true").lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
+        self.allow_empty = allow_empty
 
     async def check_permission(
         self, user_id: str, project_id: str, action: str
     ) -> bool:
+        if self.allow_empty:
+            total = await self.permissions.count_documents({})
+            if total == 0:
+                return True
+            project_total = await self.permissions.count_documents(
+                {"project_id": project_id}
+            )
+            if project_total == 0:
+                return True
+
         permission = await self.permissions.find_one(
             {
                 "user_id": user_id,
@@ -22,9 +41,6 @@ class PermissionService:
         )
 
         if not permission:
-            total = await self.permissions.count_documents({})
-            if total == 0:
-                return True
             return False
 
         role = permission.get("role")

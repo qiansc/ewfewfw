@@ -21,6 +21,15 @@
 >
 > **设计原则**：不创建新目录，复用现有 `types/` 和 `utils/` 结构。
 
+> **补充（2026-02-02）**：
+>
+> Server 模式已引入基础权限检查（storage-backend），为避免集成测试被“空权限表”阻断，
+> 需要补充 **权限初始化/Bootstrap** 策略（见 1.1.4）：
+>
+> - Dev/测试环境允许空权限表（可配置，默认开启）
+> - 生产环境必须显式授权（空权限表视为拒绝）
+> - 提供可脚本化的授权方式（CLI 或 HTTP API）
+
 ---
 
 ## 1. 跨项目 feat 权限控制
@@ -180,6 +189,67 @@ interface ProjectPermission {
 // db.project_permissions.createIndex({ user_id: 1 })
 // db.project_permissions.createIndex({ project_id: 1 })
 ```
+
+#### 1.1.4 权限初始化 / Bootstrap（补充）
+
+**问题**：当 `project_permissions` 集合存在任意记录时，未显式授权的用户会被拒绝（403）。
+这在 **新项目/新用户** 或 **集成测试** 中会造成阻断。
+
+**策略**：
+- **Dev/测试环境**：
+  - 若权限表为空 → 允许全部
+  - 若权限表不为空但目标项目无记录 → 允许全部（避免新项目被阻断）
+- **生产环境**：空权限表视为拒绝，必须显式授权
+
+**建议实现（storage-backend）**：
+
+```python
+class PermissionService:
+    def __init__(self, mongodb: MongoDBAdapter, allow_empty: bool):
+        self.permissions = mongodb.db["project_permissions"]
+        self.allow_empty = allow_empty
+
+    async def check_permission(self, user_id: str, project_id: str, action: str) -> bool:
+        # 1) 空权限表：Dev/测试可允许全部
+        if self.allow_empty:
+            total = await self.permissions.count_documents({})
+            if total == 0:
+                return True
+            project_total = await self.permissions.count_documents({"project_id": project_id})
+            if project_total == 0:
+                return True
+
+        # 2) 正常权限校验
+        permission = await self.permissions.find_one({
+            "user_id": user_id,
+            "project_id": project_id,
+        })
+        if not permission:
+            return False
+        ...
+```
+
+**配置建议**：
+- 环境变量：`C4A_PERMISSION_ALLOW_EMPTY=true|false`
+- 默认值：`true`（dev/test），`false`（prod）
+
+**授权方式**（二选一即可）：
+1. **HTTP API**：`POST /permissions`（已在 13.12 规划）
+2. **CLI**：`c4a permission grant <user> <project> <role>`
+
+#### 1.1.5 Server 端实现状态（补充）
+
+> **说明（2026-02-02）**：
+>
+> - Server 端 **实体 CRUD** 已接入权限校验（按 `source_project` 检查 write/read）
+> - Feat 相关端点已补基础权限校验：
+>   - `feat_lifecycle`：非 `published` 转换要求 write；`published` 需要 approve
+>   - `feat_merge`：需要 approve
+>   - `feat_checklist`/`workflow-step`：需要 write
+> - **项目集合的来源**：
+>   1. 优先从 `feat.metadata.project_ids` 或 `feat.project_ids` 获取
+>   2. 兜底从 `entities` 中查询 `proposal_id=feat_id` 的 `source_project`
+> - 若无法推断任何项目 ID，则跳过权限校验（视为单项目/空数据场景）
 
 #### 1.1.3 Local → Server 数据迁移时的权限校验
 
@@ -844,4 +914,3 @@ class PermissionAuditor {
 ```
 
 ---
-

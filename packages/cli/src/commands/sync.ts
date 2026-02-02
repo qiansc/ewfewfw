@@ -281,7 +281,7 @@ async function syncServerRemote(
       : undefined;
   const isRemote = projectConfig.mode === "remote";
   const baseUrl = isRemote ? projectConfig.remote?.url : serverUrl;
-  const transport: McpTransport = isRemote ? "http" : "stdio";
+  const transport: McpTransport = "http";
   const client = deps.createMcpClient({ baseUrl, transport });
 
   const localManifest = await collectLocalManifestWithContent(contextDir);

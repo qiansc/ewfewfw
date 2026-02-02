@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { SQLiteStore } from '../../../sqlite-store.js';
 import { createStorageOperationsFromDatabase } from '../../../lite-adapter/dataOpsContext.js';
@@ -12,6 +12,12 @@ const TMP_ROOT = join(process.cwd(), '.tmp', 'workflow-recovery-tests');
 const DB_PATH = join(TMP_ROOT, `workflow-recovery-${Date.now()}.db`);
 
 let store: SQLiteStore;
+
+function resetStoreInstance(): void {
+  const storeClass = SQLiteStore as unknown as { instance: SQLiteStore | null };
+  storeClass.instance = null;
+  store = undefined as unknown as SQLiteStore;
+}
 
 function resetDb(): void {
   const db = store.getDatabase();
@@ -76,7 +82,11 @@ describe('workflow recovery', () => {
   });
 
   afterAll(() => {
-    // Avoid closing the shared SQLiteStore singleton here to prevent test interference.
+    store.close();
+    rmSync(DB_PATH, { force: true });
+    rmSync(`${DB_PATH}-wal`, { force: true });
+    rmSync(`${DB_PATH}-shm`, { force: true });
+    resetStoreInstance();
   });
 
   beforeEach(() => {
