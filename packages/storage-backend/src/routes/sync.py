@@ -7,8 +7,43 @@ from pydantic import BaseModel
 
 from ..dependencies import get_current_user, get_permission_service
 from ..services.permission import PermissionService
+from pathlib import Path
 
 router = APIRouter()
+
+
+def _validate_safe_path(input_path: str, root: Path) -> Path:
+    candidate = Path(input_path)
+    if candidate.is_absolute():
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "C4A-INPUT-007",
+                "message": "不允许绝对路径",
+                "details": {"path": input_path},
+            },
+        )
+    if ".." in candidate.parts:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "C4A-INPUT-007",
+                "message": "不允许父目录引用",
+                "details": {"path": input_path},
+            },
+        )
+    resolved = (root / candidate).resolve()
+    root_resolved = root.resolve()
+    if root_resolved != resolved and root_resolved not in resolved.parents:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "C4A-INPUT-006",
+                "message": "路径必须在项目根目录内",
+                "details": {"path": input_path},
+            },
+        )
+    return resolved
 
 
 async def _require_write_permission_for_all_projects(
@@ -81,6 +116,9 @@ async def sync(
     permission_service: PermissionService = Depends(get_permission_service),
 ) -> dict[str, Any]:
     await _require_write_permission_for_all_projects(user_id, permission_service)
+    # 仅做路径校验（真正读写由客户端完成）
+    if _.path:
+        _validate_safe_path(_.path, Path.cwd())
     return {
         "success": True,
         "stats": {
@@ -103,10 +141,26 @@ async def plan_sync(
     permission_service: PermissionService = Depends(get_permission_service),
 ) -> dict[str, Any]:
     await _require_write_permission_for_all_projects(user_id, permission_service)
+    if params.execute:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "C4A-INPUT-002",
+                "message": "Server/Remote 同步执行尚未支持",
+                "details": {
+                    "field": "execute",
+                    "suggestion": "请先使用 plan_sync 生成计划，执行同步将在 v0.4.0 提供",
+                },
+            },
+        )
     from ..services.database import get_mongodb_adapter
 
     adapter = await get_mongodb_adapter()
     files = params.local_manifest.get("files", [])
+    # 校验本地文件路径，防止路径穿越
+    for file in files:
+        if file.path:
+            _validate_safe_path(file.path, Path.cwd())
     conflict_policy = (params.options or {}).get("conflict_policy", "warn")
 
     to_upload = []

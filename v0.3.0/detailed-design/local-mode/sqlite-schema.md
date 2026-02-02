@@ -338,7 +338,7 @@ CREATE VIRTUAL TABLE entities_fts USING fts5(
     entity_id UNINDEXED,           -- 实体 ID（不参与搜索，仅用于关联）
     source_project UNINDEXED,      -- 项目 ID（不参与搜索）
     proposal_id UNINDEXED,         -- Feat ID（不参与搜索）
-    search_text,                   -- 搜索文本：name + description + tags
+    search_text,                   -- 搜索文本：通用字段 + ADR/Process 关键字段
     tokenize = 'unicode61'         -- Unicode 分词器，支持多语言
 );
 ```
@@ -360,7 +360,7 @@ CREATE VIRTUAL TABLE entities_fts USING fts5(
 
 ```sql
 -- 触发器：实体插入时自动更新 FTS 索引
--- 注意：search_text 从 data 顶层字段提取（converter 输出格式）
+-- 注意：search_text 以通用字段为主，并补充 ADR/Process 的关键字段
 CREATE TRIGGER entities_fts_insert AFTER INSERT ON entities
 BEGIN
     INSERT INTO entities_fts(entity_id, source_project, proposal_id, search_text)
@@ -370,7 +370,17 @@ BEGIN
         NEW.proposal_id,
         COALESCE(json_extract(NEW.data, '$.name'), '') || ' ' ||
         COALESCE(json_extract(NEW.data, '$.description'), '') || ' ' ||
-        COALESCE(json_extract(NEW.data, '$.tags'), '');
+        COALESCE(json_extract(NEW.data, '$.tags'), '') || ' ' ||
+        COALESCE(json_extract(NEW.data, '$.adr.title'), '') || ' ' ||
+        COALESCE(json_extract(NEW.data, '$.context'), '') || ' ' ||
+        COALESCE(json_extract(NEW.data, '$.decision'), '') || ' ' ||
+        COALESCE(json_extract(NEW.data, '$.consequences.positive'), '') || ' ' ||
+        COALESCE(json_extract(NEW.data, '$.consequences.negative'), '') || ' ' ||
+        COALESCE(json_extract(NEW.data, '$.consequences.neutral'), '') || ' ' ||
+        COALESCE(json_extract(NEW.data, '$.alternatives'), '') || ' ' ||
+        COALESCE(json_extract(NEW.data, '$.process.name'), '') || ' ' ||
+        COALESCE(json_extract(NEW.data, '$.process.description'), '') || ' ' ||
+        COALESCE(json_extract(NEW.data, '$.process.tags'), '');
 END;
 
 -- 触发器：实体更新时同步更新 FTS 索引
@@ -388,7 +398,17 @@ BEGIN
         NEW.proposal_id,
         COALESCE(json_extract(NEW.data, '$.name'), '') || ' ' ||
         COALESCE(json_extract(NEW.data, '$.description'), '') || ' ' ||
-        COALESCE(json_extract(NEW.data, '$.tags'), '');
+        COALESCE(json_extract(NEW.data, '$.tags'), '') || ' ' ||
+        COALESCE(json_extract(NEW.data, '$.adr.title'), '') || ' ' ||
+        COALESCE(json_extract(NEW.data, '$.context'), '') || ' ' ||
+        COALESCE(json_extract(NEW.data, '$.decision'), '') || ' ' ||
+        COALESCE(json_extract(NEW.data, '$.consequences.positive'), '') || ' ' ||
+        COALESCE(json_extract(NEW.data, '$.consequences.negative'), '') || ' ' ||
+        COALESCE(json_extract(NEW.data, '$.consequences.neutral'), '') || ' ' ||
+        COALESCE(json_extract(NEW.data, '$.alternatives'), '') || ' ' ||
+        COALESCE(json_extract(NEW.data, '$.process.name'), '') || ' ' ||
+        COALESCE(json_extract(NEW.data, '$.process.description'), '') || ' ' ||
+        COALESCE(json_extract(NEW.data, '$.process.tags'), '');
 END;
 
 -- 触发器：实体删除时同步删除 FTS 索引
@@ -401,13 +421,17 @@ BEGIN
 END;
 ```
 
+> **重建策略**：启动时可执行一次 `DELETE FROM entities_fts` + `INSERT ... SELECT`，确保索引字段变更后生效。
+
 **索引字段映射规则**：
 
 | 实体类型 | data 结构 | 提取字段 |
 |---------|----------|---------|
-| 所有类型 | `{ name, description, tags, ... }` | `$.name`, `$.description`, `$.tags` |
+| 通用 | `{ name, description, tags, ... }` | `$.name`, `$.description`, `$.tags` |
+| ADR | `{ adr, context, decision, consequences, alternatives }` | `$.adr.title`, `$.context`, `$.decision`, `$.consequences.*`, `$.alternatives` |
+| Process | `{ process }` | `$.process.name`, `$.process.description`, `$.process.tags` |
 
-> **注意**：converter 输出的 `data` 字段已扁平化，`name`/`description`/`tags` 位于顶层。
+> **注意**：通用字段来自顶层；ADR/Process 字段来自对应嵌套结构。
 
 **字段映射说明**：
 
@@ -487,6 +511,10 @@ CREATE TABLE graph_cache (
 
 CREATE INDEX idx_graph_cache_expires ON graph_cache(expires_at);
 ```
+
+**清理策略**：
+- 启动时清理过期缓存：`expires_at <= now`
+- 过期时间使用 ISO 8601 字符串，便于字典序比较
 
 > **与内存缓存的关系**：
 > - **内存缓存**（见 [graph-query.md](graph-query.md#42-图查询缓存)）：进程内缓存，访问速度快，进程重启后失效

@@ -17,7 +17,8 @@ export type EntityType =
   | 'contract'
   | 'product'
   | 'process'
-  | 'sor';
+  | 'sor'
+  | 'concept';
 
 /**
  * 实体状态

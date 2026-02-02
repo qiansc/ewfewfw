@@ -71,6 +71,21 @@ class Neo4jAdapter:
                 project=project_id,
             )
 
+    async def delete_relations_from_entity(
+        self, entity_id: str, project_id: str, proposal_id: str
+    ) -> None:
+        async with self.driver.session() as session:
+            await session.run(
+                """
+                MATCH (from:Entity {id: $id, project: $project})-[r]->()
+                WHERE r.proposal_id = $proposal_id
+                DELETE r
+                """,
+                id=entity_id,
+                project=project_id,
+                proposal_id=proposal_id,
+            )
+
     async def delete_relation(self, relation_id: str) -> int:
         async with self.driver.session() as session:
             result = await session.run(

@@ -7,15 +7,15 @@ describe("generateTemplate", () => {
       id: "user-service",
       name: "用户服务",
       related: "ecommerce-system",
-      now: new Date("2026-01-01T00:00:00Z"),
     });
 
+    expect(content).toContain("schema: c4a/v1");
     expect(content).toContain("type: container");
+    expect(content).toContain("container:");
     expect(content).toContain("id: user-service");
     expect(content).toContain("name: \"用户服务\"");
     expect(content).toContain("system_id: \"ecommerce-system\"");
-    expect(content).toContain("metadata:");
-    expect(content).toContain("created_at: \"2026-01-01T00:00:00.000Z\"");
+    expect(content).toContain("technology: []");
   });
 
   test("adds TODO comment when name missing", () => {

@@ -21,6 +21,8 @@ c4a_store_feat_checklist({
 
   // generate 用：从 Technical Spec 自动生成 checklist
   source?: "technical_spec",
+  // generate 用：可选的初始任务（用于一次性生成带任务的 checklist）
+  items?: ChecklistItem[],
 
   // patch 用：更新特定任务（增量模式，推荐用于多人协作）
   patches?: [
@@ -107,6 +109,8 @@ c4a_store_feat_checklist({
 - **generate**：从 Technical Spec 自动生成 checklist 并保存到数据库
   - 解析 feat 关联的 Container、Component、Contract 实体
   - 为每个实体生成对应的任务项（带 `entity_id` 关联）
+  - 若传入 `items`，与自动生成的任务合并（`id` 冲突时以 `items` 为准）
+  - 仅传 `items`（不提供 `source`）时，直接用作初始 checklist
   - 直接保存到 MongoDB，返回结构化的 checklist
   - LLM 可在此基础上通过 patch 补充自定义任务
 - **get**：从数据库获取当前 checklist
@@ -158,6 +162,16 @@ await c4a_store_feat_checklist({
         status: "pending"
       }
     }
+  ]
+});
+
+// 2.1 或者：一次性生成带自定义任务
+await c4a_store_feat_checklist({
+  action: "generate",
+  feat_id: "feat-a001",
+  source: "technical_spec",
+  items: [
+    { id: "task-100", title: "编写单元测试", status: "pending", type: "test" }
   ]
 });
 
@@ -702,5 +716,4 @@ RETURN dependent.id, dependent.proposal_id, dependent.type
 | 检测对象 | 同一实体的多方修改 | 实体间的依赖关系 |
 | 触发时机 | 修改实体时 | 删除/废弃实体时 |
 | 数据源 | MongoDB | Neo4j |
-
 

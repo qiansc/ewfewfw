@@ -3,6 +3,7 @@
  *
  * 将 Mermaid 代码渲染为 SVG/PNG
  */
+import { escapeHtml, escapeMermaidString } from "@c4a/core/utils";
 import type { RenderChartInput } from "../schemas/inputSchemas.js";
 
 export interface MermaidRenderOptions {
@@ -84,11 +85,7 @@ function validateMermaidCode(code: string, type: string): void {
  */
 function generateMermaidSvg(code: string, theme: string): string {
   // 返回带 Mermaid 标记的 HTML，可用于客户端渲染
-  const escapedCode = code
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+  const escapedCode = escapeHtml(code);
 
   return `<div class="mermaid" data-theme="${theme}">${escapedCode}</div>
 
@@ -131,14 +128,17 @@ export function generateC4Diagram(
   // 添加实体
   for (const entity of entities) {
     const entityType = getC4EntityType(entity.type);
-    code += `  ${entityType}(${entity.id}, "${entity.name}", "${entity.description}")\n`;
+    const name = escapeMermaidString(entity.name);
+    const description = escapeMermaidString(entity.description);
+    code += `  ${entityType}(${entity.id}, "${name}", "${description}")\n`;
   }
 
   code += "\n";
 
   // 添加关系
   for (const rel of relationships) {
-    code += `  Rel(${rel.from}, ${rel.to}, "${rel.label}")\n`;
+    const label = escapeMermaidString(rel.label);
+    code += `  Rel(${rel.from}, ${rel.to}, "${label}")\n`;
   }
 
   return code;

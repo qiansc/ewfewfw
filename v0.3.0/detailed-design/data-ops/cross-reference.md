@@ -226,6 +226,44 @@ c4a_store_save({
 //    - 创建 REFERENCES 关系，properties 包含 target_scope
 ```
 
+### 1.10.1 保存时的层级关系写入
+
+系统/容器/组件的层级结构通过 `CONTAINS` 关系落库，保存时自动生成：
+
+| 实体类型 | 字段 | 自动生成的关系 |
+|---------|------|----------------|
+| Container | `data.system_id` | `System --CONTAINS--> Container` |
+| Component | `data.container_id` | `Container --CONTAINS--> Component` |
+
+**行为说明**：
+- 若 `system_id` / `container_id` 对应的父实体存在，则写入 `CONTAINS` 关系。
+- 若父实体不存在，则不写入关系，并按一致性规则返回 Warning（draft）或 Error（published）。
+- 该关系用于 `c4a_query_deps` / `c4a_query_impact` 的层级遍历与图可视化。
+
+```typescript
+// 保存 Container（示意）
+c4a_store_save({
+  type: "container",
+  data: {
+    id: "order-service",
+    system_id: "e-commerce-system",
+    name: "订单服务"
+  }
+})
+// 自动写入：System "e-commerce-system" --CONTAINS--> Container "order-service"
+
+// 保存 Component（示意）
+c4a_store_save({
+  type: "component",
+  data: {
+    id: "order-processor",
+    container_id: "order-service",
+    name: "订单处理器"
+  }
+})
+// 自动写入：Container "order-service" --CONTAINS--> Component "order-processor"
+```
+
 ### 1.11 悬空引用处理
 
 > **关键设计：逻辑引用完整性检查（非物理外键）**
@@ -877,4 +915,3 @@ c4a_store_read_history({ feat_id: "feat-a002-add-oauth" })
 - 支持审计和回滚
 
 ---
-

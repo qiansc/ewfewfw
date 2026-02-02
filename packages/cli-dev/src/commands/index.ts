@@ -6,6 +6,7 @@ import {
   checkDocker,
   startDockerDesktop,
   startStorageServices,
+  startStorageBackend,
   startAllServices,
   stopServices,
   showStatus,
@@ -13,6 +14,7 @@ import {
   cleanData,
   waitForServicesHealthy,
   areStorageServicesRunning,
+  isStorageBackendRunning,
 } from "../utils/docker.js";
 import {
   checkBun,
@@ -34,6 +36,7 @@ import {
 } from "../utils/process.js";
 import { confirm } from "../components/index.js";
 import { cmdBuild } from "./build.js";
+import { loadConfig } from "@c4a/storage";
 
 const PROJECT_ROOT = resolve(import.meta.dirname, "../../../..");
 
@@ -265,6 +268,41 @@ async function cmdDev(forceRestart = false) {
     success("所有存储服务已就绪");
   }
 
+  const projectConfig = await loadConfig(PROJECT_ROOT);
+  const shouldStartBackend = projectConfig.mode === "server";
+  if (shouldStartBackend) {
+    const backendRunning = isStorageBackendRunning();
+    if (backendRunning) {
+      info("storage-backend 已在运行，检查健康状态...");
+      const backendHealthy = await checkHttpHealth("localhost", 8055, "/health");
+      if (backendHealthy) {
+        success("storage-backend 健康，复用已有服务");
+      } else {
+        warn("storage-backend 不健康，建议运行 ./start.sh restart 重启");
+      }
+    } else {
+      info("启动 storage-backend...");
+      await startStorageBackend();
+      success("storage-backend 已启动");
+
+      info("等待 storage-backend 健康...");
+      const startTime = Date.now();
+      let backendHealthy = false;
+      while (Date.now() - startTime < 60000) {
+        backendHealthy = await checkHttpHealth("localhost", 8055, "/health");
+        if (backendHealthy) {
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+      if (!backendHealthy) {
+        error("storage-backend 启动失败或健康检查超时");
+        process.exit(1);
+      }
+      success("storage-backend 已就绪");
+    }
+  }
+
   // 5. 启动 mcp-store（带健康检查和重试）
   info("启动 mcp-store...");
   try {
@@ -320,6 +358,9 @@ async function cmdDev(forceRestart = false) {
   console.log("    - MongoDB:  localhost:27017");
   console.log("    - Neo4j:    localhost:7474 (HTTP), localhost:7687 (Bolt)");
   console.log("    - Milvus:   localhost:19530");
+  if (shouldStartBackend) {
+    console.log("    - storage-backend: localhost:8055");
+  }
   console.log("    - mcp-store: localhost:8051");
   console.log("    - mcp-query: localhost:8054");
 
@@ -381,6 +422,9 @@ async function cmdProd() {
 }
 
 async function cmdDebugDsl() {
+  if (!(await checkDependencies(["bun"]))) {
+    process.exit(1);
+  }
   info("前台运行 mcp-store (stdio 模式)...");
   info("按 Ctrl+C 退出\n");
   await runForeground("bun", ["run", "packages/mcp-store/src/index.ts"], {
@@ -389,6 +433,9 @@ async function cmdDebugDsl() {
 }
 
 async function cmdDebugCode() {
+  if (!(await checkDependencies(["bun"]))) {
+    process.exit(1);
+  }
   info("前台运行 mcp-extract (stdio 模式)...");
   info("按 Ctrl+C 退出\n");
   await runForeground("bun", ["run", "packages/mcp-extract/src/index.ts"], {
@@ -397,6 +444,9 @@ async function cmdDebugCode() {
 }
 
 async function cmdDebugData() {
+  if (!(await checkDependencies(["bun"]))) {
+    process.exit(1);
+  }
   info("前台运行 mcp-query (stdio 模式)...");
   info("按 Ctrl+C 退出\n");
   await runForeground("bun", ["run", "packages/mcp-query/src/index.ts"], {

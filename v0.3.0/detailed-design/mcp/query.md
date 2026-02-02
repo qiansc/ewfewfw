@@ -2,12 +2,13 @@
 
 ## 4.1 `c4a_query_search`（语义搜索）
 
-- **输入（建议）**
+- **输入（定义）**
   - `query: string`：搜索关键词
-  - `type_filter?: string`：按实体类型筛选（`"system"`, `"container"`, `"component"`, `"adr"`, `"contract"`, `"product"`, `"process"`, `"sor"`, `"all"`）
+  - `scope?: string`：按实体类型筛选（`"system"`, `"container"`, `"component"`, `"adr"`, `"contract"`, `"product"`, `"process"`, `"sor"`, `"all"`）
+  - `type_filter?: string`：兼容字段（等价于 `scope`，优先级低）
   - `limit?: number = 20`：返回结果数量上限
   - `offset?: number = 0`：分页偏移量
-- **返回（JSON，建议）**：
+- **返回（JSON，定义）**：
   ```typescript
   {
     items: { score?: number; id; type; summary?; ... }[];
@@ -17,13 +18,13 @@
 
 ## 4.2 `c4a_query_deps`（依赖查询）
 
-- **输入（建议）**：`id: string`, `direction?: "upstream" | "downstream" | "both"`, `depth?: number`
-- **返回（JSON，建议）**：依赖节点列表
+- **输入（定义）**：`id: string`, `direction?: "upstream" | "downstream" | "both"`, `depth?: number`
+- **返回（JSON，定义）**：依赖节点列表
 
 ## 4.3 `c4a_query_impact`（影响分析）
 
-- **输入（建议）**：`id: string`, `change_type?: string`, `depth?: number`
-- **返回（JSON，建议）**：影响节点列表
+- **输入（定义）**：`id: string`, `change_type?: string`, `depth?: number`
+- **返回（JSON，定义）**：影响节点列表
 
 ---
 

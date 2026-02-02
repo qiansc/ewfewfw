@@ -21,6 +21,64 @@ import { rowToEntity } from './helpers.js';
 
 type Database = ReturnType<SQLiteStore['getDatabase']>;
 
+function resolveDanglingRelations(
+  db: Database,
+  sourceProject: string,
+  entityId: string
+): void {
+  const rows = db.prepare(`
+    SELECT id, to_project, properties
+    FROM relations
+    WHERE to_id = ?
+      AND (status IS NULL OR status != 'deleted')
+  `).all(entityId) as Array<{
+    id: string;
+    to_project: string | null;
+    properties: string | null;
+  }>;
+
+  if (rows.length === 0) return;
+
+  const now = new Date().toISOString();
+  const updateStmt = db.prepare(`
+    UPDATE relations
+    SET to_project = ?, properties = ?, updated_at = ?
+    WHERE id = ?
+  `);
+
+  for (const row of rows) {
+    let props: Record<string, unknown> = {};
+    if (row.properties) {
+      try {
+        props = JSON.parse(row.properties) as Record<string, unknown>;
+      } catch {
+        props = {};
+      }
+    }
+
+    const isDangling =
+      props.resolved === false || props.resolve_status === 'pending';
+    if (!isDangling) continue;
+
+    const toProject = row.to_project ?? '';
+    const targetProject =
+      typeof props.target_project === 'string' ? props.target_project : null;
+    const shouldResolve =
+      toProject === sourceProject || toProject === '' || targetProject === sourceProject;
+
+    if (!shouldResolve) continue;
+
+    delete props.resolved;
+    if (props.resolve_status === 'pending') {
+      delete props.resolve_status;
+    }
+
+    const nextProject = toProject === '' ? sourceProject : toProject;
+    const nextProps = Object.keys(props).length > 0 ? JSON.stringify(props) : null;
+    updateStmt.run(nextProject, nextProps, now, row.id);
+  }
+}
+
 export function createDataOpsContext(ctx: AdapterContext): DataOpsContext {
   const vectorEnabled = ctx.config.enableVectorSearch && ctx.store.isVectorSearchEnabled();
   return {
@@ -145,7 +203,7 @@ function createStorageOperationsWithDb(db: Database, inTransaction: boolean): St
         SELECT e.id, m.content_hash
         FROM entities e
         JOIN metadata m ON e.source_project = m.source_project
-          AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+          AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
         WHERE e.proposal_id = ?
         ORDER BY e.id
       `).all(featId) as FeatEntityContentHash[];
@@ -156,7 +214,7 @@ function createStorageOperationsWithDb(db: Database, inTransaction: boolean): St
         SELECT e.id, e.source_project, e.type, e.kind, e.data, m.content_hash
         FROM entities e
         JOIN metadata m ON e.source_project = m.source_project
-          AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+          AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
         WHERE e.proposal_id = ?
       `).all(featId) as FeatEntityConflictRow[];
     },
@@ -169,7 +227,7 @@ function createStorageOperationsWithDb(db: Database, inTransaction: boolean): St
         SELECT e.type, e.kind, e.data, m.content_hash
         FROM entities e
         JOIN metadata m ON e.source_project = m.source_project
-          AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+          AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
         WHERE e.id = ? AND e.source_project = ? AND (e.proposal_id IS NULL OR e.proposal_id = '')
       `).get(entityId, sourceProject) as MainEntityConflictRow | undefined;
       return row ?? null;
@@ -193,7 +251,7 @@ function createStorageOperationsWithDb(db: Database, inTransaction: boolean): St
                m.status, m.content_hash, m.updated_at
         FROM entities e
         JOIN metadata m ON e.source_project = m.source_project
-          AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+          AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
         WHERE e.proposal_id = ?
       `).all(featId) as FeatMergeEntity[];
     },
@@ -315,7 +373,7 @@ function createStorageOperationsWithDb(db: Database, inTransaction: boolean): St
                m.created_by, m.updated_by
         FROM entities e
         JOIN metadata m ON e.source_project = m.source_project
-          AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+          AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
         WHERE (e.proposal_id IS NULL OR e.proposal_id = '')
           AND EXISTS (
             SELECT 1 FROM entities f
@@ -423,6 +481,8 @@ function createStorageOperationsWithDb(db: Database, inTransaction: boolean): St
         params.createdAt,
         params.updatedAt
       );
+
+      resolveDanglingRelations(db, params.sourceProject, params.entityId);
     },
 
     updateEntity(params): UpdateResult {
@@ -469,7 +529,7 @@ function createStorageOperationsWithDb(db: Database, inTransaction: boolean): St
         SELECT e.id, e.type, e.data, m.status, m.content_hash, m.updated_at
         FROM entities e
         JOIN metadata m ON e.source_project = m.source_project
-          AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+          AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
         WHERE (e.proposal_id IS NULL OR e.proposal_id = '') ${statusCondition}
       `).all() as Array<{
         id: string;
@@ -492,7 +552,7 @@ function createStorageOperationsWithDb(db: Database, inTransaction: boolean): St
         SELECT e.id, e.type, e.data, m.content_hash
         FROM entities e
         JOIN metadata m ON e.source_project = m.source_project
-          AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+          AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
         WHERE (e.proposal_id = ? OR e.proposal_id IS NULL OR e.proposal_id = '') ${statusCondition}
       `).all(params.proposalId ?? null) as Array<{
         id: string;
@@ -509,7 +569,7 @@ function createStorageOperationsWithDb(db: Database, inTransaction: boolean): St
                m.created_by, m.updated_by
         FROM entities e
         JOIN metadata m ON e.source_project = m.source_project
-          AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+          AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
         WHERE e.id = ? AND e.proposal_id = ?
       `).get(params.entityId, params.featId) as EntityRow | undefined;
       return row ? rowToEntity(row) : null;
@@ -522,7 +582,7 @@ function createStorageOperationsWithDb(db: Database, inTransaction: boolean): St
                m.created_by, m.updated_by
         FROM entities e
         JOIN metadata m ON e.source_project = m.source_project
-          AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+          AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
         WHERE e.id = ? AND (e.proposal_id IS NULL OR e.proposal_id = '')
       `).all(entityId) as EntityRow[];
       return rows.map(rowToEntity);

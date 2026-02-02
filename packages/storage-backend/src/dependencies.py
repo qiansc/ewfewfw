@@ -5,6 +5,7 @@ from typing import Any, Iterable
 from fastapi import Body, Depends, HTTPException, Request
 
 from .adapters.mongodb import MongoDBAdapter
+from .config import load_settings
 from .models.permission import PermissionGrant
 from .services.permission import PermissionService
 
@@ -15,7 +16,10 @@ _permission_service: PermissionService | None = None
 def init_services(mongodb: MongoDBAdapter) -> None:
     global _mongodb, _permission_service
     _mongodb = mongodb
-    _permission_service = PermissionService(mongodb)
+    settings = load_settings()
+    _permission_service = PermissionService(
+        mongodb, allow_empty=settings.permission_allow_empty
+    )
 
 
 def reset_services() -> None:

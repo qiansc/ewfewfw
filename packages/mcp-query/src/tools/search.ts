@@ -14,9 +14,10 @@ export async function querySearchHandler(
 
   const limit = args.limit ?? 20;
   const offset = args.offset ?? 0;
+  const scope = args.scope ?? args.type_filter;
   const result = await adapter.search({
     query: args.query,
-    scope: args.scope,
+    scope,
     proposal_id: args.proposal_id,
     limit,
     offset,

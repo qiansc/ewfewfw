@@ -47,7 +47,7 @@ export const ProposalIdSchema = z
     message: "proposal_id 必须符合格式：feat-{小写字母/数字/连字符}",
   })
   .nullable()
-  .optional();
+  .default(null);
 
 // ============ c4a_store_save ============
 
@@ -880,6 +880,14 @@ export const StoreFeatChecklistInputSchema = z.object({
   action: ChecklistActionSchema.describe("操作类型"),
   feat_id: z.string().describe("Feat ID"),
   source: z.literal("technical_spec").optional().describe("Checklist 来源（generate 用）"),
+  items: z.array(z.object({
+    id: z.string().describe("任务 ID"),
+    title: z.string().optional().describe("任务标题"),
+    status: z.enum(["pending", "in_progress", "completed", "blocked", "skipped"]).optional().describe("状态"),
+    type: z.enum(["dsl", "code", "test", "doc", "contract"]).optional().describe("任务类型"),
+    entity_id: z.string().optional().describe("关联实体 ID"),
+    assignee: z.string().optional().describe("负责人"),
+  })).optional().describe("初始任务列表（generate 用）"),
   patches: z.array(ChecklistPatchSchema).optional().describe("更新补丁（patch 用）"),
   validate: z.boolean().optional().default(true).describe("是否验证"),
 });

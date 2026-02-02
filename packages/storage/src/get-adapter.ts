@@ -9,12 +9,13 @@
  */
 
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { LiteAdapter } from './lite-adapter.js';
 import { ServerAdapter } from './server-adapter.js';
 import type { LiteAdapterConfig } from './lite-adapter.js';
 import type { StorageAdapter } from './adapter.js';
+import type { ADRPolicyConfig } from './adapterCrudTypes.js';
 
 // ============================================================
 // 配置类型
@@ -47,6 +48,7 @@ export interface C4AConfig {
   remote?: ServerConfig;
   project_id?: string;
   repo_id?: string;
+  adr_policy?: ADRPolicyConfig;
   feat?: {
     concurrent_warning?: boolean;
     auto_notify?: boolean;
@@ -73,22 +75,28 @@ const CONFIG_PATHS = [
  * 加载 C4A 配置
  */
 export function loadConfig(basePath: string = process.cwd()): C4AConfig {
-  for (const configPath of CONFIG_PATHS) {
-    const fullPath = join(basePath, configPath);
-    if (existsSync(fullPath)) {
-      const content = readFileSync(fullPath, 'utf-8');
-      return parseYaml(content) as C4AConfig;
+  let currentPath = resolve(basePath);
+  while (true) {
+    for (const configPath of CONFIG_PATHS) {
+      const fullPath = join(currentPath, configPath);
+      if (existsSync(fullPath)) {
+        const content = readFileSync(fullPath, 'utf-8');
+        return parseYaml(content) as C4AConfig;
+      }
     }
+    const parentPath = dirname(currentPath);
+    if (parentPath === currentPath) {
+      break;
+    }
+    currentPath = parentPath;
   }
 
-  if (basePath === process.cwd()) {
-    const backendUrl = process.env.C4A_STORAGE_BACKEND_URL;
-    if (backendUrl) {
-      return {
-        mode: 'server',
-        server: { url: backendUrl },
-      };
-    }
+  const backendUrl = process.env.C4A_STORAGE_BACKEND_URL;
+  if (backendUrl) {
+    return {
+      mode: 'server',
+      server: { url: backendUrl },
+    };
   }
 
   // 默认配置

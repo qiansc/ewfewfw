@@ -116,3 +116,6 @@ c4a_visual_render_c4({
 | `c4a_visual_cleanup` | CLI 命令 | 通过 `c4a cache clean` 命令调用 |
 | `c4a_visual_storage_stats` | CLI 命令 | 通过 `c4a status` 命令展示 |
 | `c4a_visual_get_style` | 内部 | 风格配置功能，CLI/内部调用 |
+
+> **默认暴露策略**：仅对 Agent 暴露 `c4a_visual_generate` 与 `c4a_visual_render_c4`。
+> 如需调试内部工具，可设置 `VISUAL_EXPOSE_INTERNAL_TOOLS=1`。

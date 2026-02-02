@@ -343,7 +343,7 @@ project_id: my-project          # 项目标识
 mode: local                     # local | server | remote
 skills: {cursor: true, claude: false, opencode: false}  # Skills 配置
 adr_policy: {enforce: true, scope: [system, container], on_missing: warning}
-server: {url: http://localhost:8050}    # Server 模式配置
+server: {url: http://localhost:8051}    # Server 模式配置
 remote: {url: https://c4a.example.com}  # Remote 模式配置
 ```
 
@@ -351,6 +351,11 @@ remote: {url: https://c4a.example.com}  # Remote 模式配置
 - `skills`: 启用的 AI 工具（cursor/claude/opencode）
 - `adr_policy`: ADR 策略（enforce/scope/on_missing: error|warning|ignore）
 - `server`/`remote`: 对应模式的服务地址配置
+
+**配置加载规则（StorageAdapter/MCP）**：
+1. 优先从 `basePath/.context/.c4a.yaml` 读取（MCP 服务可能从子目录启动，需显式传入项目根目录或向上查找）
+2. 若未找到且设置了 `C4A_STORAGE_BACKEND_URL`，则使用该地址并视为 `mode: server`
+3. 默认 `mode: local`
 
 > 详细配置说明见 [cli-design.md 2.5 节](./detailed-design/cli-design.md#25-项目配置)
 
@@ -819,6 +824,11 @@ rel_type: CORRESPONDS
 | SoR | name, entity_type, sor_type, description, acceptance_criteria, corresponds_to | 记录系统（Technical SoR 通过 corresponds_to 关联 Business SoR） |
 | ADR | title, status, context, decision, consequences, alternatives | 架构决策记录（状态定义见 concepts.md） |
 | Contract | contract_type, implements_sor, spec/spec_uri | API 契约（状态定义见 concepts.md） |
+
+**层级关系写入（CONTAINS）**：
+- 保存 Container 时，根据 `data.system_id` 自动写入 `System → Container` 的 `CONTAINS` 关系
+- 保存 Component 时，根据 `data.container_id` 自动写入 `Container → Component` 的 `CONTAINS` 关系
+- 图查询（`c4a_query_deps` / `c4a_query_impact`）依赖这些关系进行层级遍历
 
 **Contract 的 spec 与 spec_uri**：
 

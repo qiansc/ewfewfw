@@ -26,11 +26,13 @@
 
 ## Part 06 Local 模式
 
-| 原任务编号 | 任务 | 设计文档位置 | 延后原因 |
-|-----------|------|-------------|---------|
-| 6.20 | Local→Server 切换 | mode-switch.md | 依赖 Server API |
-| 6.21 | Server→Local 切换 | mode-switch.md | 依赖 Server 备份 |
-| 6.24 | 性能基准测试 | appendix.md | 非核心功能 |
+| 原任务编号 | 任务 | 设计文档位置 | 状态 |
+|-----------|------|-------------|:----:|
+| 6.20 | Local→Server 切换 | mode-switch.md | ✅ 已实现 |
+| 6.21 | Server→Local 切换 | mode-switch.md | ✅ 已实现 |
+| 6.24 | 性能基准测试 | appendix.md | ⏳ 延后 |
+
+**实现位置**: `packages/storage/src/mode-switch.ts` 及相关模块
 
 ---
 

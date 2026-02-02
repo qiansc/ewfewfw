@@ -348,7 +348,7 @@ Flow 不作为独立实体存储，而是作为 Process 的附属信息：
 > **字段与关系双轨存储**：`corresponds_to` 字段是 `CORRESPONDS` 关系的冗余存储。
 > - **字段**：便于单表查询，无需 JOIN 图数据库
 > - **关系**：支持图遍历和复杂关系查询
-> - **维护方式**：当前版本由 `relations` 表维护关系（DSL 不包含 `data.relationships`），字段仅作为便捷查询的冗余存储
+> - **维护方式**：`relations` 表是权威来源；DSL 可选提供 `relationships` 作为便捷输入，保存时解析并写入关系表，字段本身不作为最终关系来源
 >
 > **示例**：SoR 字段与关系表
 > ```yaml
@@ -457,6 +457,10 @@ C4A 定义了 6 种核心关系类型：
 - 所有关系在图数据库中都有明确的存储方向（from→to）
 - `CORRESPONDS` 关系虽然语义上是双向对应，但存储时约定从 Technical 指向 Business
 - 查询时可以双向遍历（通过 `direction: 'both'` 参数）
+
+**层级关系补充**：
+- `CONTAINS` 的层级关系由结构字段自动生成：`Container.data.system_id` → System，`Component.data.container_id` → Container。
+- 这些关系用于依赖/影响查询与图可视化，属于图谱的基础骨架。
 
 ---
 
@@ -917,7 +921,7 @@ c4a_store_save({
 > **字段与关系双轨存储**：`corresponds_to` 字段是 `CORRESPONDS` 关系的冗余存储。
 > - **字段**：便于单表查询，无需 JOIN 图数据库
 > - **关系**：支持图遍历和复杂关系查询
-> - **维护方式**：当前版本由 `relations` 表维护关系（DSL 不包含 `data.relationships`）
+> - **维护方式**：`relations` 表是权威来源；DSL 可选提供 `relationships` 作为便捷输入，保存时解析并写入关系表
 
 ### 修正 3：Local 模式状态流转记录说明
 

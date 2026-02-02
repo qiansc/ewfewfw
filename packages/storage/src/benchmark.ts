@@ -261,7 +261,7 @@ export class Benchmark {
         SELECT e.*, m.status, m.content_hash
         FROM entities e
         JOIN metadata m ON e.source_project = m.source_project
-          AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+          AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
         WHERE e.id = ?
       `).get(`bench-query-${i % 100}`);
     }
@@ -273,7 +273,7 @@ export class Benchmark {
         SELECT e.*, m.status, m.content_hash
         FROM entities e
         JOIN metadata m ON e.source_project = m.source_project
-          AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+          AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
         WHERE e.id = ?
       `).get(`bench-query-${i % 100}`);
       const end = performance.now();

@@ -108,7 +108,7 @@ $ c4a
   ╚══════════════════════════════════════╝
 
   ℹ️  当前项目使用 remote 模式
-  远程服务: https://c4a.example.com:8050
+  远程服务: https://c4a.example.com:8051
 
   ↑/↓ 选择  → 展开  Enter 确认  q 退出
 ```
@@ -172,7 +172,7 @@ $ c4a init
 选择: remote
 ─────────────────────────────────────────
 
-? 远程 MCP 服务地址: https://c4a.example.com:8050
+? 远程 MCP 服务地址: https://c4a.example.com:8051
 
 ? 选择 AI IDE:
   > Cursor
@@ -316,7 +316,9 @@ $ c4a init
 **Skills 安装**：
 - 根据用户选择的 AI IDE 安装对应配置
 - Cursor: `.cursor/mcp.json` + `.cursorrules`
-- Claude Code: `claude.json`
+- Claude Code: `.mcp.json` + `.claude/settings.local.json`
+  - `enabledMcpjsonServers` 需与 `.mcp.json` 中的服务名一致
+  - 推荐服务名：`c4a-store-mcp`、`c4a-query-mcp`、`c4a-extract-mcp`、`c4a-visual-mcp`
 - OpenCode: `.opencode/opencode.json`
 - 全部安装：创建所有配置文件
 
@@ -414,7 +416,7 @@ $ c4a install
   切换存储模式
 
 ⚠️  您当前处于 Remote 模式
-   远程服务: https://c4a.example.com:8050
+   远程服务: https://c4a.example.com:8051
 
 安装 Local 或 Server 模式将切换到本地存储。
 切换后，您需要重新同步数据到本地。
@@ -1444,7 +1446,7 @@ server:
 # .context/.c4a.yaml (项目配置)
 mode: server  # 使用团队共享服务
 server:
-  url: https://c4a.team.com:8050
+  url: https://c4a.team.com:8055
 ```
 
 #### 模式切换
@@ -1480,7 +1482,7 @@ local:
 
 # Server 模式安装信息（可选）
 server:
-  url: http://localhost:8050  # 本地 Docker 服务地址
+  url: http://localhost:8051  # 本地 Docker 服务地址
   installed_at: "2026-01-22T11:00:00Z"
   services:
     mongodb: localhost:27017
@@ -1525,11 +1527,11 @@ adr_policy:
 
 # Server 模式配置（mode: server 时使用）
 server:
-  url: http://localhost:8050  # 本地服务或团队共享服务地址
+  url: http://localhost:8051  # 本地服务或团队共享服务地址
 
 # Remote 模式配置（mode: remote 时使用）
 remote:
-  url: https://c4a.example.com:8050
+  url: https://c4a.example.com:8051
   # v0.3.0 暂不支持认证，允许匿名访问
   # 认证功能将在后续版本中实现
 ```
@@ -1637,7 +1639,7 @@ Remote 模式不需要安装本地存储服务。
 配置示例:
   .context/.c4a.yaml:
     remote:
-      url: https://c4a.example.com:8050
+      url: https://c4a.example.com:8051
 
 下一步:
   1. 在项目中运行 c4a init 初始化配置
@@ -1676,7 +1678,7 @@ $ c4a init
 选择: remote
 ─────────────────────────────────────────
 
-? 远程 MCP 服务地址: https://c4a.example.com:8050
+? 远程 MCP 服务地址: https://c4a.example.com:8051
 ? 选择 AI IDE:
   > Cursor
     Claude Code
@@ -1719,7 +1721,7 @@ $ c4a status
   配置文件: .context/.c4a.yaml
 
 远程服务:
-  地址: https://c4a.example.com:8050
+  地址: https://c4a.example.com:8051
   状态: ✅ 连接正常
   延迟: 45ms
 
@@ -1735,4 +1737,3 @@ Remote 模式下，`c4a sync` 通过远程 MCP 服务的 HTTP API 实现双向�
 
 
 ---
-

@@ -111,4 +111,5 @@ export interface VisualConfig {
   templates_path: string;
   default_template: string;
   cache_ttl_hours: number;
+  expose_internal_tools: boolean;
 }

@@ -29,11 +29,9 @@ if (existsSync(treeSitterWasm)) {
 }
 
 // Language WASM files - note: these need to be built or obtained separately
-// tree-sitter-typescript/go/python don't include pre-built WASM files
+// tree-sitter-go/python don't include pre-built WASM files
 // For now, we'll check if they exist and warn if not
 const languageWasmFiles = [
-  "tree-sitter-typescript.wasm",
-  "tree-sitter-tsx.wasm",
   "tree-sitter-go.wasm",
   "tree-sitter-python.wasm",
 ];

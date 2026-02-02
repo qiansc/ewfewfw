@@ -257,10 +257,10 @@ function ftsSearch(
         ) AS rn
       FROM entities e
       JOIN metadata m ON e.source_project = m.source_project
-        AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+        AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
       JOIN entities_fts ON e.id = entities_fts.entity_id
         AND e.source_project = entities_fts.source_project
-        AND e.proposal_id IS entities_fts.proposal_id
+        AND e.proposal_id = entities_fts.proposal_id
       WHERE ${whereClause}
     )
     SELECT id, source_project, proposal_id, type, data, status, updated_at, content_hash, fts_rank
@@ -370,10 +370,10 @@ function ftsSearchFallback(
         ) AS rn
       FROM entities e
       JOIN metadata m ON e.source_project = m.source_project
-        AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+        AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
       JOIN entities_fts ON e.id = entities_fts.entity_id
         AND e.source_project = entities_fts.source_project
-        AND e.proposal_id IS entities_fts.proposal_id
+        AND e.proposal_id = entities_fts.proposal_id
       WHERE ${whereClause}
     )
     SELECT id, source_project, proposal_id, type, data, status, updated_at, content_hash, fts_rank
@@ -473,7 +473,7 @@ function likeSearch(
         ) AS rn
       FROM entities e
       JOIN metadata m ON e.source_project = m.source_project
-        AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+        AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
       WHERE ${whereClause}
     )
     SELECT id, source_project, proposal_id, type, data, status, updated_at, content_hash
@@ -556,10 +556,10 @@ function countFtsMatches(
           ) AS rn
         FROM entities e
         JOIN metadata m ON e.source_project = m.source_project
-          AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+          AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
         JOIN entities_fts ON e.id = entities_fts.entity_id
           AND e.source_project = entities_fts.source_project
-          AND e.proposal_id IS entities_fts.proposal_id
+          AND e.proposal_id = entities_fts.proposal_id
         WHERE ${whereClause}
       )
       SELECT COUNT(*) AS total FROM ranked WHERE rn = 1
@@ -616,7 +616,7 @@ function countLikeMatches(
           ) AS rn
         FROM entities e
         JOIN metadata m ON e.source_project = m.source_project
-          AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+          AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
         WHERE ${whereClause}
       )
       SELECT COUNT(*) AS total FROM ranked WHERE rn = 1

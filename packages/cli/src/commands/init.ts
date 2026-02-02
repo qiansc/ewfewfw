@@ -44,6 +44,8 @@ interface InitDependencies {
 
 const CONTEXT_DIRS = [
   ".context",
+  ".context/.schemas",
+  ".context/assets",
   ".context/business/products",
   ".context/business/processes",
   ".context/business/sors",
@@ -51,6 +53,7 @@ const CONTEXT_DIRS = [
   ".context/technical/systems",
   ".context/technical/containers",
   ".context/technical/components",
+  ".context/technical/contracts",
   ".context/technical/processes",
   ".context/technical/sors",
 ];
@@ -141,8 +144,11 @@ type McpServerMap = Record<string, McpServerConfig>;
 
 function buildMcpServers(mode: CliMode, remoteUrl?: string): McpServerMap {
   if (mode === "remote") {
+    const url = normalizeMcpUrl(remoteUrl ?? "");
     return {
-      "c4a-store-mcp": { url: normalizeMcpUrl(remoteUrl ?? "") },
+      "c4a-store-mcp": { url },
+      "c4a-query-mcp": { url },
+      "c4a-visual-mcp": { url },
     };
   }
   return {
@@ -175,12 +181,31 @@ async function writeCursorConfig(servers: McpServerMap): Promise<void> {
 }
 
 async function writeClaudeConfig(servers: McpServerMap): Promise<void> {
-  const config = {
+  const rootDir = process.cwd();
+  const claudeDir = join(rootDir, ".claude");
+  if (!existsSync(claudeDir)) {
+    await mkdir(claudeDir, { recursive: true });
+  }
+
+  const mcpConfig = {
     mcpServers: Object.fromEntries(
       Object.entries(servers).map(([name, server]) => [name, { type: "http", url: server.url }])
     ),
   };
-  await writeFile(join(process.cwd(), "claude.json"), JSON.stringify(config, null, 2) + "\n", "utf-8");
+  await writeFile(
+    join(rootDir, ".mcp.json"),
+    JSON.stringify(mcpConfig, null, 2) + "\n",
+    "utf-8"
+  );
+
+  const settings = {
+    enabledMcpjsonServers: Object.keys(servers),
+  };
+  await writeFile(
+    join(claudeDir, "settings.local.json"),
+    JSON.stringify(settings, null, 2) + "\n",
+    "utf-8"
+  );
 }
 
 async function writeOpenCodeConfig(servers: McpServerMap): Promise<void> {
@@ -358,6 +383,7 @@ export async function initCommand(
       skills,
       adr_policy: adrPolicy,
       sync: { auto_export: autoExport },
+      server: mode === "server" ? { url: "http://localhost:8051" } : undefined,
       remote: remoteUrl ? { url: remoteUrl } : undefined,
     };
 

@@ -17,6 +17,7 @@ class MongoDBAdapter:
         self.metadata = self.db["metadata"]
         self.feats = self.db["feats"]
         self.permissions = self.db["project_permissions"]
+        self.entity_history = self.db["entity_history"]
 
     @staticmethod
     def _resolve_database(uri: str) -> str:
@@ -52,6 +53,13 @@ class MongoDBAdapter:
                 IndexModel([("project_id", 1), ("user_id", 1)], unique=True),
                 IndexModel([("user_id", 1)]),
                 IndexModel([("project_id", 1)]),
+            ]
+        )
+
+        await self.entity_history.create_indexes(
+            [
+                IndexModel([("entity_id", 1), ("changed_at", -1)]),
+                IndexModel([("feat_id", 1), ("changed_at", -1)]),
             ]
         )
 
@@ -119,6 +127,18 @@ class MongoDBAdapter:
         result = await self.relations.delete_many(query)
         return result.deleted_count
 
+    async def delete_relations_from_entity(
+        self, entity_id: str, project_id: str, proposal_id: str
+    ) -> int:
+        result = await self.relations.delete_many(
+            {
+                "from_id": entity_id,
+                "from_project": project_id,
+                "proposal_id": proposal_id,
+            }
+        )
+        return result.deleted_count
+
     async def save_relations(self, relations: list[dict[str, Any]]) -> dict[str, int]:
         if not relations:
             return {"inserted": 0, "modified": 0}
@@ -136,6 +156,22 @@ class MongoDBAdapter:
             "inserted": result.upserted_count,
             "modified": result.modified_count,
         }
+
+    async def insert_entity_history(self, record: dict[str, Any]) -> None:
+        await self.entity_history.insert_one(record)
+
+    async def list_entity_history(
+        self, query: dict[str, Any], limit: int, order: int
+    ) -> list[dict[str, Any]]:
+        cursor = (
+            self.entity_history.find(query, {"_id": 0})
+            .sort("changed_at", order)
+            .limit(limit)
+        )
+        return await cursor.to_list(length=None)
+
+    async def count_entity_history(self, query: dict[str, Any]) -> int:
+        return await self.entity_history.count_documents(query)
 
     async def delete_relation(self, relation_id: str) -> int:
         result = await self.relations.delete_one({"id": relation_id})

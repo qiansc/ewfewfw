@@ -148,7 +148,7 @@ export async function list(ctx: AdapterContext, params: ListParams): Promise<Lis
     const countResult = db.prepare(`
       ${baseCte}
       SELECT COUNT(*) as total FROM ${baseFrom}
-      JOIN metadata m ON e.source_project = m.source_project AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+      JOIN metadata m ON e.source_project = m.source_project AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
       ${baseRnClause}
       ${whereClause ? (baseRnClause ? `AND ${whereClause.slice(6)}` : whereClause) : ''}
     `).get(...proposalParams, ...values) as { total: number };
@@ -162,7 +162,7 @@ export async function list(ctx: AdapterContext, params: ListParams): Promise<Lis
     const groups = db.prepare(`
       ${baseCte}
       SELECT ${groupField} as group_key, COUNT(*) as count FROM ${baseFrom}
-      JOIN metadata m ON e.source_project = m.source_project AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+      JOIN metadata m ON e.source_project = m.source_project AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
       ${baseRnClause}
       ${whereClause ? (baseRnClause ? `AND ${whereClause.slice(6)}` : whereClause) : ''}
       GROUP BY ${groupField}
@@ -183,7 +183,7 @@ export async function list(ctx: AdapterContext, params: ListParams): Promise<Lis
     ${baseCte}
     SELECT e.id, e.type, e.source_project, e.proposal_id, m.status, m.updated_at, m.content_hash
     FROM ${baseFrom}
-    JOIN metadata m ON e.source_project = m.source_project AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+    JOIN metadata m ON e.source_project = m.source_project AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
     ${baseRnClause}
     ${whereClause ? (baseRnClause ? `AND ${whereClause.slice(6)}` : whereClause) : ''}
     ORDER BY m.updated_at DESC
@@ -193,7 +193,7 @@ export async function list(ctx: AdapterContext, params: ListParams): Promise<Lis
   const totalResult = db.prepare(`
     ${baseCte}
     SELECT COUNT(*) as total FROM ${baseFrom}
-    JOIN metadata m ON e.source_project = m.source_project AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+    JOIN metadata m ON e.source_project = m.source_project AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
     ${baseRnClause}
     ${whereClause ? (baseRnClause ? `AND ${whereClause.slice(6)}` : whereClause) : ''}
   `).get(...proposalParams, ...values) as { total: number };
@@ -251,7 +251,7 @@ async function doDelete(ctx: AdapterContext, params: DeleteParams): Promise<Dele
       SELECT DISTINCT r.from_id, r.from_project, e.type, r.proposal_id, r.rel_type
       FROM relations r
       JOIN entities e ON r.from_project = e.source_project
-        AND r.from_id = e.id AND r.proposal_id IS e.proposal_id
+        AND r.from_id = e.id AND r.proposal_id = e.proposal_id
       LEFT JOIN feats f ON r.proposal_id = f.id
       WHERE r.to_id = ?
         AND (r.status IS NULL OR r.status != 'deleted')
@@ -328,7 +328,7 @@ async function doDelete(ctx: AdapterContext, params: DeleteParams): Promise<Dele
           'archive', NULL, m.updated_by, datetime('now')
         FROM entities e
         JOIN metadata m ON e.source_project = m.source_project
-          AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+          AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
         WHERE e.id = ? AND e.proposal_id = ?
       `).run(params.id, dbProposalId);
 
@@ -379,7 +379,7 @@ async function doDelete(ctx: AdapterContext, params: DeleteParams): Promise<Dele
         'delete', NULL, m.updated_by, datetime('now')
       FROM entities e
       JOIN metadata m ON e.source_project = m.source_project
-        AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+        AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
       WHERE e.id = ? AND ${entityClause}
     `).run(...entityParams);
 
@@ -474,7 +474,7 @@ function queryEntity(
              m.source_repo, m.external_url, m.created_by, m.updated_by
       FROM entities e
       JOIN metadata m ON e.source_project = m.source_project
-        AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+        AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
       WHERE e.id = ? AND (e.proposal_id IS NULL OR e.proposal_id = '')
     `;
     const row = db.prepare(query).get(id) as EntityRow | undefined;
@@ -494,7 +494,7 @@ function queryEntity(
           ) AS rn
         FROM entities e
         JOIN metadata m ON e.source_project = m.source_project
-          AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+          AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
         WHERE e.id = ? AND (e.proposal_id = ? OR e.proposal_id IS NULL OR e.proposal_id = '')
       )
       SELECT * FROM ranked WHERE rn = 1
@@ -520,7 +520,7 @@ function queryEntity(
         ) AS rn
       FROM entities e
       JOIN metadata m ON e.source_project = m.source_project
-        AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+        AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
       WHERE e.id = ? AND (e.proposal_id IN (${placeholders}) OR e.proposal_id IS NULL OR e.proposal_id = '')
     )
     SELECT * FROM ranked WHERE rn = 1

@@ -1,6 +1,13 @@
 # C4A - Context For AI
 
-基于知识抽象模型扩展的架构知识管理平台，为 AI Agent 和企业开发团队提供架构知识的生产与消费能力。
+AI 原生的架构知识管理平台，以 AI Agent 为一等公民，提供架构知识的生产与消费能力。
+
+## 核心特性
+
+- **知识抽象模型**：8 种实体类型覆盖架构、决策、业务三层
+- **Feat 分支隔离**：类似 Git 分支，支持并行开发和知识演进
+- **三种工作模式**：Local（单机）、Server（团队）、Remote（云端）
+- **MCP 工具集成**：通过 MCP 协议为 AI Agent 提供知识读写能力
 
 ## 开发自举
 
@@ -14,9 +21,10 @@
 我想做一些关于 xxx 的调研
 
 # Skills
-/c4a:research # 自由调研
-/c4a:draft    # 结合调研抽象 ADR 提案
-/c4a:review   # 自由对话，通过影响分析、澄清、决策、范围检查等手段逐步使方案完成达成发布状态
+/c4a:feat      # Feature 生命周期管理
+/c4a:specify   # 需求定义
+/c4a:plan      # 技术设计
+/c4a:implement # 代码实现
 ```
 
 ### 代码实现
@@ -43,14 +51,32 @@ C4A 现阶段聚焦于高质量知识生产和消费，在代码开发的场景�
 
 ## 快速开始
 
-```bash
-git clone https://github.com/context4ai/c4a
-cd c4a
+在仓库根目录执行：
 
-# 一键启动，自动安装依赖，包括 Bun 1.3+, Python 3.11+, Docker 及 镜像
-# dev、prod 运行；server、mcp、数据库管理；日志和测试管理交互菜单
-./start.sh
+```bash
+# 安装
+./start.sh install
+
+# 启动 (Local 模式)
+./start.sh dev
+
+# 启动 (Server 模式)
+./start.sh docker
 ```
+
+## 核心命令
+
+- `c4a init` - 初始化项目
+- `c4a sync` - 同步知识
+- `c4a status` - 查看状态
+- `c4a feat` - 管理 Feature
+
+## Skills 使用
+
+- `/c4a:feat` - Feature 管理
+- `/c4a:specify` - 需求定义
+- `/c4a:plan` - 技术设计
+- `/c4a:implement` - 代码实现
 
 ## 开发环境
 
@@ -63,6 +89,12 @@ cd c4a
 ## 开发指南
 
 开发细节请参考 [CLAUDE.md](CLAUDE.md)。
+
+## 已知问题
+
+- **Server 模式一致性窗口**：MongoDB 写入后到 Neo4j/Milvus 同步完成前，查询可能返回过期数据（建议在关键查询前等待同步完成或使用重试策略）。
+- **Checklist 并发行为**：多人同时编辑时采用 Last Write Wins 策略（建议通过流程约束避免并发编辑同一 Checklist）。
+- **跨项目权限死锁**：发布前需确认所有涉及项目的权限状态（建议发布前执行权限自检或统一审批窗口）。
 
 ## License
 

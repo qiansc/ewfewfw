@@ -232,7 +232,7 @@ function loadEntity(db: Database, candidate: Candidate): {
       SELECT e.id, e.source_project, e.proposal_id, e.type, e.data
       FROM entities e
       JOIN metadata m ON e.source_project = m.source_project
-        AND e.id = m.entity_id AND e.proposal_id IS m.proposal_id
+        AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
       WHERE e.source_project = ?
         AND e.id = ?
         AND (e.proposal_id = ? OR (e.proposal_id IS NULL AND ? = ''))

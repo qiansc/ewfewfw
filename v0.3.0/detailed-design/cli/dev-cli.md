@@ -26,7 +26,7 @@ $ ./start.sh
 ```
 
 **菜单说明**（根据光标位置动态显示）：
-- **dev**：存储服务 Docker 运行，MCP Server 本地运行，支持热重载，适合日常开发
+- **dev**：存储服务 Docker 运行，MCP Server 本地运行，支持热重载，适合日常开发（当 `.context/.c4a.yaml` 为 `mode: server` 时自动启动 storage-backend 并等待健康检查）
 - **docker**：所有服务容器化运行，暴露 HTTP 端口，适合 CI/CD 和团队共享
 - **debug**：前台运行 MCP 服务，可直接查看日志，适合调试
 - **server**：管理服务状态（status/restart/stop/logs）
@@ -180,4 +180,3 @@ async function cmdDev() {
 | 其他 | 无 |
 
 ---
-

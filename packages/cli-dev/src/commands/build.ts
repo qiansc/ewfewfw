@@ -8,7 +8,7 @@ import { join, resolve } from "node:path";
 
 type ConfirmOptions = {
   title: string;
-  message?: string;
+  message: string;
   items?: string[];
   warning?: string;
   confirmText?: string;
@@ -223,16 +223,22 @@ async function generateDistPackageJson(
   const srcPkgPath = resolve(cliDir, "package.json");
   const distPkgPath = resolve(distDir, "package.json");
 
-  const srcPkg = JSON.parse(await readFile(srcPkgPath, "utf-8"));
+  const srcPkg = JSON.parse(await readFile(srcPkgPath, "utf-8")) as {
+    name?: string;
+    version?: string;
+    dependencies?: Record<string, unknown>;
+  };
   const bundledDeps = new Set(["@c4a/core", "@c4a/storage"]);
-  const dependencies = Object.fromEntries(
-    Object.entries(srcPkg.dependencies ?? {}).filter(([name, version]) => {
+  const dependencyEntries = Object.entries(srcPkg.dependencies ?? {}).filter(
+    (entry): entry is [string, string] => {
+      const [name, version] = entry;
       if (bundledDeps.has(name)) {
         return false;
       }
-      return typeof version !== "string" || !version.startsWith("workspace:");
-    })
+      return typeof version === "string" && !version.startsWith("workspace:");
+    }
   );
+  const dependencies = Object.fromEntries(dependencyEntries);
 
   const distPkg: DistPackage = {
     name: srcPkg.name,
