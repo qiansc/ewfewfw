@@ -417,7 +417,7 @@ python -m pytest tests/test_api.py -v
 ./start.sh logs
 
 # 运行 Server 模式集成测试（需要服务已启动）
-C4A_STORAGE_BACKEND_URL=http://localhost:8051 bun run --filter @c4a/storage test
+C4A_STORAGE_BACKEND_URL=http://localhost:8055 bun run --filter @c4a/storage test
 ```
 
 ---
