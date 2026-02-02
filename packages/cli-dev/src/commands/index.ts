@@ -16,6 +16,7 @@ import {
 } from "../utils/docker.js";
 import {
   checkBun,
+  checkUv,
   checkOpencode,
   checkTtyd,
   checkHttpHealth,
@@ -32,6 +33,7 @@ import {
   generateOpencodeConfig,
 } from "../utils/process.js";
 import { confirm } from "../components/index.js";
+import { cmdBuild } from "./build.js";
 
 const PROJECT_ROOT = resolve(import.meta.dirname, "../../../..");
 
@@ -54,32 +56,58 @@ function error(msg: string) {
   console.log(red(`❌ ${msg}`));
 }
 
-async function checkDependencies(deps: string[]): Promise<boolean> {
+async function checkDependencies(required: string[], optional: string[] = []): Promise<boolean> {
   let allOk = true;
 
-  if (deps.includes("docker")) {
+  const requiresDocker = required.includes("docker");
+  const wantsDocker = requiresDocker || optional.includes("docker");
+  if (wantsDocker) {
     if (checkDocker()) {
       success("Docker 已运行");
     } else {
-      // 尝试自动启动 Docker Desktop
-      warn("Docker 未运行，正在尝试启动...");
-      const started = await startDockerDesktop(60000, 2000);
-      if (started) {
-        console.log(""); // 清除进度行
-        success("Docker 已启动");
+      if (requiresDocker) {
+        // 尝试自动启动 Docker Desktop
+        warn("Docker 未运行，正在尝试启动...");
+        const started = await startDockerDesktop(60000, 2000);
+        if (started) {
+          console.log(""); // 清除进度行
+          success("Docker 已启动");
+        } else {
+          error("Docker 启动失败或超时，请手动启动 Docker Desktop");
+          allOk = false;
+        }
       } else {
-        error("Docker 启动失败或超时，请手动启动 Docker Desktop");
-        allOk = false;
+        warn("Docker 未运行，可选依赖缺失");
       }
     }
   }
 
-  if (deps.includes("bun")) {
+  const requiresBun = required.includes("bun");
+  const wantsBun = requiresBun || optional.includes("bun");
+  if (wantsBun) {
     if (checkBun()) {
       success("Bun 已安装");
     } else {
-      error("Bun 未安装，请安装: curl -fsSL https://bun.sh/install | bash");
+      if (requiresBun) {
+        error("Bun 未安装，请安装: curl -fsSL https://bun.sh/install | bash");
+        allOk = false;
+      } else {
+        warn("Bun 未安装，可选依赖缺失");
+      }
+    }
+  }
+
+  const requiresUv = required.includes("uv");
+  const wantsUv = requiresUv || optional.includes("uv");
+  if (wantsUv) {
+    if (checkUv()) {
+      success("uv 已安装");
+    } else if (requiresUv) {
+      error("uv 未安装，请安装: curl -LsSf https://astral.sh/uv/install.sh | sh");
       allOk = false;
+    } else {
+      warn("uv 未安装，Python 功能不可用");
+      warn("安装: curl -LsSf https://astral.sh/uv/install.sh | sh");
     }
   }
 
@@ -153,6 +181,21 @@ export async function runCommand(command: string, args: string[] = []) {
     case "clean:local":
       await cmdCleanLocal();
       break;
+    case "build":
+      await cmdBuild(args, {
+        projectRoot: PROJECT_ROOT,
+        checkDependencies,
+        runForeground,
+        info,
+        success,
+        warn,
+        error,
+        blue,
+        green,
+        confirm,
+        waitForInput,
+      });
+      break;
     case "install":
       await cmdInstall();
       break;
@@ -172,7 +215,7 @@ async function cmdDev(forceRestart = false) {
 
   // 1. 检查依赖
   info("检查依赖...");
-  if (!(await checkDependencies(["docker", "bun", "uv"]))) {
+  if (!(await checkDependencies(["docker", "bun"], ["uv"]))) {
     process.exit(1);
   }
 
@@ -618,7 +661,7 @@ async function cmdCleanAll() {
 }
 
 async function cmdInstall() {
-  if (!(await checkDependencies(["bun"]))) {
+  if (!(await checkDependencies(["bun"], ["uv"]))) {
     process.exit(1);
   }
 

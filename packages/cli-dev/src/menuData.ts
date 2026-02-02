@@ -14,6 +14,7 @@ export const menuTree: MenuItem[] = [
   { id: "restart", label: "restart", description: "重启服务" },
   { id: "docker", label: "docker", description: "全 Docker 模式" },
   { id: "prod", label: "prod", description: "生产部署" },
+  { id: "build", label: "build", description: "编译 CLI" },
   {
     id: "debug",
     label: "debug",
@@ -65,6 +66,7 @@ export const helpDescriptions: Record<string, string> = {
   stop: "停止所有运行中的服务，包括 Docker 容器和本地进程。",
   logs: "查看 Docker 容器日志，可指定服务名如 logs mongodb。",
   install: "安装项目依赖：bun install。",
+  build: "编译用户 CLI：打包 skills/schemas 并生成 dist 产物。",
   test: "运行项目测试：bun test。",
   clean: "按 → 展开子菜单，选择清理范围：远程存储、本地文件或全部。",
   "clean:storage": "清理远程存储（MongoDB/Neo4j/Milvus/Ollama volumes）。本地 .context/ 文件不受影响。",

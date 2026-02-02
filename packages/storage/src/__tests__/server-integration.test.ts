@@ -12,6 +12,7 @@ const runTest = baseUrl ? test : test.skip;
 const sharedProjectId = process.env.C4A_TEST_PROJECT_ID ?? `proj-${Date.now()}`;
 const adminId = process.env.C4A_ADMIN_USER_ID ?? `admin-${Date.now()}`;
 const supportsSharedFs = process.env.C4A_STORAGE_BACKEND_FS === 'shared';
+let serverAvailabilityError: string | null = null;
 let permissionReady = false;
 const TMP_DIR = join(process.cwd(), '.tmp');
 
@@ -53,6 +54,22 @@ async function requestJson<T>(path: string, init: RequestInit): Promise<T> {
   return payload as T;
 }
 
+async function checkServerAvailable(): Promise<boolean> {
+  if (!baseUrl) return false;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 1500);
+  try {
+    const response = await fetch(new URL('/health', baseUrl).toString(), {
+      signal: controller.signal,
+    });
+    return response.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function grantPermission(
   projectId: string,
   userId: string,
@@ -76,6 +93,14 @@ async function grantPermission(
 describe('Server mode integration', () => {
   beforeAll(async () => {
     if (!baseUrl) return;
+    const available = await checkServerAvailable();
+    if (!available) {
+      serverAvailabilityError =
+        `[server-integration] storage-backend 不可用，请先执行 ./start.sh docker 启动服务后再运行测试。` +
+        ` (url: ${baseUrl})`;
+      permissionReady = false;
+      return;
+    }
     try {
       await grantPermission(sharedProjectId, adminId, 'admin', adminId);
       permissionReady = true;
@@ -92,6 +117,9 @@ describe('Server mode integration', () => {
   });
 
   runTest('init → save → read → search → delete (with permissions)', async () => {
+    if (serverAvailabilityError) {
+      throw new Error(serverAvailabilityError);
+    }
     if (!permissionReady) return;
     const projectId = sharedProjectId;
     const userId = `tester-${Date.now()}`;
@@ -158,6 +186,9 @@ describe('Server mode integration', () => {
   });
 
   runTest('relations: save → delete', async () => {
+    if (serverAvailabilityError) {
+      throw new Error(serverAvailabilityError);
+    }
     if (!permissionReady) return;
     const projectId = sharedProjectId;
     const relationId = `rel-${Date.now()}`;
@@ -183,6 +214,9 @@ describe('Server mode integration', () => {
   });
 
   runTest('mode switch: Local → Server → Local', async () => {
+    if (serverAvailabilityError) {
+      throw new Error(serverAvailabilityError);
+    }
     if (!permissionReady) return;
     if (!supportsSharedFs) {
       console.warn(
@@ -261,6 +295,9 @@ describe('Server mode integration', () => {
   });
 
   runTest('mode switch: Server → Local (download fallback)', async () => {
+    if (serverAvailabilityError) {
+      throw new Error(serverAvailabilityError);
+    }
     if (!permissionReady) return;
     if (supportsSharedFs) {
       console.warn('[server-integration] shared fs 启用，下载回迁场景跳过。');
