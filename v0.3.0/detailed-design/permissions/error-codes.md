@@ -1,5 +1,11 @@
 ## 3. 错误码规范
 
+> **版本说明**：
+>
+> `packages/core/src/types/errors.ts` 已包含完整的错误码体系。
+>
+> **本版本新增**：Gateway 错误码（SYS-006~009），用于 HTTP Gateway 场景。
+
 ### 3.1 错误码格式
 
 ```
@@ -95,6 +101,10 @@ function handleMcpError(error: McpError) {
 | C4A-SYS-003 | 500 | 内部服务错误 | 查看日志，联系管理员 |
 | C4A-SYS-004 | 503 | 向量搜索服务不可用 | 检查 USearch 索引或 Milvus 服务 |
 | C4A-SYS-005 | 503 | 远程服务不可用 | 检查远程服务地址和网络 |
+| C4A-SYS-006 | 504 | Gateway 超时 | 检查上游服务响应时间 |
+| C4A-SYS-007 | 502 | 上游服务错误 | 检查上游服务状态 |
+| C4A-SYS-008 | 503 | Gateway 服务不可用 | 检查 Gateway 服务状态 |
+| C4A-SYS-009 | 500 | 传输层错误 | 检查 stdio/HTTP 传输配置 |
 | **BIZ 类（业务逻辑错误）** ||||
 | C4A-BIZ-001 | 422 | 非法状态流转 | 按正确顺序流转状态 |
 | C4A-BIZ-002 | 422 | feat 状态不允许操作 | 先流转 feat 状态 |

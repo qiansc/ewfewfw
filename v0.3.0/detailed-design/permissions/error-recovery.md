@@ -1,5 +1,18 @@
 ## 2. 错误处理和恢复流程
 
+> **版本说明**：
+>
+> `packages/core/src/types/errors.ts` 已包含完整的错误处理基础设施：
+> - 7 类错误码（INPUT/DATA/SYS/BIZ/STORE/PERM/MIGRATE）
+> - HTTP 状态码映射
+> - 多语言消息
+> - C4AError 基类和子类
+> - `toMcpErrorResponse` / `errorToMcpResponse` 函数
+>
+> **本版本新增**：Gateway 错误码（SYS-006~009）
+>
+> **延后到 v0.4.0**：Skill 错误处理、归档检查、Server 数据修复、数据备份配置
+
 ### 2.1 错误分类
 
 | 错误类型 | 说明 | 示例 | 恢复策略 |

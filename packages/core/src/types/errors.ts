@@ -60,6 +60,10 @@ export const SYS_ERROR_CODES = {
   INTERNAL_ERROR: 'C4A-SYS-003', // 内部服务错误
   VECTOR_SERVICE_UNAVAILABLE: 'C4A-SYS-004', // 向量搜索服务不可用
   REMOTE_SERVICE_UNAVAILABLE: 'C4A-SYS-005', // 远程服务不可用
+  GATEWAY_TIMEOUT: 'C4A-SYS-006', // Gateway 超时
+  GATEWAY_BAD_GATEWAY: 'C4A-SYS-007', // 上游服务错误
+  GATEWAY_SERVICE_UNAVAILABLE: 'C4A-SYS-008', // Gateway 服务不可用
+  TRANSPORT_ERROR: 'C4A-SYS-009', // 传输层错误（stdio/http 通用）
 } as const;
 
 /**
@@ -151,6 +155,10 @@ export const ERROR_CODE_TO_HTTP_STATUS: Record<ErrorCode, number> = {
   'C4A-SYS-003': 500,
   'C4A-SYS-004': 503,
   'C4A-SYS-005': 503,
+  'C4A-SYS-006': 504,
+  'C4A-SYS-007': 502,
+  'C4A-SYS-008': 503,
+  'C4A-SYS-009': 500,
   // BIZ
   'C4A-BIZ-001': 422,
   'C4A-BIZ-002': 422,
@@ -207,6 +215,10 @@ export const ERROR_MESSAGES: Record<ErrorCode, { zh: string; en: string }> = {
   'C4A-SYS-003': { zh: '内部服务错误', en: 'Internal service error' },
   'C4A-SYS-004': { zh: '向量搜索服务不可用', en: 'Vector search service unavailable' },
   'C4A-SYS-005': { zh: '远程服务不可用', en: 'Remote service unavailable' },
+  'C4A-SYS-006': { zh: 'Gateway 超时', en: 'Gateway timeout' },
+  'C4A-SYS-007': { zh: '上游服务错误', en: 'Bad gateway' },
+  'C4A-SYS-008': { zh: 'Gateway 服务不可用', en: 'Gateway service unavailable' },
+  'C4A-SYS-009': { zh: '传输层错误', en: 'Transport error' },
   // BIZ
   'C4A-BIZ-001': { zh: '非法状态流转', en: 'Invalid status transition' },
   'C4A-BIZ-002': { zh: 'feat 状态不允许此操作', en: 'Feat status does not allow this operation' },

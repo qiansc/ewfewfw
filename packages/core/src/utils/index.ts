@@ -32,3 +32,5 @@ export function generateId(prefix: string = "c4a"): string {
 export function now(): string {
   return new Date().toISOString();
 }
+
+export * from "./security.js";
