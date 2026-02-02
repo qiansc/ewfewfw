@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any, Iterable
 
 from fastapi import Body, Depends, HTTPException, Request
@@ -66,6 +67,7 @@ def _raise_missing_project() -> None:
             "code": "C4A-INPUT-001",
             "message": "缺少 project_id",
             "details": {"field": "project_id"},
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         },
     )
 
@@ -198,7 +200,17 @@ async def get_user_visible_projects(
     mongodb: MongoDBAdapter = Depends(get_mongodb),
 ) -> list[str]:
     if user_id == "anonymous":
-        return []
+        total = await mongodb.permissions.count_documents({})
+        if total == 0:
+            return ["*"]
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "C4A-PERM-003",
+                "message": "无读权限",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+        )
     total = await mongodb.permissions.count_documents({})
     if total == 0:
         return ["*"]

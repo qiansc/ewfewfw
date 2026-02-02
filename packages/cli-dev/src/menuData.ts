@@ -12,7 +12,7 @@ export interface MenuItem {
 export const menuTree: MenuItem[] = [
   { id: "dev", label: "dev", description: "本地开发" },
   { id: "restart", label: "restart", description: "重启服务" },
-  { id: "docker", label: "docker", description: "全 Docker 模式" },
+  { id: "docker:rebuild", label: "docker:rebuild", description: "Docker 重建并重启" },
   { id: "prod", label: "prod", description: "生产部署" },
   { id: "build", label: "build", description: "编译 CLI" },
   {
@@ -55,7 +55,7 @@ export const menuTree: MenuItem[] = [
 export const helpDescriptions: Record<string, string> = {
   dev: "启动存储服务(Docker) + mcp-store/mcp-query，带健康检查和自动重试。使用 ./start.sh dev --force 强制重启。",
   restart: "重启所有服务，包括 mcp-store/mcp-query 和 ttyd。适用于服务异常时恢复。",
-  docker: "所有 MCP 服务容器化运行，暴露 HTTP 端口供远程 Agent 调用。适合团队共享和 CI/CD。",
+  "docker:rebuild": "强制重建所有 Docker 镜像并重启容器，确保代码更新生效。",
   prod: "生产级部署，启用健康检查和自动重启，支持 TLS/认证。适合正式环境。",
   debug: "按 → 展开子菜单，选择要调试的 MCP 服务，前台运行可直接看日志。",
   "debug:store": "前台运行 mcp-store (stdio 模式)，可直接看到输入输出日志，Ctrl+C 退出。",

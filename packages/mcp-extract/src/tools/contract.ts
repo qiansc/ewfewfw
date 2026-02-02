@@ -40,7 +40,7 @@ export async function generateContract(
     baseUrl,
   } = input;
 
-  const resolvedPath = resolveCodePath(path);
+  const resolvedPath = await resolveCodePath(path);
   const errors: Array<{ file: string; error: string }> = [];
 
   // Collect all code analysis

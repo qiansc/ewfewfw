@@ -6,6 +6,8 @@
 import { mkdir, writeFile, readFile, unlink, readdir, stat } from "fs/promises";
 import { join, resolve, relative, dirname, basename, extname } from "path";
 import { existsSync } from "fs";
+import { validatePath } from "@c4a/core/utils";
+import { InputError, INPUT_ERROR_CODES } from "@c4a/core/types";
 import { config } from "../config.js";
 import type {
   StorageMode,
@@ -24,6 +26,26 @@ const STORAGE_PATHS: Record<StorageMode, string> = {
 
 // 元数据存储
 const metadataStore = new Map<string, StoredImage>();
+
+async function assertSafePath(
+  relativePath: string,
+  basePath: string,
+  field: string
+): Promise<void> {
+  const validation = await validatePath(relativePath, basePath);
+  if (!validation.valid) {
+    throw new InputError(
+      validation.errorCode ?? INPUT_ERROR_CODES.INVALID_PATH_CHARS,
+      {
+        field,
+        actual: relativePath,
+        expected: "path within storage base directory",
+        suggestion: validation.error,
+      },
+      validation.error
+    );
+  }
+}
 
 /**
  * 获取存储基础路径
@@ -76,6 +98,18 @@ export async function saveImage(
   const imageId = generateImageId();
   const ext = format.toLowerCase() === "jpeg" ? "jpg" : format.toLowerCase();
   const filename = options.filename || `${imageId}.${ext}`;
+
+  const basePath = getBasePath();
+  const relativeDir =
+    mode === "report"
+      ? `reports/${options.reportId ?? ""}/images`
+      : STORAGE_PATHS[mode];
+  await assertSafePath(
+    relativeDir,
+    basePath,
+    mode === "report" ? "report_id" : "storage_mode"
+  );
+  await assertSafePath(`${relativeDir}/${filename}`, basePath, "filename");
 
   const storagePath = getStoragePath(mode, options.reportId);
 

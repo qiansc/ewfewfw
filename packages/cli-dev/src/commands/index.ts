@@ -148,8 +148,8 @@ export async function runCommand(command: string, args: string[] = []) {
     case "restart":
       await cmdRestart();
       break;
-    case "docker":
-      await cmdDocker();
+    case "docker:rebuild":
+      await cmdDockerRebuild();
       break;
     case "prod":
       await cmdProd();
@@ -383,18 +383,18 @@ async function cmdDev(forceRestart = false) {
   console.log("");
 }
 
-async function cmdDocker() {
+async function cmdDockerRebuild() {
   console.log("\n" + blue("═".repeat(50)));
-  console.log(blue("  C4A v2 - 全 Docker 模式"));
+  console.log(blue("  C4A v2 - Docker 重建并重启"));
   console.log(blue("═".repeat(50)) + "\n");
 
   if (!(await checkDependencies(["docker"]))) {
     process.exit(1);
   }
 
-  info("启动所有服务 (包含 MCP)...");
-  await startAllServices("mcp");
-  success("所有服务已启动");
+  info("重建并启动所有服务 (包含 MCP)...");
+  await startAllServices("mcp", { rebuild: true });
+  success("所有服务已重建并启动");
 
   console.log("\n  MCP 端点:");
   console.log("    - mcp-store:  http://localhost:8051/mcp");

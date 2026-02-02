@@ -3,6 +3,7 @@
  */
 
 import { readFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 import type { RestoreParams, RestoreResult, RestoreConflict } from '../adapter.js';
 import type { AdapterContext } from './types.js';
@@ -204,11 +205,11 @@ export async function restore(
 
     // 恢复关系（简化处理）
     for (const relation of backupData.relations) {
-      const relationId = relation.id ?? null;
-      const fromProject = relation.from_project ?? null;
-      const toProject = relation.to_project ?? null;
+      const relationId = relation.id ?? randomUUID();
+      const fromProject = relation.from_project ?? '';
+      const toProject = relation.to_project ?? '';
       try {
-        db.prepare(`
+        const result = db.prepare(`
           INSERT OR IGNORE INTO relations (id, proposal_id, from_project, from_id, to_project, to_id, rel_type, created_at, updated_at)
           VALUES (?, '', ?, ?, ?, ?, ?, ?, ?)
         `).run(
@@ -221,7 +222,9 @@ export async function restore(
           now,
           now
         );
-        relationsRestored++;
+        if (result.changes > 0) {
+          relationsRestored++;
+        }
       } catch {
         // 忽略关系恢复错误
       }

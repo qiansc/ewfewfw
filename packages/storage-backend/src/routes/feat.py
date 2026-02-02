@@ -171,12 +171,43 @@ def _entity_snapshot(entity: dict[str, Any]) -> dict[str, Any]:
 
 
 async def _list_feat_entities(adapter: Any, feat_id: str) -> list[dict[str, Any]]:
-    cursor = adapter.entities.find({"proposal_id": feat_id}, {"_id": 0})
-    return await cursor.to_list(length=None)
+    normalized_feat_id = feat_id.strip()
+    cursor = adapter.entities.find({"proposal_id": normalized_feat_id}, {"_id": 0})
+    entities = await cursor.to_list(length=None)
+    if entities:
+        return entities
+    # 兼容历史数据：proposal_id 写在 data/metadata 中
+    legacy_query = {
+        "$or": [
+            {"data.proposal_id": normalized_feat_id},
+            {"data.metadata.proposal_id": normalized_feat_id},
+            {"metadata.proposal_id": normalized_feat_id},
+        ]
+    }
+    cursor = adapter.entities.find(legacy_query, {"_id": 0})
+    legacy_entities = await cursor.to_list(length=None)
+    if not legacy_entities:
+        return []
+    for entity in legacy_entities:
+        update_filter: dict[str, Any] = {"id": entity.get("id")}
+        if entity.get("source_project") is not None:
+            update_filter["source_project"] = entity.get("source_project")
+        update_filter["$or"] = [
+            {"proposal_id": {"$in": [None, "", normalized_feat_id]}},
+            {"data.proposal_id": normalized_feat_id},
+            {"data.metadata.proposal_id": normalized_feat_id},
+            {"metadata.proposal_id": normalized_feat_id},
+        ]
+        await adapter.entities.update_one(
+            update_filter, {"$set": {"proposal_id": normalized_feat_id}}
+        )
+        entity["proposal_id"] = normalized_feat_id
+    return legacy_entities
 
 
 async def _list_feat_relations(adapter: Any, feat_id: str) -> list[dict[str, Any]]:
-    cursor = adapter.relations.find({"proposal_id": feat_id}, {"_id": 0})
+    normalized_feat_id = feat_id.strip()
+    cursor = adapter.relations.find({"proposal_id": normalized_feat_id}, {"_id": 0})
     return await cursor.to_list(length=None)
 
 
@@ -321,22 +352,35 @@ async def _merge_feat_entities(
 ) -> list[str]:
     now = now_iso()
     merged_ids: list[str] = []
+    normalized_feat_id = feat_id.strip()
     for entity in entities:
         merged = dict(entity)
         merged["proposal_id"] = ""
         merged["status"] = "published"
         merged["updated_at"] = now
-        await adapter.save_entity(merged)
+        entity_id = entity.get("id")
+        source_project = entity.get("source_project", "")
         await adapter.entities.delete_one(
-            {
-                "id": entity.get("id"),
-                "source_project": entity.get("source_project", ""),
-                "proposal_id": feat_id,
-            }
+            {"id": entity_id, "source_project": source_project, "proposal_id": ""}
         )
+        update_result = await adapter.entities.update_one(
+            {
+                "id": entity_id,
+                "source_project": source_project,
+                "proposal_id": normalized_feat_id,
+            },
+            {"$set": merged},
+        )
+        matched_count = (
+            update_result.get("matched_count", update_result.get("modified_count", 0))
+            if isinstance(update_result, dict)
+            else getattr(update_result, "matched_count", 0)
+        )
+        if matched_count == 0:
+            await adapter.save_entity(merged)
         await _sync_entity_indexes(adapter, merged)
-        await _delete_feat_vector(entity, feat_id)
-        merged_ids.append(str(entity.get("id")))
+        await _delete_feat_vector(entity, normalized_feat_id)
+        merged_ids.append(str(entity_id))
 
     await _merge_feat_relations(adapter, feat_id, now)
     return merged_ids
@@ -428,6 +472,28 @@ async def feat_lifecycle(
 
             feat_entities = await _list_feat_entities(adapter, params.feat_id)
             merged = await _merge_feat_entities(adapter, params.feat_id, feat_entities)
+            remaining = await _list_feat_entities(adapter, params.feat_id)
+            if remaining:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "C4A-BIZ-004",
+                        "message": "发布合并未完成",
+                        "details": {
+                            "feat_id": params.feat_id,
+                            "remaining_ids": [item.get("id") for item in remaining],
+                            "merged_ids": merged,
+                        },
+                        "timestamp": now_iso(),
+                        "recoverable_actions": [
+                            {
+                                "action": "retry",
+                                "label": "重试合并",
+                                "params": {"feat_id": params.feat_id, "strategy": "auto"},
+                            }
+                        ],
+                    },
+                )
             await feats.update_one(
                 {"id": params.feat_id},
                 {"$set": {"status": to_status, "updated_at": now_iso(), "checklist": None}},

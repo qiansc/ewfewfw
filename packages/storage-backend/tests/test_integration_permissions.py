@@ -368,11 +368,15 @@ def test_utils_restore_conflict_error(monkeypatch, tmp_path: Path):
         "relations": [],
         "feats": [],
     }
-    backup_path = tmp_path / "backup.json"
+    relative_dir = Path(".tmp") / "tests"
+    safe_dir = Path.cwd() / relative_dir
+    safe_dir.mkdir(parents=True, exist_ok=True)
+    relative_path = relative_dir / f"backup-{tmp_path.name}.json"
+    backup_path = Path.cwd() / relative_path
     backup_path.write_text(json.dumps(backup_payload), encoding="utf-8")
 
     response = client.post(
         "/utils/restore",
-        json={"input": str(backup_path), "conflict_policy": "error"},
+        json={"input": str(relative_path), "conflict_policy": "error"},
     )
     assert response.status_code == 409

@@ -25,11 +25,15 @@ def normalize_text(text: str | None) -> str:
 
 
 def normalize_proposal_id(value: str | None) -> str:
-    return value or ""
+    if not value:
+        return ""
+    return value.strip()
 
 
 def normalize_source_project(value: str | None) -> str:
-    return value or ""
+    if not value:
+        return ""
+    return value.strip()
 
 
 def pick_string(value: Any) -> str | None:

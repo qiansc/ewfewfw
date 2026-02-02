@@ -48,7 +48,7 @@ export async function analyze(input: AnalyzeInput): Promise<AnalyzeResult> {
     offset = 0,
   } = input;
 
-  const resolvedPath = resolveCodePath(path);
+  const resolvedPath = await resolveCodePath(path);
 
   const result: AnalyzeResult = {
     files: [],

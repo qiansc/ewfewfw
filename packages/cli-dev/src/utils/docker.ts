@@ -103,10 +103,17 @@ export function startStorageServices(): Promise<void> {
   });
 }
 
-export function startAllServices(_profile: string = "mcp"): Promise<void> {
+export function startAllServices(
+  _profile: string = "mcp",
+  options?: { rebuild?: boolean }
+): Promise<void> {
   return new Promise((resolve, reject) => {
-    const [cmd, ...args] = dockerCompose("up", "-d");
-    const proc = spawn(cmd, args, { stdio: "inherit" });
+    const args = ["up", "-d"];
+    if (options?.rebuild) {
+      args.push("--build");
+    }
+    const [cmd, ...rest] = dockerCompose(...args);
+    const proc = spawn(cmd, rest, { stdio: "inherit" });
     proc.on("close", (code) => {
       if (code === 0) resolve();
       else reject(new Error(`Docker compose failed with code ${code}`));

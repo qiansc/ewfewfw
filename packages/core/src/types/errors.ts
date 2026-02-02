@@ -153,7 +153,17 @@ export const ERROR_CODES = {
   ...VISUAL_ERROR_CODES,
 } as const;
 
-export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
+export type ErrorCode =
+  | (typeof INPUT_ERROR_CODES)[keyof typeof INPUT_ERROR_CODES]
+  | (typeof DATA_ERROR_CODES)[keyof typeof DATA_ERROR_CODES]
+  | (typeof SYS_ERROR_CODES)[keyof typeof SYS_ERROR_CODES]
+  | (typeof BIZ_ERROR_CODES)[keyof typeof BIZ_ERROR_CODES]
+  | (typeof STORE_ERROR_CODES)[keyof typeof STORE_ERROR_CODES]
+  | (typeof PERM_ERROR_CODES)[keyof typeof PERM_ERROR_CODES]
+  | (typeof MIGRATE_ERROR_CODES)[keyof typeof MIGRATE_ERROR_CODES]
+  | (typeof EXTRACT_ERROR_CODES)[keyof typeof EXTRACT_ERROR_CODES]
+  | (typeof QUERY_ERROR_CODES)[keyof typeof QUERY_ERROR_CODES]
+  | (typeof VISUAL_ERROR_CODES)[keyof typeof VISUAL_ERROR_CODES];
 
 // ============================================================================
 // 错误码到 HTTP 状态码映射

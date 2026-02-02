@@ -10,7 +10,7 @@ import type {
   StoreListCountResult,
   StoreListGroupResult,
 } from "../schemas.js";
-import { getAdapter } from "@c4a/storage";
+import { getAdapter, loadConfig } from "@c4a/storage";
 
 /**
  * c4a_store_list 处理函数
@@ -24,15 +24,18 @@ export async function storeListHandler(
   args: StoreListInput
 ): Promise<StoreListResult | StoreListCountResult | StoreListGroupResult> {
   const adapter = await getAdapter();
+  const config = loadConfig();
 
   // 确保适配器已初始化
   await adapter.initialize();
+
+  const resolvedProjectId = args.project_id ?? config.project_id;
 
   // 调用 StorageAdapter.list()
   const result = await adapter.list({
     filter: args.filter,
     type: args.type,
-    project_id: args.project_id,
+    project_id: resolvedProjectId,
     proposal_id: args.proposal_id,
     status: args.status,
     updated_after: args.updated_after,

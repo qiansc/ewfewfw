@@ -98,12 +98,23 @@ class FakeMongoAdapter:
             return item
         return None
 
+    async def delete_relations_from_entity(
+        self, _entity_id: str, _project_id: str, _proposal_id: str
+    ) -> int:
+        return 0
+
 
 class FakeNeo4jAdapter:
     def __init__(self, state: dict[str, bool]) -> None:
         self._state = state
 
     async def upsert_entity(self, entity: dict[str, Any]) -> None:
+        if self._state.get("fail"):
+            raise RuntimeError("neo4j boom")
+
+    async def delete_relations_from_entity(
+        self, _entity_id: str, _project_id: str, _proposal_id: str
+    ) -> None:
         if self._state.get("fail"):
             raise RuntimeError("neo4j boom")
 

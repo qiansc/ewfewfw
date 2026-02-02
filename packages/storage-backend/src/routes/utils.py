@@ -141,7 +141,14 @@ def _normalize_projects(projects: list[str | None]) -> list[str]:
 def _validate_safe_path(input_path: str, root: Path) -> Path:
     candidate = Path(input_path)
     if candidate.is_absolute():
-        return candidate.resolve()
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "C4A-INPUT-007",
+                "message": "不允许绝对路径",
+                "details": {"path": input_path},
+            },
+        )
     if ".." in candidate.parts:
         raise HTTPException(
             status_code=400,

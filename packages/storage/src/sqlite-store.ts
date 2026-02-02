@@ -347,6 +347,13 @@ export class SQLiteStore {
       CREATE INDEX IF NOT EXISTS idx_metadata_content_hash ON metadata(content_hash);
     `);
 
+    this.db.exec(`
+      UPDATE entities SET source_project = '' WHERE source_project IS NULL;
+      UPDATE entities SET proposal_id = '' WHERE proposal_id IS NULL;
+      UPDATE metadata SET source_project = '' WHERE source_project IS NULL;
+      UPDATE metadata SET proposal_id = '' WHERE proposal_id IS NULL;
+    `);
+
     // Workflow 状态表
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS workflow_states (
