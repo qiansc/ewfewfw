@@ -1,100 +1,94 @@
 # C4A - Context For AI
 
-AI 原生的架构知识管理平台，以 AI Agent 为一等公民，提供架构知识的生产与消费能力。
+**知识驱动开发（Knowledge-Driven Development）平台**
 
-## 核心特性
+C4A 是一个 AI 原生的知识管理平台，为 AI Agent 提供结构化的上下文，实现从业务需求到代码实现的全链路知识贯通。
 
-- **知识抽象模型**：8 种实体类型覆盖架构、决策、业务三层
-- **Feat 分支隔离**：类似 Git 分支，支持并行开发和知识演进
-- **三种工作模式**：Local（单机）、Server（团队）、Remote（云端）
-- **MCP 工具集成**：通过 MCP 协议为 AI Agent 提供知识读写能力
+## 核心理念
 
-## 开发自举
+**传统开发的痛点**：需求文档、设计文档、代码实现之间存在断层，AI Agent 缺乏足够的上下文来理解业务意图。
 
-本项目的开发基于 AI IDE 和 C4A 本身实现自我迭代，开发者只需要一切 talk with AI，与 C4A Agent 一起工作和迭代。
+**C4A 的解决方案**：通过统一的知识模型，将业务知识、架构决策、技术实现串联起来，让 AI Agent 能够：
+- 理解业务背景和约束条件
+- 遵循已有的架构决策
+- 生成符合规范的代码
 
-你可以自由与 C4A Agent 对话，让它帮你完成架构规划和代码实现；
-或通过指令，使用 ADR 工作流（调研 → 草稿 → 评审 → 批准 → 实现 → 发布）进行迭代。
+## 知识模型
 
-```
-# Vibe Coding Start
-我想做一些关于 xxx 的调研
+C4A 定义了 8 种知识实体，覆盖业务、架构、技术三个层面：
 
-# Skills
-/c4a:feat      # Feature 生命周期管理
-/c4a:specify   # 需求定义
-/c4a:plan      # 技术设计
-/c4a:implement # 代码实现
-```
+| 层面 | 实体类型 | 说明 |
+|------|----------|------|
+| **业务层** | Product | 产品定义、用户故事、验收标准 |
+| | Process | 业务流程、工作流定义 |
+| | SoR (Source of Record) | 权威数据源、主数据定义 |
+| **架构层** | System | 系统边界、外部依赖 |
+| | Container | 服务、应用、数据存储 |
+| | Component | 模块、类、函数 |
+| | ADR | 架构决策记录 |
+| **契约层** | Contract | API 契约（OpenAPI/AsyncAPI/Proto） |
 
-### 代码实现
+## 工作模式
 
-C4A 现阶段聚焦于高质量知识生产和消费，在代码开发的场景下，实现的部分是开放选择的，你可以选择任意 Spec 工具、Plan Mode 进行接力工作：
-
-```
-# Vibe Coding
-请你就 adr-001 提案进行规划
-
-# Claude Code Feat DEV [推荐]
-/feat-dev 阅读并实现 @.c4a/drafts/adr-001
-
-# Spec Kit
-/specify @.c4a/drafts/adr-001
-```
-
-只需要在任何你觉得代码就绪的时候执行归档即可：
-
-```
-我已完成 adr-002 的开发，请帮我完成知识发布
-
-```
+| 模式 | 存储 | 适用场景 |
+|------|------|----------|
+| **Local** | SQLite + 本地向量 | 个人开发、离线使用 |
+| **Server** | MongoDB + Neo4j + Milvus | 团队协作、知识共享 |
+| **Remote** | 云端托管 | 企业级部署 |
 
 ## 快速开始
 
-在仓库根目录执行：
-
 ```bash
-# 安装
-./start.sh install
+# 初始化项目
+c4a init
 
-# 启动 (Local 模式)
-./start.sh dev
+# 安装并配置工作模式
+c4a install              # 交互式选择
+c4a install local        # Local 模式
+c4a install server       # Server 模式
 
-# 启动 (Server 模式)
-./start.sh docker
+# 查看状态
+c4a status
 ```
 
-## 核心命令
+## CLI 命令
 
-- `c4a init` - 初始化项目
-- `c4a sync` - 同步知识
-- `c4a status` - 查看状态
-- `c4a feat` - 管理 Feature
+```bash
+c4a init                 # 初始化项目
+c4a install [mode]       # 安装 (local|server|remote)
+c4a sync                 # 同步知识到数据库
+c4a status               # 查看状态
+c4a validate             # 验证 DSL 文件
+c4a feat render <id>     # 渲染 Checklist
+c4a template <type>      # 生成实体模板
+c4a schema <type|all>    # 输出 JSON Schema
+c4a server <subcommand>  # 服务管理 (Server 模式)
+c4a local <subcommand>   # 本地管理 (Local 模式)
+```
 
-## Skills 使用
+## Skills
 
-- `/c4a:feat` - Feature 管理
-- `/c4a:specify` - 需求定义
-- `/c4a:plan` - 技术设计
-- `/c4a:implement` - 代码实现
+### 工作流 Skills
 
-## 开发环境
+| Skill | 用途 |
+|-------|------|
+| `/c4a:feat` | Feature 管理（创建/修改/切换/流转） |
+| `/c4a:specify` | 功能规格（Functional Spec） |
+| `/c4a:plan` | 技术方案（Technical Spec + 契约 + 验收清单） |
+| `/c4a:analyze` | 一致性检查 |
+| `/c4a:implement` | 实现代码辅助 |
 
-| 环境 | 说明 |
-|------|------|
-| **Claude Code + Opus 4.5** | 推荐 |
-| **Cursor + Opus 4.5** |  |
-| **OpenCode + GLM 4.5** | 免IDE安装和Token配置，dev 启动直接调起 |
+### 知识技能 Skills
 
-## 开发指南
+| Skill | 用途 |
+|-------|------|
+| `/c4a:know:learn` | 快速录入知识 |
+| `/c4a:know:search` | 搜索知识库 |
 
-开发细节请参考 [CLAUDE.md](CLAUDE.md)。
+## 文档
 
-## 已知问题
-
-- **Server 模式一致性窗口**：MongoDB 写入后到 Neo4j/Milvus 同步完成前，查询可能返回过期数据（建议在关键查询前等待同步完成或使用重试策略）。
-- **Checklist 并发行为**：多人同时编辑时采用 Last Write Wins 策略（建议通过流程约束避免并发编辑同一 Checklist）。
-- **跨项目权限死锁**：发布前需确认所有涉及项目的权限状态（建议发布前执行权限自检或统一审批窗口）。
+- [CLAUDE.md](CLAUDE.md) - 开发指南
+- [ARCHITECTURE.md](ARCHITECTURE.md) - 技术架构
 
 ## License
 
