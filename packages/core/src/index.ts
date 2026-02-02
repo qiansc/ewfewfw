@@ -14,6 +14,7 @@ export * as DSL from "./types/dsl.js";
 // 工具函数
 export * from "./utils/index.js";
 export * from "./utils/converter.js";
+export * from "./utils/security.js";
 export {
   CONFIG_FILENAME,
   CONTEXT_ROOT_DIR,

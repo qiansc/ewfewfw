@@ -9,7 +9,7 @@
 > - Skills/Commands 设计：[detailed-design/skills-design.md](./detailed-design/skills-design.md)
 > - 数据操作详细设计：[detailed-design/data-operations.md](./detailed-design/data-operations.md)
 > - Local 模式实现：[detailed-design/local-mode.md](./detailed-design/local-mode.md)
-> - 权限与错误处理：[detailed-design/permissions-and-errors.md](./detailed-design/permissions-and-errors.md)
+> - 权限与错误处理：[detailed-design/permissions-and-errors.md](./detailed-design/permissions-and-errors.md)（本版本实现 Part 11 Lite，完整权限系统延后）
 
 ---
 
