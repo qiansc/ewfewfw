@@ -56,6 +56,7 @@ async def save_entity(
                 "code": "C4A-INPUT-001",
                 "message": "缺少 project_id",
                 "details": {"field": "project_id"},
+                "timestamp": now_iso(),
             },
         )
     allowed = await permission_service.check_permission(user_id, source_project, "write")
@@ -197,8 +198,8 @@ async def save_entity(
     await adapter.save_entity(entity_doc)
 
     relations = _parse_relations(data, params.type, source_project, entity_id, proposal_id)
+    await adapter.delete_relations_from_entity(entity_id, source_project, proposal_id)
     if relations:
-        await adapter.delete_relations_from_entity(entity_id, source_project, proposal_id)
         await adapter.save_relations(relations)
 
     history_record = {
@@ -220,10 +221,9 @@ async def save_entity(
     try:
         neo4j = await entities_module.get_neo4j_adapter()
         await neo4j.upsert_entity(entity_doc)
-        if relations:
-            await neo4j.delete_relations_from_entity(entity_id, source_project, proposal_id)
-            for relation in relations:
-                await neo4j.save_relation(relation)
+        await neo4j.delete_relations_from_entity(entity_id, source_project, proposal_id)
+        for relation in relations:
+            await neo4j.save_relation(relation)
     except Exception as exc:  # pragma: no cover - 图数据库异常不影响 MongoDB 权威写入
         sync_status["neo4j"] = "pending"
         sync_status["neo4j_error"] = str(exc)

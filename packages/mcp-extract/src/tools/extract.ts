@@ -30,7 +30,7 @@ export async function extract(input: ExtractInput): Promise<ExtractResult> {
     exclude = ["**/node_modules/**", "**/.git/**", "**/dist/**", "**/build/**"],
   } = input;
 
-  const resolvedPath = resolveCodePath(path);
+  const resolvedPath = await resolveCodePath(path);
 
   const result: ExtractResult = {
     files: 0,

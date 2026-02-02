@@ -1,4 +1,4 @@
-import { getAdapter, isLocalMode } from "@c4a/storage";
+import { getAdapter, isLocalMode, loadConfig } from "@c4a/storage";
 import { checkSyncStatus } from "../checkSyncStatus.js";
 import type { QueryHandlerOptions } from "../handlerContext.js";
 import type { QueryImpactInput } from "../schemas.js";
@@ -8,6 +8,7 @@ export async function queryImpactHandler(
   args: QueryImpactInput,
   options: QueryHandlerOptions = {}
 ): Promise<QueryImpactResponse> {
+  const config = loadConfig();
   const adapter = options.adapter ?? (await getAdapter());
 
   // 确保适配器已初始化
@@ -25,9 +26,14 @@ export async function queryImpactHandler(
     };
   }
 
+  const resolvedSourceProject =
+    args.source_project ?? config.project_id ?? config.local?.defaultProject;
+  if (!resolvedSourceProject) {
+    throw new Error("缺少 source_project（project_id）");
+  }
   const result = await adapter.queryImpact({
     id: args.id,
-    source_project: args.source_project,
+    source_project: resolvedSourceProject,
     change_type: args.change_type,
     depth: args.depth,
     proposal_id: args.proposal_id,

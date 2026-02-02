@@ -131,6 +131,9 @@ export function buildEntityFilePath(
   format: ExportFormat,
   featId: string | null
 ): string | null {
+  if (entity.type === 'concept') {
+    return null;
+  }
   const data = entity.data ?? {};
   let perspective = pickString((data as Record<string, unknown>).perspective) as
     | 'business'

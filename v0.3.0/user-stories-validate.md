@@ -655,18 +655,7 @@
 
 ## 待改进项
 
-### 1. 关系图自动建立
-
-**现象**: 保存 container 时指定了 `system_id`，但 Neo4j 中未自动创建 `CONTAINS` 关系边
-
-**影响**: `c4a_query_deps` 返回空关系
-
-**建议**: 在 `c4a_store_save` 时，根据以下字段自动创建关系：
-- `container.system_id` → `(system)-[:CONTAINS]->(container)`
-- `component.container_id` → `(container)-[:CONTAINS]->(component)`
-- `sor.owner` → `(container)-[:OWNS]->(sor)`
-
-### 2. 依赖查询错误处理
+### 1. 依赖查询错误处理
 
 **现象**: `c4a_query_deps` 对不存在关系的实体返回 `Bad Request` 错误
 
@@ -679,6 +668,19 @@
   "message": "No relationships found"
 }
 ```
+
+---
+
+## 已解决项
+
+### 1. 关系图自动建立
+
+**状态**: 已修复
+
+**说明**: `c4a_store_save` 已根据以下字段自动创建关系：
+- `container.system_id` → `(system)-[:CONTAINS]->(container)`
+- `component.container_id` → `(container)-[:CONTAINS]->(component)`
+- `sor.owner` → `(container)-[:OWNS]->(sor)`
 
 ---
 

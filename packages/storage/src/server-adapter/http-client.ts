@@ -278,12 +278,13 @@ export class HttpClient {
       payload = await response.text();
     }
 
-    if (this.isErrorResponse(payload)) {
-      const details = payload.details ?? {};
-      if (payload.recoverable_actions) {
-        details.recoverable_actions = payload.recoverable_actions;
+    const resolved = this.unwrapErrorResponse(payload);
+    if (resolved) {
+      const details = resolved.details ?? {};
+      if (resolved.recoverable_actions) {
+        details.recoverable_actions = resolved.recoverable_actions;
       }
-      return new C4AError(payload.code, details, payload.message);
+      return new C4AError(resolved.code, details, resolved.message);
     }
 
     const code = mapHttpStatusToErrorCode(response.status);
@@ -297,6 +298,18 @@ export class HttpClient {
     if (!payload || typeof payload !== 'object') return false;
     const value = payload as ErrorResponse;
     return typeof value.code === 'string' && typeof value.message === 'string';
+  }
+
+  private unwrapErrorResponse(payload: unknown): ErrorResponse | null {
+    if (this.isErrorResponse(payload)) {
+      return payload;
+    }
+    if (!payload || typeof payload !== 'object') return null;
+    const value = payload as { detail?: unknown };
+    if (value.detail && this.isErrorResponse(value.detail)) {
+      return value.detail;
+    }
+    return null;
   }
 
   private shouldRetry(status?: number, error?: Error): boolean {

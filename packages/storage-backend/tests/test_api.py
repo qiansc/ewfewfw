@@ -106,6 +106,21 @@ class FakeMongoAdapter:
         ]
         return before - len(self.relations_data)
 
+    async def delete_relations_from_entity(
+        self, entity_id: str, project_id: str, proposal_id: str
+    ) -> int:
+        before = len(self.relations_data)
+        self.relations_data = [
+            item
+            for item in self.relations_data
+            if not (
+                item.get("from_id") == entity_id
+                and item.get("from_project") == project_id
+                and item.get("proposal_id") == proposal_id
+            )
+        ]
+        return before - len(self.relations_data)
+
     async def save_relation(self, relation: dict[str, Any]) -> dict[str, int]:
         inserted = 0
         modified = 0

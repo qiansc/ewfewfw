@@ -177,6 +177,23 @@ class FakeMongoAdapter:
         self.relations.items = remaining
         return count
 
+    async def delete_relations_from_entity(
+        self, entity_id: str, project_id: str, proposal_id: str
+    ) -> int:
+        count = 0
+        remaining = []
+        for rel in self.relations.items:
+            if (
+                rel.get("from_id") == entity_id
+                and rel.get("from_project") == project_id
+                and rel.get("proposal_id") == proposal_id
+            ):
+                count += 1
+                continue
+            remaining.append(rel)
+        self.relations.items = remaining
+        return count
+
     async def save_relation(self, relation: dict[str, Any]) -> dict[str, int]:
         for idx, item in enumerate(self.relations.items):
             if item.get("id") == relation.get("id"):
@@ -281,6 +298,9 @@ def create_app(monkeypatch, fake_db: FakeMongoAdapter, fake_neo4j: FakeNeo4jAdap
     monkeypatch.setattr(graph, "get_neo4j_adapter", get_neo4j)
 
     monkeypatch.setattr(feat, "get_mongodb_adapter", get_mongo)
+    monkeypatch.setattr(feat, "get_neo4j_adapter", get_neo4j)
+    monkeypatch.setattr(feat, "get_milvus_adapter", get_milvus)
+    monkeypatch.setattr(feat.EmbeddingService, "get_provider", lambda: FakeEmbedder())
 
     monkeypatch.setattr(utils, "get_mongodb_adapter", get_mongo)
     monkeypatch.setattr(utils, "get_neo4j_adapter", get_neo4j)
@@ -365,8 +385,12 @@ def test_feat_and_utils_flow(monkeypatch, tmp_path: Path):
     )
     assert response.status_code == 200
 
-    backup_path = tmp_path / "backup.json"
-    response = client.post("/utils/backup", json={"output": str(backup_path), "format": "json"})
+    relative_dir = Path(".tmp") / "tests"
+    safe_dir = Path.cwd() / relative_dir
+    safe_dir.mkdir(parents=True, exist_ok=True)
+    relative_path = relative_dir / f"backup-{tmp_path.name}.json"
+    backup_path = Path.cwd() / relative_path
+    response = client.post("/utils/backup", json={"output": str(relative_path), "format": "json"})
     assert response.status_code == 200
     assert backup_path.exists()
 
@@ -380,10 +404,58 @@ def test_feat_and_utils_flow(monkeypatch, tmp_path: Path):
 
     response = client.post(
         "/utils/restore",
-        json={"input": str(backup_path), "conflict_policy": "override"},
+        json={"input": str(relative_path), "conflict_policy": "override"},
     )
     assert response.status_code == 200
     assert response.json()["success"] is True
+
+
+def test_feat_publish_merges_entities(monkeypatch):
+    fake_db = FakeMongoAdapter()
+    app = create_app(monkeypatch, fake_db, FakeNeo4jAdapter())
+    client = TestClient(app)
+
+    response = client.post("/feat/lifecycle", json={"action": "create", "feat_id": "feat-merge"})
+    assert response.status_code == 200
+
+    response = client.post(
+        "/entities/save",
+        json={
+            "type": "system",
+            "proposal_id": "feat-merge",
+            "source_project": "demo",
+            "data": {"id": "system-merge", "name": "System Merge", "scope": "project"},
+        },
+    )
+    assert response.status_code == 200
+
+    response = client.post(
+        "/feat/lifecycle",
+        json={"action": "transition", "feat_id": "feat-merge", "to_status": "approved"},
+    )
+    assert response.status_code == 200
+
+    response = client.post(
+        "/feat/lifecycle",
+        json={"action": "transition", "feat_id": "feat-merge", "to_status": "published"},
+    )
+    assert response.status_code == 200
+
+    response = client.post(
+        "/entities/read",
+        json={"id": "system-merge", "filter": {"source_project": "demo"}},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["entity"]["proposal_id"] is None
+    assert payload["entity"]["metadata"]["status"] == "published"
+
+    response = client.post(
+        "/entities/list",
+        json={"proposal_id": "feat-merge", "project_id": "demo", "limit": 10},
+    )
+    assert response.status_code == 200
+    assert response.json()["pagination"]["total"] == 0
 
 
 def test_sync_plan(monkeypatch):

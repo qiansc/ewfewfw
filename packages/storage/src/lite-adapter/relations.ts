@@ -156,6 +156,7 @@ function findReferences(data: Record<string, unknown>, entityType: EntityType): 
     sor: 'sor',
     adr: 'adr',
     contract: 'contract',
+    concept: 'concept',
   };
 
   const block = data[entityKey[entityType]];

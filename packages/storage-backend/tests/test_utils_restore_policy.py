@@ -78,6 +78,14 @@ def write_backup_file(path: Path, entity: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
 
+def build_safe_backup_paths(tmp_path: Path) -> tuple[Path, Path]:
+    relative_dir = Path(".tmp") / "tests"
+    safe_dir = Path.cwd() / relative_dir
+    safe_dir.mkdir(parents=True, exist_ok=True)
+    relative_path = relative_dir / f"backup-{tmp_path.name}.json"
+    return relative_path, Path.cwd() / relative_path
+
+
 def build_entity(entity_id: str, updated_at: str, project_id: str = "demo") -> dict[str, Any]:
     data = {"id": entity_id, "name": f"Entity {entity_id}", "source_project": project_id}
     return {
@@ -112,14 +120,14 @@ def test_restore_merge_skips_stale_entity(monkeypatch, tmp_path):
     app.dependency_overrides[get_current_user] = lambda: "tester"
 
     incoming = build_entity("sys-1", "2024-01-01T00:00:00Z")
-    backup_path = tmp_path / "backup.json"
+    relative_path, backup_path = build_safe_backup_paths(tmp_path)
     write_backup_file(backup_path, incoming)
 
     client = TestClient(app)
     response = client.post(
         "/utils/restore",
         json={
-            "input": str(backup_path),
+            "input": str(relative_path),
             "conflict_policy": "merge",
             "validate_checksums": True,
         },
@@ -149,13 +157,13 @@ def test_restore_override_saves_entity(monkeypatch, tmp_path):
     app.dependency_overrides[get_current_user] = lambda: "tester"
 
     incoming = build_entity("sys-2", "2024-03-01T00:00:00Z")
-    backup_path = tmp_path / "backup.json"
+    relative_path, backup_path = build_safe_backup_paths(tmp_path)
     write_backup_file(backup_path, incoming)
 
     client = TestClient(app)
     response = client.post(
         "/utils/restore",
-        json={"input": str(backup_path), "conflict_policy": "override"},
+        json={"input": str(relative_path), "conflict_policy": "override"},
     )
     assert response.status_code == 200
     assert response.json()["success"] is True
@@ -180,14 +188,14 @@ def test_restore_validate_checksums_rejects(monkeypatch, tmp_path):
 
     incoming = build_entity("sys-3", "2024-01-01T00:00:00Z")
     incoming["content_hash"] = "invalid"
-    backup_path = tmp_path / "backup.json"
+    relative_path, backup_path = build_safe_backup_paths(tmp_path)
     write_backup_file(backup_path, incoming)
 
     client = TestClient(app)
     response = client.post(
         "/utils/restore",
         json={
-            "input": str(backup_path),
+            "input": str(relative_path),
             "conflict_policy": "override",
             "validate_checksums": True,
         },

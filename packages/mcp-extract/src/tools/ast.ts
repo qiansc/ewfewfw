@@ -22,7 +22,7 @@ export interface ASTResult {
 export async function getAST(input: ASTInput): Promise<ASTResult> {
   const { path, language, maxDepth = 10, nodeTypes } = input;
 
-  const resolvedPath = resolveCodePath(path);
+  const resolvedPath = await resolveCodePath(path);
   const content = await readFile(resolvedPath, "utf-8");
   const detectedLang = language ?? detectLanguage(resolvedPath);
 
