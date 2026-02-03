@@ -22,6 +22,7 @@ export interface StoreFeatChecklistInput {
   action: ChecklistAction;
   feat_id: string;
   source?: "technical_spec";
+  expected_version?: string;
   items?: Array<{
     id: string;
     title?: string;
@@ -55,6 +56,7 @@ export async function storeFeatChecklistHandler(
     action: args.action,
     feat_id: args.feat_id,
     source: args.source,
+    expected_version: args.expected_version,
     items: args.items,
     patches: args.patches,
     validate: args.validate ?? true,

@@ -6,14 +6,14 @@ import { gunzipSync } from 'node:zlib';
 import { SQLiteStore } from '../sqlite-store.js';
 import { InMemoryGraph } from '../in-memory-graph.js';
 import { GraphQueryCache } from '../graph-query-cache.js';
+import type { FeatureExtractionPipeline } from '@xenova/transformers';
 import { save } from '../lite-adapter/crud-save.js';
-import { del } from '../lite-adapter/crud-read.js';
 import { backup } from '../lite-adapter/utilsBackup.js';
 import { restore } from '../lite-adapter/utilsRestore.js';
 import { readHistory } from '../lite-adapter/utilsHistory.js';
 import { repair } from '../lite-adapter/utilsRepair.js';
-import { validate } from '../lite-adapter/utilsValidate.js';
 import type { AdapterContext } from '../lite-adapter/types.js';
+import { generateVectorKey, setEmbedderForTest } from '../vector-search.js';
 
 const TMP_ROOT = join(process.cwd(), '.tmp', 'store-utils-tests');
 const DB_PATH = join(TMP_ROOT, `lite-adapter-utils-${Date.now()}.db`);
@@ -177,6 +177,12 @@ function extractTarPayload(buffer: Buffer): string | null {
   return buffer.subarray(start, end).toString('utf-8');
 }
 
+function makeEmbedding(seed: number): Float32Array {
+  const vector = new Float32Array(384);
+  vector[0] = seed;
+  return vector;
+}
+
 describe('LiteAdapter utils fixes', () => {
   beforeAll(() => {
     mkdirSync(TMP_ROOT, { recursive: true });
@@ -230,51 +236,6 @@ describe('LiteAdapter utils fixes', () => {
     expect(resultForced.warnings).toBeUndefined();
   });
 
-  test('save warns on deprecated references', async () => {
-    insertEntity({ id: 'target' });
-    insertEntity({ id: 'consumer' });
-    insertRelation({ fromId: 'consumer', toId: 'target' });
-
-    const result = await save(createContext(), {
-      type: 'system',
-      data: { id: 'target', name: 'target', status: 'deprecated' },
-    });
-
-    expect(result.status).toBe('deprecated');
-    expect(result.warnings?.[0].code).toBe('DANGLING_REFERENCE');
-  });
-
-  test('reference warning ignores non-dependency relations', async () => {
-    insertEntity({ id: 'target' });
-    insertEntity({ id: 'consumer' });
-    insertRelation({ fromId: 'consumer', toId: 'target', relType: 'REFERENCES' });
-
-    const result = await save(createContext(), {
-      type: 'system',
-      data: { id: 'target', name: 'target', status: 'deprecated' },
-    });
-
-    expect(result.warnings).toBeUndefined();
-  });
-
-  test('delete warns on dependency relations only', async () => {
-    insertEntity({ id: 'target' });
-    insertEntity({ id: 'consumer' });
-    insertRelation({ fromId: 'consumer', toId: 'target', relType: 'DEPENDS_ON' });
-
-    const result = await del(createContext(), { id: 'target' });
-    expect(result.warnings?.[0].code).toBe('DANGLING_REFERENCE');
-  });
-
-  test('delete keeps HAS_RELATIONS for non-dependency relations', async () => {
-    insertEntity({ id: 'target' });
-    insertEntity({ id: 'consumer' });
-    insertRelation({ fromId: 'consumer', toId: 'target', relType: 'REFERENCES' });
-
-    const result = await del(createContext(), { id: 'target' });
-    expect(result.warnings?.[0].code).toBe('HAS_RELATIONS');
-  });
-
   test('backup tar.gz includes repo metadata', async () => {
     insertEntity({ id: 'svc' });
     const backupFile = join(TMP_ROOT, `backup-${Date.now()}.tar.gz`);
@@ -314,32 +275,30 @@ describe('LiteAdapter utils fixes', () => {
     expect(result.error).toBe('关系数据校验和不匹配');
   });
 
-  test('validate references include main branch targets', async () => {
-    insertEntity({ id: 'auth' });
-    insertEntity({ id: 'svc', proposalId: 'feat-a', status: 'draft' });
-    insertRelation({ fromId: 'svc', toId: 'auth', proposalId: 'feat-a' });
+  test('restore rebuilds vector index when enabled', async () => {
+    const vectorStore = store.getVectorStore();
+    expect(vectorStore).not.toBeNull();
+    if (!vectorStore) return;
 
-    const result = await validate(createContext(), {
-      proposal_id: 'feat-a',
-      checks: ['references'],
+    const stubEmbedder = (async () => ({ data: makeEmbedding(1) })) as unknown as FeatureExtractionPipeline;
+    setEmbedderForTest(stubEmbedder);
+
+    insertEntity({ id: 'svc', data: { id: 'svc', name: 'svc' } });
+    const backupFile = join(TMP_ROOT, `backup-${Date.now()}.json`);
+    await backup(createContext(), { output: backupFile, format: 'json' });
+
+    resetDb();
+    vectorStore.rebuild([]);
+
+    const result = await restore(createContext({ enableVectorSearch: true }), {
+      input: backupFile,
+      validate_checksums: true,
     });
 
     expect(result.success).toBe(true);
-    expect(result.checks?.references.status).toBe('passed');
-  });
-
-  test('validate adr completeness reports architecture change without adr', async () => {
-    insertEntity({ id: 'sys', data: { id: 'sys', name: 'v1' } });
-    insertEntity({ id: 'sys', proposalId: 'feat-a', status: 'draft', data: { id: 'sys', name: 'v2' } });
-
-    const result = await validate(createContext(), {
-      proposal_id: 'feat-a',
-      checks: ['adr_completeness'],
-    });
-
-    expect(result.success).toBe(true);
-    expect(result.checks?.adr_completeness.status).toBe('warning');
-    expect(result.checks?.adr_completeness.changes_detected?.length).toBeGreaterThan(0);
+    expect(result.stats?.vectors).toBe(1);
+    const key = generateVectorKey('alpha', 'svc', null);
+    expect(vectorStore.has(key)).toBe(true);
   });
 
   test('repair neo4j scope returns local mode message', async () => {

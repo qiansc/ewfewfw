@@ -22,6 +22,25 @@ const TMP_ROOT = join(ORIGINAL_CWD, ".tmp", `mcp-store-tests-${Date.now()}`);
 const DB_PATH = join(TMP_ROOT, "store.db");
 const CONTEXT_DIR = join(TMP_ROOT, ".context");
 const PROJECT_ID = "mcp-store-project";
+const SAVE_DEFAULTS = {
+  format: "yaml" as const,
+  enforce_adr: false,
+  skip_adr_check: false,
+  ignore_concurrent_warning: false,
+  force_save: false,
+};
+const READ_DEFAULTS = {
+  format: "object" as const,
+  proposal_id: null as string | null,
+};
+const DELETE_DEFAULTS = {
+  proposal_id: null as string | null,
+  force: false,
+};
+const FEAT_LIFECYCLE_DEFAULTS = {
+  sync_checklist: true,
+  force_publish: false,
+};
 
 let adapter: StorageAdapter;
 
@@ -133,6 +152,7 @@ describe("MCP Store Integration", () => {
     it("should save entity with valid DSL", async () => {
       const entityId = makeId("sys");
       const result = await storeSaveHandler({
+        ...SAVE_DEFAULTS,
         type: "system",
         data: buildSystemDsl(entityId, "Demo System", "Demo"),
         source_project: PROJECT_ID,
@@ -142,7 +162,7 @@ describe("MCP Store Integration", () => {
       expect(result.success).toBe(true);
       expect(result.id).toBe(entityId);
 
-      const read = await storeReadHandler({ id: entityId, format: "object" });
+      const read = await storeReadHandler({ ...READ_DEFAULTS, id: entityId });
       expect(read && "entity" in read).toBe(true);
       if (read && "entity" in read) {
         expect(read.entity?.id).toBe(entityId);
@@ -152,6 +172,7 @@ describe("MCP Store Integration", () => {
     it("should reject invalid DSL", async () => {
       await expect(
         storeSaveHandler({
+          ...SAVE_DEFAULTS,
           type: "system",
           content: "invalid: [",
           format: "yaml",
@@ -164,6 +185,7 @@ describe("MCP Store Integration", () => {
     it("should handle concurrent modification warning", async () => {
       const entityId = makeId("sys");
       await storeSaveHandler({
+        ...SAVE_DEFAULTS,
         type: "system",
         data: buildSystemDsl(entityId, "Base System", "Main"),
         source_project: PROJECT_ID,
@@ -171,6 +193,7 @@ describe("MCP Store Integration", () => {
       });
 
       await storeSaveHandler({
+        ...SAVE_DEFAULTS,
         type: "system",
         data: buildSystemDsl(entityId, "Feat B", "Feat B"),
         source_project: PROJECT_ID,
@@ -178,6 +201,7 @@ describe("MCP Store Integration", () => {
       });
 
       const result = await storeSaveHandler({
+        ...SAVE_DEFAULTS,
         type: "system",
         data: buildSystemDsl(entityId, "Feat A", "Feat A"),
         source_project: PROJECT_ID,
@@ -194,13 +218,14 @@ describe("MCP Store Integration", () => {
     it("should read entity by id", async () => {
       const entityId = makeId("sys");
       await storeSaveHandler({
+        ...SAVE_DEFAULTS,
         type: "system",
         data: buildSystemDsl(entityId, "Read System", "Read"),
         source_project: PROJECT_ID,
         proposal_id: null,
       });
 
-      const result = await storeReadHandler({ id: entityId, format: "object" });
+      const result = await storeReadHandler({ ...READ_DEFAULTS, id: entityId });
       expect(result && "entity" in result).toBe(true);
       if (result && "entity" in result) {
         expect(result.entity?.id).toBe(entityId);
@@ -213,6 +238,7 @@ describe("MCP Store Integration", () => {
       const consumerId = makeId("consumer");
 
       await storeSaveHandler({
+        ...SAVE_DEFAULTS,
         type: "system",
         data: buildSystemDsl(systemId, "System", "System"),
         source_project: PROJECT_ID,
@@ -220,6 +246,7 @@ describe("MCP Store Integration", () => {
       });
 
       await storeSaveHandler({
+        ...SAVE_DEFAULTS,
         type: "container",
         data: buildContainerDsl(targetId, systemId, "Target", "Target"),
         source_project: PROJECT_ID,
@@ -227,6 +254,7 @@ describe("MCP Store Integration", () => {
       });
 
       await storeSaveHandler({
+        ...SAVE_DEFAULTS,
         type: "container",
         data: buildContainerDsl(consumerId, systemId, "Consumer", "Consumer", [
           { to: targetId, description: "depends" },
@@ -236,6 +264,7 @@ describe("MCP Store Integration", () => {
       });
 
       const result = await storeSaveHandler({
+        ...SAVE_DEFAULTS,
         type: "container",
         data: {
           ...buildContainerDsl(targetId, systemId, "Target", "Target"),
@@ -257,6 +286,7 @@ describe("MCP Store Integration", () => {
       const containerId = makeId("container");
 
       await storeSaveHandler({
+        ...SAVE_DEFAULTS,
         type: "system",
         data: buildSystemDsl(sysId, "List System", "List"),
         source_project: PROJECT_ID,
@@ -264,6 +294,7 @@ describe("MCP Store Integration", () => {
       });
 
       await storeSaveHandler({
+        ...SAVE_DEFAULTS,
         type: "container",
         data: buildContainerDsl(containerId, sysId, "List Container", "List"),
         source_project: PROJECT_ID,
@@ -275,6 +306,7 @@ describe("MCP Store Integration", () => {
         project_id: PROJECT_ID,
         limit: 10,
         offset: 0,
+        count_only: false,
       });
 
       if ("items" in result) {
@@ -287,6 +319,7 @@ describe("MCP Store Integration", () => {
       const sysIds = [makeId("sys"), makeId("sys"), makeId("sys")];
       for (const id of sysIds) {
         await storeSaveHandler({
+          ...SAVE_DEFAULTS,
           type: "system",
           data: buildSystemDsl(id, "Paged System", "Paged"),
           source_project: PROJECT_ID,
@@ -299,6 +332,7 @@ describe("MCP Store Integration", () => {
         project_id: PROJECT_ID,
         limit: 1,
         offset: 0,
+        count_only: false,
       });
 
       if ("pagination" in result) {
@@ -312,6 +346,7 @@ describe("MCP Store Integration", () => {
       const entityId = makeId("sys");
 
       await storeSaveHandler({
+        ...SAVE_DEFAULTS,
         type: "system",
         data: buildSystemDsl(entityId, "Main", "Main"),
         source_project: PROJECT_ID,
@@ -319,6 +354,7 @@ describe("MCP Store Integration", () => {
       });
 
       await storeSaveHandler({
+        ...SAVE_DEFAULTS,
         type: "system",
         data: buildSystemDsl(entityId, "Feat", "Feat"),
         source_project: PROJECT_ID,
@@ -345,6 +381,7 @@ describe("MCP Store Integration", () => {
       const consumerId = makeId("consumer");
 
       await storeSaveHandler({
+        ...SAVE_DEFAULTS,
         type: "system",
         data: buildSystemDsl(systemId, "System", "System"),
         source_project: PROJECT_ID,
@@ -352,6 +389,7 @@ describe("MCP Store Integration", () => {
       });
 
       await storeSaveHandler({
+        ...SAVE_DEFAULTS,
         type: "container",
         data: buildContainerDsl(targetId, systemId, "Target", "Target"),
         source_project: PROJECT_ID,
@@ -359,6 +397,7 @@ describe("MCP Store Integration", () => {
       });
 
       await storeSaveHandler({
+        ...SAVE_DEFAULTS,
         type: "container",
         data: buildContainerDsl(consumerId, systemId, "Consumer", "Consumer", [
           { to: targetId, description: "depends" },
@@ -378,6 +417,7 @@ describe("MCP Store Integration", () => {
     it("should create feat", async () => {
       const featId = `feat-${Date.now()}`;
       const result = await storeFeatLifecycleHandler({
+        ...FEAT_LIFECYCLE_DEFAULTS,
         action: "create",
         feat_id: featId,
         metadata: {
@@ -394,6 +434,7 @@ describe("MCP Store Integration", () => {
     it("should transition draft → approved → published", async () => {
       const featId = `feat-${Date.now()}`;
       await storeFeatLifecycleHandler({
+        ...FEAT_LIFECYCLE_DEFAULTS,
         action: "create",
         feat_id: featId,
         metadata: {
@@ -404,6 +445,7 @@ describe("MCP Store Integration", () => {
       });
 
       const approved = await storeFeatLifecycleHandler({
+        ...FEAT_LIFECYCLE_DEFAULTS,
         action: "transition",
         feat_id: featId,
         to_status: "approved",
@@ -412,6 +454,7 @@ describe("MCP Store Integration", () => {
       expect(approved.to_status).toBe("approved");
 
       const published = await storeFeatLifecycleHandler({
+        ...FEAT_LIFECYCLE_DEFAULTS,
         action: "transition",
         feat_id: featId,
         to_status: "published",
@@ -425,6 +468,7 @@ describe("MCP Store Integration", () => {
       const entityId = makeId("conflict");
 
       await storeSaveHandler({
+        ...SAVE_DEFAULTS,
         type: "system",
         data: buildSystemDsl(entityId, "Main", "Main"),
         source_project: PROJECT_ID,
@@ -432,6 +476,7 @@ describe("MCP Store Integration", () => {
       });
 
       await storeFeatLifecycleHandler({
+        ...FEAT_LIFECYCLE_DEFAULTS,
         action: "create",
         feat_id: featId,
         metadata: {
@@ -442,6 +487,7 @@ describe("MCP Store Integration", () => {
       });
 
       await storeSaveHandler({
+        ...SAVE_DEFAULTS,
         type: "system",
         data: buildSystemDsl(entityId, "Feat", "Feat"),
         source_project: PROJECT_ID,
@@ -449,12 +495,14 @@ describe("MCP Store Integration", () => {
       });
 
       await storeFeatLifecycleHandler({
+        ...FEAT_LIFECYCLE_DEFAULTS,
         action: "transition",
         feat_id: featId,
         to_status: "approved",
       });
 
       const published = await storeFeatLifecycleHandler({
+        ...FEAT_LIFECYCLE_DEFAULTS,
         action: "transition",
         feat_id: featId,
         to_status: "published",
@@ -486,7 +534,9 @@ describe("MCP Store Integration", () => {
         direction: "import",
         path: syncRoot,
         mode: "incremental",
+        format: "yaml",
         status_filter: "all",
+        conflict_policy: "skip",
       });
 
       expect(result.success).toBe(true);
@@ -498,6 +548,7 @@ describe("MCP Store Integration", () => {
       const entityId = makeId("sys");
 
       await storeSaveHandler({
+        ...SAVE_DEFAULTS,
         type: "system",
         data: buildSystemDsl(entityId, "Sync System", "Sync"),
         source_project: PROJECT_ID,
@@ -510,6 +561,7 @@ describe("MCP Store Integration", () => {
         mode: "incremental",
         format: "yaml",
         status_filter: "all",
+        conflict_policy: "skip",
       });
 
       expect(result.success).toBe(true);
@@ -522,6 +574,7 @@ describe("MCP Store Integration", () => {
       const entityId = makeId("sys");
 
       await storeSaveHandler({
+        ...SAVE_DEFAULTS,
         type: "system",
         data: buildSystemDsl(entityId, "Sync System", "Sync"),
         source_project: PROJECT_ID,
@@ -534,9 +587,11 @@ describe("MCP Store Integration", () => {
         mode: "incremental",
         format: "yaml",
         status_filter: "all",
+        conflict_policy: "skip",
       });
 
       await storeSaveHandler({
+        ...SAVE_DEFAULTS,
         type: "system",
         data: buildSystemDsl(entityId, "Sync System Updated", "Sync"),
         source_project: PROJECT_ID,

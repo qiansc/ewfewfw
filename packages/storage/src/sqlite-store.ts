@@ -112,6 +112,10 @@ export class SQLiteStore {
 
     // 同步模式设置为 NORMAL（平衡性能和安全性）
     this.db.exec('PRAGMA synchronous = NORMAL;');
+
+    // 缓存与临时表配置
+    this.db.exec('PRAGMA cache_size = -64000;');
+    this.db.exec('PRAGMA temp_store = MEMORY;');
   }
 
   /**

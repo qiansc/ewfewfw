@@ -59,7 +59,10 @@ export const QueryDepsDirectionSchema = z.enum(["upstream", "downstream", "both"
 
 export const QueryDepsInputSchema = z.object({
   id: z.string().describe("实体 ID"),
-  source_project: z.string().optional().describe("实体归属项目"),
+  source_project: z
+    .string()
+    .optional()
+    .describe("实体归属项目（可选，未传将从配置 project_id 自动补齐；Server 模式仍需有效值）"),
   direction: QueryDepsDirectionSchema.optional().describe("依赖方向"),
   depth: z.number().optional().describe("依赖深度"),
   proposal_id: ProposalIdSchema.describe("feat/提案隔离（主分支为 null）"),
@@ -73,7 +76,10 @@ export type QueryDepsDirection = z.infer<typeof QueryDepsDirectionSchema>;
  */
 export const QueryImpactInputSchema = z.object({
   id: z.string().describe("实体 ID"),
-  source_project: z.string().optional().describe("实体归属项目"),
+  source_project: z
+    .string()
+    .optional()
+    .describe("实体归属项目（可选，未传将从配置 project_id 自动补齐；Server 模式仍需有效值）"),
   change_type: z
     .enum(["upgrade", "deprecate", "remove"])
     .optional()

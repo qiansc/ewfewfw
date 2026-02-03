@@ -69,8 +69,8 @@ export async function read(
 
   // 可选：包含关系
   if (params.include_relations) {
-    // 关系查询仍使用单个 proposal_id（取第一个）
-    const singleProposalId = proposalIds ? proposalIds[0] : null;
+    // 关系查询仍使用单个 proposal_id（取优先级最高的 feat）
+    const singleProposalId = proposalIds ? proposalIds[proposalIds.length - 1] : null;
     result.relations = queryRelations(db, entity.id, singleProposalId, params.filter_relations);
   }
 
@@ -459,8 +459,8 @@ async function doDelete(ctx: AdapterContext, params: DeleteParams): Promise<Dele
  * 设计文档: store-crud.md §3.2
  * > proposal_id?: string | string[] | null：支持多 Feat 合并视图
  *
- * 优先级规则：数组中靠前的 feat 优先级更高，主分支优先级最低
- * 例如：proposal_id = ['feat-a', 'feat-b'] 时，优先级为 feat-a > feat-b > main
+ * 优先级规则：数组中靠后的 feat 优先级更高，主分支优先级最低
+ * 例如：proposal_id = ['feat-a', 'feat-b'] 时，优先级为 feat-b > feat-a > main
  */
 function queryEntity(
   db: ReturnType<SQLiteStore['getDatabase']>,
@@ -504,9 +504,9 @@ function queryEntity(
   }
 
   // 多个 feat：构建动态优先级 CASE 语句
-  // 优先级：proposalIds[0] > proposalIds[1] > ... > main(NULL)
+  // 优先级：proposalIds[最后] > proposalIds[0] > main(NULL)
   const caseClauses = proposalIds
-    .map((_, i) => `WHEN e.proposal_id = ? THEN ${i}`)
+    .map((_, i) => `WHEN e.proposal_id = ? THEN ${proposalIds.length - 1 - i}`)
     .join(' ');
   const placeholders = proposalIds.map(() => '?').join(', ');
 

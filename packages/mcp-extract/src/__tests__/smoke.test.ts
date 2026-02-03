@@ -15,11 +15,20 @@ import {
 import { resetTreeSitterCache } from "../parsers/treeSitter.js";
 
 const fixtureRoot = resolve(process.cwd(), ".tmp", "mcp-extract-tests");
+const fixtureRel = join(".tmp", "mcp-extract-tests");
 const tsFile = join(fixtureRoot, "sample.ts");
+const tsRel = join(fixtureRel, "sample.ts");
+const tsRelFromRoot = "sample.ts";
 const goFile = join(fixtureRoot, "sample.go");
+const goRel = join(fixtureRel, "sample.go");
+const goRelFromRoot = "sample.go";
 const pyFile = join(fixtureRoot, "sample.py");
+const pyRel = join(fixtureRel, "sample.py");
+const pyRelFromRoot = "sample.py";
 const outsideFile = resolve(fixtureRoot, "..", "outside.ts");
+const outsideRelFromRoot = "../outside.ts";
 const symlinkPath = join(fixtureRoot, "outside-link");
+const symlinkRelFromRoot = join("outside-link", "outside.ts");
 
 beforeAll(async () => {
   await mkdir(fixtureRoot, { recursive: true });
@@ -93,7 +102,7 @@ afterAll(async () => {
 describe("mcp-extract tools", () => {
   test("extract returns interfaces with properties and methods", async () => {
     const result = await extract({
-      path: tsFile,
+      path: tsRel,
       language: "typescript",
       recursive: false,
     });
@@ -112,19 +121,19 @@ describe("mcp-extract tools", () => {
   });
 
   test("extract supports go and python", async () => {
-    const goResult = await extract({ path: goFile, language: "go", recursive: false });
+    const goResult = await extract({ path: goRel, language: "go", recursive: false });
     const goNames = goResult.interfaces.map((iface) => iface.name);
     expect(goNames).toContain("Reader");
     expect(goNames).toContain("User");
 
-    const pyResult = await extract({ path: pyFile, language: "python", recursive: false });
+    const pyResult = await extract({ path: pyRel, language: "python", recursive: false });
     const pyNames = pyResult.interfaces.map((iface) => iface.name);
     expect(pyNames).toContain("Client");
   });
 
   test("analyze supports summary_only and pagination", async () => {
     const summaryOnly = await analyze({
-      path: fixtureRoot,
+      path: fixtureRel,
       summary_only: true,
       includeDependencies: false,
       includeMetrics: true,
@@ -138,7 +147,7 @@ describe("mcp-extract tools", () => {
     expect(summaryOnly.summary.languages.python).toBe(1);
 
     const paged = await analyze({
-      path: fixtureRoot,
+      path: fixtureRel,
       summary_only: false,
       limit: 1,
       offset: 1,
@@ -152,7 +161,7 @@ describe("mcp-extract tools", () => {
 
   test("ast returns filtered nodes", async () => {
     const result = await getAST({
-      path: tsFile,
+      path: tsRel,
       nodeTypes: ["interface_declaration"],
       maxDepth: 2,
     });
@@ -170,7 +179,7 @@ describe("mcp-extract tools", () => {
 
   test("contract returns schemas and endpoints", async () => {
     const result = await generateContract({
-      path: tsFile,
+      path: tsRel,
       format: "openapi",
       version: "3.0.0",
     });
@@ -202,7 +211,7 @@ describe("mcp-extract tools", () => {
     );
 
     const extractResult = await extract({
-      path: tsFile,
+      path: tsRel,
       language: "typescript",
       recursive: false,
     });
@@ -211,7 +220,7 @@ describe("mcp-extract tools", () => {
     );
 
     const analyzeResult = await analyze({
-      path: tsFile,
+      path: tsRel,
       includeMetrics: true,
       includeDependencies: true,
       summary_only: false,
@@ -221,11 +230,11 @@ describe("mcp-extract tools", () => {
     expect(analyzeResult.summary).toBeTruthy();
     expect(analyzeResult.errors).toBeTruthy();
 
-    const astResult = await getAST({ path: tsFile, maxDepth: 10 });
+    const astResult = await getAST({ path: tsRel, maxDepth: 10 });
     expect(Object.keys(astResult).sort()).toEqual(["ast", "file", "language"].sort());
 
     const contractResult = await generateContract({
-      path: tsFile,
+      path: tsRel,
       format: "openapi",
       version: "3.0.0",
     });
@@ -240,13 +249,13 @@ describe("mcp-extract tools", () => {
     process.env.C4A_EXTRACT_ROOT = fixtureRoot;
 
     await expect(
-      extract({ path: tsFile, language: "typescript", recursive: false })
+      extract({ path: tsRelFromRoot, language: "typescript", recursive: false })
     ).resolves.toBeTruthy();
 
-    const outsidePath = resolve(fixtureRoot, "..");
+    const outsidePath = outsideRelFromRoot;
     await expect(
       extract({ path: outsidePath, language: "typescript", recursive: false })
-    ).rejects.toThrow("Path is outside allowed root");
+    ).rejects.toThrow("不允许父目录引用");
 
     if (originalExtractRoot === undefined) {
       delete process.env.C4A_EXTRACT_ROOT;
@@ -267,11 +276,11 @@ describe("mcp-extract tools", () => {
 
     await expect(
       extract({
-        path: join(symlinkPath, "outside.ts"),
+        path: symlinkRelFromRoot,
         language: "typescript",
         recursive: false,
       })
-    ).rejects.toThrow("Path is outside allowed root");
+    ).rejects.toThrow("符号链接指向项目外");
 
     if (originalExtractRoot === undefined) {
       delete process.env.C4A_EXTRACT_ROOT;
@@ -286,7 +295,7 @@ describe("mcp-extract tools", () => {
     process.env.C4A_TREE_SITTER_GO_WASM = "/nonexistent/tree-sitter-go.wasm";
 
     const result = await analyze({
-      path: goFile,
+      path: goRel,
       language: "go",
       includeDependencies: false,
       includeMetrics: true,

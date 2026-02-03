@@ -41,81 +41,25 @@ description: C4A 默认 Agent，全功能架构知识管理
 ## 工作流程
 
 ### 本地工作流（推荐）
-1. **初始化**：创建 `.c4a/` 目录结构（必要时手动初始化）
+1. **初始化**：创建 `.context/` 目录结构（必要时手动初始化）
 2. **创建草稿**：使用 `Write` 在 `drafts/` 创建 DSL
 3. **验证和迭代**：使用 `Read` 查看内容并修正错误
 4. **状态流转**：按流程移动文件（draft → approved → published）
-5. **同步到知识库**：
-   - 先用 `Glob` 获取需要同步的文件列表
-   - 然后逐个调用 `c4a_store_sync` 同步每个文件（direction="import"，避免超时）
-   - 每同步一个文件，向用户报告进度
+5. **同步到知识库**：使用 `c4a_store_sync(direction="import")` 同步
 
-### 同步到知识库（重要）
+### 同步到知识库
 
-**⚠️ 避免使用 `c4a_store_sync` 批量同步（mode=full）**，该操作可能因文件数量较多导致 MCP 请求超时。
+使用 `c4a_store_sync` 工具进行同步：
 
-**⚠️ 必须串行同步，禁止并发调用**：每次只调用一个 `c4a_store_sync`，等待返回结果后再调用下一个。
-
-**推荐的逐文件同步流程**：
 ```
-1. 使用 Glob(".c4a/published/**/*.c4a.yaml") 获取已发布的文件列表
-2. 【串行】对每个文件逐一调用 c4a_store_sync(path="xxx", direction="import")
-   - 调用第 1 个文件 → 等待结果 → 报告
-   - 调用第 2 个文件 → 等待结果 → 报告
-   - ...依此类推
-3. 全部完成后，汇总报告同步结果
-```
-
-**❌ 错误示例（并发调用会导致超时）**：
-```
-// 不要这样做！
-同时调用:
-  c4a_store_sync(path=file1, direction="import")
-  c4a_store_sync(path=file2, direction="import")
-  c4a_store_sync(path=file3, direction="import")
-```
-
-**✅ 正确示例（串行调用）**：
-```
-用户: 把 published 的 DSL 同步到知识库
-Agent:
-1. 调用 Glob(".c4a/published/**/*.c4a.yaml") → 获取 5 个文件
-2. 串行同步:
-   调用 c4a_store_sync(path="system/c4a.c4a.yaml", direction="import") → 等待结果
-   ✅ 已同步: system/c4a.c4a.yaml (created)
-   
-   调用 c4a_store_sync(path="container/c4a-store-mcp.c4a.yaml", direction="import") → 等待结果
-   ✅ 已同步: container/c4a-store-mcp.c4a.yaml (created)
-   ...
-3. 汇总: 成功同步 5 个文件
+c4a_store_sync(direction="import")   # 从本地文件导入到数据库
+c4a_store_sync(direction="export")   # 从数据库导出到本地文件
 ```
 
 ### 查询工作流
 1. **本地查询**：使用 `Glob` 和 `Read` 查看本地 DSL
 2. **知识库查询**：使用 `c4a_store_read` 和 `c4a_query_search` 搜索已同步的知识
 3. **依赖分析**：使用 `c4a_query_deps` 和 `c4a_query_impact` 分析关系
-
-## 输出格式
-
-### DSL knowledge 字段规范（重要）
-
-DSL 的 `knowledge` 字段用于描述**当前状态**，保持精简。决策过程请放在 ADR 中。
-
-**允许的字段**：
-- `responsibility`: 职责说明（一句话）
-- `how`: 实现说明（description, architecture, components）
-- `interfaces`: 关键接口/方法列表
-- `api_tag`: 对应 OpenAPI 的 tag
-- `constraints`: 约束条件（performance, security, availability）
-- `risks`: 已知风险
-- `examples`: 使用示例
-- `links`: 相关链接
-
-**禁止的字段**：
-- `what` / `why` - 这些属于决策说明，应放在 ADR 中
-- 任何未在上述列表中定义的字段（会导致验证失败）
-
-### 成功时
 ```
 ## 结果
 [任务执行结果的描述]
@@ -144,7 +88,7 @@ DSL 的 `knowledge` 字段用于描述**当前状态**，保持精简。决策�
 
 1. **不自动提交**：修改操作需用户确认
 2. **不删除无备份数据**：删除操作前提醒用户
-3. **遵循知识状态流转**：`draft → approved → implemented → published → deprecated`
+3. **遵循知识状态流转**：`draft → approved → published → deprecated → archived`
 4. **保持幂等性**：相同操作多次执行结果一致
 5. **工具失败不绕行**：当 MCP 工具调用失败时，**禁止**通过以下方式绕过：
    - 直接读取 YAML 文件并手动解析后调用底层工具

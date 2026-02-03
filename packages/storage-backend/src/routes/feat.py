@@ -74,6 +74,7 @@ class ChecklistRequest(BaseModel):
     action: Literal["generate", "get", "patch", "clear"]
     feat_id: str
     source: str | None = None
+    expected_version: str | None = None
     items: list[ChecklistItem] | None = None
     patches: list[ChecklistPatch] | None = None
     validate_: bool | None = Field(default=None, alias="validate")
@@ -386,6 +387,61 @@ async def _merge_feat_entities(
     return merged_ids
 
 
+def _normalize_expected_version(value: str | None) -> str | None:
+    if value is None:
+        return None
+    return value or None
+
+
+def _build_checklist_conflict_response(
+    feat_id: str,
+    current_version: str | None,
+    conflicting_tasks: list[str] | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "success": False,
+        "feat_id": feat_id,
+        "error": "CHECKLIST_CONFLICT",
+        "message": "Checklist 已被其他会话更新，请先执行 get 获取最新内容",
+        "current_version": current_version,
+    }
+    if conflicting_tasks:
+        payload["conflicting_tasks"] = conflicting_tasks
+    return payload
+
+
+def _build_checklist_conflict(
+    feat_id: str,
+    current_version: str | None,
+    expected_version: str | None,
+    conflicting_tasks: list[str] | None = None,
+) -> dict[str, Any] | None:
+    if expected_version is None:
+        return None
+    if expected_version == (current_version or None):
+        return None
+    return _build_checklist_conflict_response(
+        feat_id, current_version, conflicting_tasks
+    )
+
+
+def _build_checklist_update_filter(
+    feat_id: str, current_version: str | None
+) -> dict[str, Any]:
+    if current_version is None:
+        return {"id": feat_id, "checklist.version": None}
+    return {"id": feat_id, "checklist.version": current_version}
+
+
+def _extract_checklist_version(doc: dict[str, Any] | None) -> str | None:
+    if not doc:
+        return None
+    checklist = doc.get("checklist")
+    if isinstance(checklist, dict):
+        return checklist.get("version")
+    return None
+
+
 @router.post("/lifecycle")
 async def feat_lifecycle(
     params: FeatLifecycleRequest,
@@ -615,11 +671,19 @@ async def feat_checklist(
         await _require_write_for_projects(permission_service, user_id, project_ids)
 
     checklist = feat.get("checklist")
+    expected_version = _normalize_expected_version(params.expected_version)
+    current_version = checklist.get("version") if isinstance(checklist, dict) else None
 
     if params.action == "generate":
+        conflict = _build_checklist_conflict(
+            params.feat_id, current_version, expected_version
+        )
+        if conflict:
+            return conflict
         items = [item.model_dump() for item in (params.items or [])]
+        version = uuid4().hex
         checklist = {
-            "version": uuid4().hex,
+            "version": version,
             "metadata": {
                 "feat_id": params.feat_id,
                 "generated_at": now_iso(),
@@ -628,7 +692,17 @@ async def feat_checklist(
             "updated_at": now_iso(),
             "items": items,
         }
-        await feats.update_one({"id": params.feat_id}, {"$set": {"checklist": checklist}})
+        update_result = await feats.update_one(
+            _build_checklist_update_filter(params.feat_id, current_version),
+            {"$set": {"checklist": checklist}},
+        )
+        matched = getattr(update_result, "matched_count", 0)
+        if matched == 0:
+            latest = await feats.find_one({"id": params.feat_id}, {"checklist": 1})
+            latest_version = _extract_checklist_version(latest)
+            return _build_checklist_conflict_response(
+                params.feat_id, latest_version
+            )
         return {"success": True, "feat_id": params.feat_id, "checklist": checklist}
 
     if params.action == "get":
@@ -637,12 +711,35 @@ async def feat_checklist(
         return {"success": True, "feat_id": params.feat_id, "checklist": checklist}
 
     if params.action == "clear":
-        await feats.update_one({"id": params.feat_id}, {"$set": {"checklist": None}})
+        conflict = _build_checklist_conflict(
+            params.feat_id, current_version, expected_version
+        )
+        if conflict:
+            return conflict
+        update_result = await feats.update_one(
+            _build_checklist_update_filter(params.feat_id, current_version),
+            {"$set": {"checklist": None}},
+        )
+        matched = getattr(update_result, "matched_count", 0)
+        if matched == 0:
+            latest = await feats.find_one({"id": params.feat_id}, {"checklist": 1})
+            latest_version = _extract_checklist_version(latest)
+            return _build_checklist_conflict_response(
+                params.feat_id, latest_version
+            )
         return {"success": True, "feat_id": params.feat_id, "cleared": True}
 
     if params.action == "patch":
         if not checklist:
             return {"success": False, "feat_id": params.feat_id, "error": "checklist not found"}
+        conflict = _build_checklist_conflict(
+            params.feat_id,
+            current_version,
+            expected_version,
+            [patch.task_id for patch in (params.patches or [])],
+        )
+        if conflict:
+            return conflict
         patches = params.patches or []
         items = {item["id"]: item for item in checklist.get("items", [])}
         updated_tasks = []
@@ -653,9 +750,22 @@ async def feat_checklist(
             updated_tasks.append(
                 {"task_id": patch.task_id, "fields_updated": list(patch.updates.keys())}
             )
+        checklist["version"] = uuid4().hex
         checklist["items"] = list(items.values())
         checklist["updated_at"] = now_iso()
-        await feats.update_one({"id": params.feat_id}, {"$set": {"checklist": checklist}})
+        update_result = await feats.update_one(
+            _build_checklist_update_filter(params.feat_id, current_version),
+            {"$set": {"checklist": checklist}},
+        )
+        matched = getattr(update_result, "matched_count", 0)
+        if matched == 0:
+            latest = await feats.find_one({"id": params.feat_id}, {"checklist": 1})
+            latest_version = _extract_checklist_version(latest)
+            return _build_checklist_conflict_response(
+                params.feat_id,
+                latest_version,
+                [patch.task_id for patch in (params.patches or [])],
+            )
         return {
             "success": True,
             "feat_id": params.feat_id,

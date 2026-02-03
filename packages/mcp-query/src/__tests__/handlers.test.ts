@@ -62,6 +62,7 @@ describe("mcp-query handlers", () => {
   });
 
   test("deps returns degraded context when provided", async () => {
+    let observedDepth: number | undefined;
     const adapter = {
       async initialize() {},
       async search(_params: SearchParams): Promise<SearchResult> {
@@ -71,7 +72,8 @@ describe("mcp-query handlers", () => {
           search_mode: "vector",
         };
       },
-      async queryDeps(_params: DepsParams): Promise<DepsResult> {
+      async queryDeps(params: DepsParams): Promise<DepsResult> {
+        observedDepth = params.depth;
         return {
           nodes: [
             {
@@ -105,6 +107,8 @@ describe("mcp-query handlers", () => {
     expect(result.items[0]?.id).toBe("dep-1");
     expect(result.degraded).toBe(true);
     expect(result.degraded_reason).toBe("PENDING_SYNC");
+    expect(result.max_depth_allowed).toBe(1);
+    expect(observedDepth).toBe(1);
   });
 
   test("deps returns adapter degraded info when adapter reports degraded", async () => {

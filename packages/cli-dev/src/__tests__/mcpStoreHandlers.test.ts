@@ -288,7 +288,7 @@ describe("store handlers", () => {
     }
     expect(list.items.some((item) => item.id === entityId)).toBe(true);
 
-    const deleted = await storeDeleteHandler({ id: entityId, force: false });
+    const deleted = await storeDeleteHandler({ id: entityId, proposal_id: null, force: false });
     expect(deleted.success).toBe(true);
   });
 

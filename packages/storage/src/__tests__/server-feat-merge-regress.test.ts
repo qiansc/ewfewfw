@@ -160,10 +160,14 @@ describe('Server feat merge regression', () => {
     const mainEntity = await adapter.read({
       id: systemId,
       filter: { source_project: projectId },
+      format: 'object',
     });
     expect(mainEntity).not.toBeNull();
-    expect(mainEntity?.entity?.proposal_id ?? null).toBeNull();
-    expect(mainEntity?.entity?.metadata?.status).toBe('published');
+    if (!mainEntity || !('entity' in mainEntity)) {
+      throw new Error('Expected entity response');
+    }
+    expect(mainEntity.entity?.proposal_id ?? null).toBeNull();
+    expect(mainEntity.entity?.metadata?.status).toBe('published');
 
     const featList = await adapter.list({
       project_id: projectId,
