@@ -25,6 +25,7 @@ export async function validate(
 ): Promise<ValidateResult> {
   const db = ctx.store.getDatabase();
   const proposalId = params.proposal_id ?? null;
+  const featStatus = proposalId ? loadFeatStatus(db, proposalId) : null;
   const dbProposalId = proposalId ?? '';
   const proposalClause = dbProposalId === ''
     ? '(e.proposal_id IS NULL OR e.proposal_id = \'\')'
@@ -45,7 +46,7 @@ export async function validate(
 
   try {
     const baseEntities = db.prepare(`
-      SELECT e.id, e.type, e.data, m.status
+      SELECT e.id, e.type, e.data, e.source_project, m.status
       FROM entities e
       JOIN metadata m ON e.source_project = m.source_project
         AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
@@ -56,6 +57,7 @@ export async function validate(
       id: string;
       type: string;
       data: string;
+      source_project: string;
       status: string;
     }>;
 
@@ -75,12 +77,20 @@ export async function validate(
     }
 
     const changesDetected = proposalId
-      ? detectArchitectureChanges(db, baseEntities)
+      ? detectArchitectureChanges(db, baseEntities, proposalId)
       : [];
 
     // 执行各项检查
     for (const check of checksToRun) {
-      const result = runCheck(db, check, byType, proposalId, scopeIds, changesDetected);
+      const result = runCheck(
+        db,
+        check,
+        byType,
+        proposalId,
+        scopeIds,
+        changesDetected,
+        featStatus
+      );
       checks[check] = result;
 
       if (result.status === 'passed') passed++;
@@ -149,7 +159,8 @@ function runCheck(
   byType: Record<string, Array<{ id: string; type: string; data: string; status: string }>>,
   proposalId: string | null,
   scopeIds: Set<string> | null,
-  changesDetected: ValidateCheckResult['changes_detected']
+  changesDetected: ValidateCheckResult['changes_detected'],
+  featStatus: string | null
 ): ValidateCheckResult {
   switch (check) {
     case 'functional_spec':
@@ -159,7 +170,7 @@ function runCheck(
     case 'contracts':
       return checkContracts(db, byType, proposalId);
     case 'references':
-      return checkReferences(db, proposalId, scopeIds);
+      return checkReferences(db, proposalId, scopeIds, featStatus);
     case 'adr_completeness':
       return checkAdrCompleteness(byType, changesDetected);
     case 'checklist':
@@ -228,9 +239,10 @@ function loadEntitiesForScope(
 
 function detectArchitectureChanges(
   db: ReturnType<typeof import('../sqlite-store.js').SQLiteStore.prototype.getDatabase>,
-  baseEntities: Array<{ id: string; type: string; data: string }>
+  baseEntities: Array<{ id: string; type: string; data: string; status: string; source_project: string }>,
+  proposalId: string
 ): ValidateCheckResult['changes_detected'] {
-  const targetTypes = new Set(['system', 'container', 'component']);
+  const targetTypes = new Set(['system', 'container']);
   const featEntities = baseEntities.filter(entity => targetTypes.has(entity.type));
   if (featEntities.length === 0) return [];
 
@@ -247,6 +259,14 @@ function detectArchitectureChanges(
   const changes: NonNullable<ValidateCheckResult['changes_detected']> = [];
 
   for (const featEntity of featEntities) {
+    if (featEntity.status === 'deleted') {
+      changes.push({
+        type: 'deleted',
+        entity_id: featEntity.id,
+        detail: 'feat 中删除实体',
+      });
+      continue;
+    }
     const mainData = mainMap.get(featEntity.id);
     if (!mainData) {
       changes.push({
@@ -257,15 +277,130 @@ function detectArchitectureChanges(
       continue;
     }
     if (mainData !== featEntity.data) {
+      const detail = buildChangeDetail(featEntity.type, mainData, featEntity.data);
       changes.push({
         type: 'modified',
         entity_id: featEntity.id,
-        detail: '实体数据发生变更',
+        detail,
+      });
+    }
+  }
+
+  const relationChanges = detectDependsOnChanges(db, proposalId, featEntities);
+  return changes.concat(relationChanges);
+}
+
+function buildChangeDetail(
+  entityType: string,
+  mainData: string,
+  featData: string
+): string {
+  if (entityType !== 'container') {
+    return '实体数据发生变更';
+  }
+  const mainTech = extractTechnology(mainData);
+  const featTech = extractTechnology(featData);
+  if (mainTech !== featTech && (mainTech || featTech)) {
+    return `技术栈变更: ${mainTech ?? 'unknown'} → ${featTech ?? 'unknown'}`;
+  }
+  return '实体数据发生变更';
+}
+
+function extractTechnology(rawData: string): string | null {
+  try {
+    const data = JSON.parse(rawData) as Record<string, unknown>;
+    if (typeof data.technology === 'string') return data.technology;
+    if (typeof data.tech_stack === 'string') return data.tech_stack;
+    if (typeof data.stack === 'string') return data.stack;
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function detectDependsOnChanges(
+  db: ReturnType<typeof import('../sqlite-store.js').SQLiteStore.prototype.getDatabase>,
+  proposalId: string,
+  featEntities: Array<{ id: string; type: string; source_project: string }>
+): Array<{ type: string; entity_id: string; detail: string }> {
+  const changes: Array<{ type: string; entity_id: string; detail: string }> = [];
+  const typeMap = new Map<string, string>();
+  for (const entity of featEntities) {
+    typeMap.set(`${entity.source_project ?? ''}::${entity.id}`, entity.type);
+  }
+
+  const featRelations = db.prepare(`
+    SELECT from_project, from_id, to_project, to_id, rel_type, status
+    FROM relations
+    WHERE proposal_id = ? AND rel_type = 'DEPENDS_ON'
+  `).all(proposalId) as Array<{
+    from_project: string;
+    from_id: string;
+    to_project: string;
+    to_id: string;
+    rel_type: string;
+    status: string | null;
+  }>;
+
+  const mainRelations = db.prepare(`
+    SELECT from_project, from_id, to_project, to_id, rel_type
+    FROM relations
+    WHERE (proposal_id IS NULL OR proposal_id = '')
+      AND rel_type = 'DEPENDS_ON'
+      AND (status IS NULL OR status != 'deleted')
+  `).all() as Array<{
+    from_project: string;
+    from_id: string;
+    to_project: string;
+    to_id: string;
+    rel_type: string;
+  }>;
+
+  const mainSet = new Set(
+    mainRelations.map(
+      (rel) =>
+        `${rel.from_project ?? ''}::${rel.from_id}::${rel.rel_type}::${rel.to_project ?? ''}::${rel.to_id}`
+    )
+  );
+
+  for (const rel of featRelations) {
+    const fromKey = `${rel.from_project ?? ''}::${rel.from_id}`;
+    const fromType = typeMap.get(fromKey);
+    if (fromType !== 'system' && fromType !== 'container') {
+      continue;
+    }
+    const relKey = `${rel.from_project ?? ''}::${rel.from_id}::${rel.rel_type}::${rel.to_project ?? ''}::${rel.to_id}`;
+    const status = rel.status ?? 'active';
+    if (status === 'deleted') {
+      if (mainSet.has(relKey)) {
+        changes.push({
+          type: 'relation_removed',
+          entity_id: rel.from_id,
+          detail: `移除 DEPENDS_ON: ${rel.from_id} → ${rel.to_id}`,
+        });
+      }
+      continue;
+    }
+    if (!mainSet.has(relKey)) {
+      changes.push({
+        type: 'relation_added',
+        entity_id: rel.from_id,
+        detail: `新增 DEPENDS_ON: ${rel.from_id} → ${rel.to_id}`,
       });
     }
   }
 
   return changes;
+}
+
+function loadFeatStatus(
+  db: ReturnType<typeof import('../sqlite-store.js').SQLiteStore.prototype.getDatabase>,
+  featId: string
+): string | null {
+  const row = db.prepare(`SELECT status FROM feats WHERE id = ?`).get(featId) as
+    | { status?: string }
+    | undefined;
+  return typeof row?.status === 'string' ? row.status : null;
 }
 
 /**
@@ -405,7 +540,8 @@ function checkContracts(
 function checkReferences(
   db: ReturnType<typeof import('../sqlite-store.js').SQLiteStore.prototype.getDatabase>,
   proposalId: string | null,
-  scopeIds: Set<string> | null
+  scopeIds: Set<string> | null,
+  featStatus: string | null
 ): ValidateCheckResult {
   const dbProposalId = proposalId ?? '';
   const scopeList = scopeIds && scopeIds.size > 0 ? Array.from(scopeIds) : [];
@@ -414,59 +550,179 @@ function checkReferences(
     : '';
 
   const params: Array<string | null> = [];
-  let dangling: Array<{ from_id: string; to_id: string }>;
+  let relations: Array<{ from_id: string; to_id: string; rel_type: string; from_project: string; to_project: string }>;
 
   if (dbProposalId === '') {
-    dangling = db.prepare(`
-      SELECT r.from_id, r.to_id
+    relations = db.prepare(`
+      SELECT r.from_id, r.to_id, r.rel_type, r.from_project, r.to_project
       FROM relations r
-      LEFT JOIN entities e_main
-        ON e_main.source_project = r.to_project AND e_main.id = r.to_id
-        AND (e_main.proposal_id IS NULL OR e_main.proposal_id = '')
       WHERE (r.proposal_id IS NULL OR r.proposal_id = '')
         AND (r.status IS NULL OR r.status != 'deleted')
         ${scopeClause}
-        AND e_main.id IS NULL
-    `).all(...scopeList) as Array<{ from_id: string; to_id: string }>;
+    `).all(...scopeList) as Array<{
+      from_id: string;
+      to_id: string;
+      rel_type: string;
+      from_project: string;
+      to_project: string;
+    }>;
   } else {
-    params.push(dbProposalId, dbProposalId);
-    dangling = db.prepare(`
-      SELECT r.from_id, r.to_id
+    params.push(dbProposalId);
+    relations = db.prepare(`
+      SELECT r.from_id, r.to_id, r.rel_type, r.from_project, r.to_project
       FROM relations r
-      LEFT JOIN entities e_main
-        ON e_main.source_project = r.to_project AND e_main.id = r.to_id
-        AND (e_main.proposal_id IS NULL OR e_main.proposal_id = '')
-      LEFT JOIN entities e_feat
-        ON e_feat.source_project = r.to_project AND e_feat.id = r.to_id
-        AND e_feat.proposal_id = ?
       WHERE (r.proposal_id IS NULL OR r.proposal_id = '' OR r.proposal_id = ?)
         AND (r.status IS NULL OR r.status != 'deleted')
         ${scopeClause}
-        AND e_main.id IS NULL AND e_feat.id IS NULL
-    `).all(...params, ...scopeList) as Array<{ from_id: string; to_id: string }>;
+    `).all(...params, ...scopeList) as Array<{
+      from_id: string;
+      to_id: string;
+      rel_type: string;
+      from_project: string;
+      to_project: string;
+    }>;
+  }
+
+  if (relations.length === 0) {
+    return {
+      status: 'passed',
+      message: 'DSL 引用正确',
+      dangling_count: 0,
+    };
+  }
+
+  const keys = new Set<string>();
+  for (const rel of relations) {
+    keys.add(`${rel.from_project ?? ''}::${rel.from_id}`);
+    keys.add(`${rel.to_project ?? ''}::${rel.to_id}`);
+  }
+  const typeMap = loadEntityTypeMap(db, proposalId, keys);
+
+  const dangling: Array<{ from_id: string; to_id: string }> = [];
+  for (const rel of relations) {
+    const fromKey = `${rel.from_project ?? ''}::${rel.from_id}`;
+    const toKey = `${rel.to_project ?? ''}::${rel.to_id}`;
+    const fromType = typeMap.get(fromKey);
+    const expectedType = resolveExpectedTargetType(fromType, rel.rel_type);
+    const actualType = typeMap.get(toKey);
+    if (!actualType) {
+      dangling.push({ from_id: rel.from_id, to_id: rel.to_id });
+      continue;
+    }
+    if (expectedType && actualType !== expectedType) {
+      dangling.push({ from_id: rel.from_id, to_id: rel.to_id });
+    }
   }
 
   const danglingCount = dangling.length;
-  const errors: ValidateError[] = dangling.slice(0, 5).map(rel => ({
+  if (danglingCount === 0) {
+    return {
+      status: 'passed',
+      message: 'DSL 引用正确',
+      dangling_count: 0,
+    };
+  }
+
+  const severity = resolveReferenceSeverity(featStatus, proposalId);
+  const items: ValidateError[] = dangling.slice(0, 5).map(rel => ({
     code: 'DANGLING_REFERENCE',
     entity_id: rel.from_id,
     message: `引用的实体 '${rel.to_id}' 不存在`,
   }));
 
-  if (danglingCount > 0) {
-    return {
-      status: 'error',
-      message: `发现 ${danglingCount} 个悬空引用`,
-      errors,
-      dangling_count: danglingCount,
-    };
+  return {
+    status: severity,
+    message:
+      severity === 'warning'
+        ? `发现 ${danglingCount} 个悬空引用（允许在 ${featStatus ?? 'draft'}）`
+        : `发现 ${danglingCount} 个悬空引用`,
+    errors: severity === 'error' ? items : undefined,
+    warnings: severity === 'warning' ? items : undefined,
+    dangling_count: danglingCount,
+  };
+}
+
+function loadEntityTypeMap(
+  db: ReturnType<typeof import('../sqlite-store.js').SQLiteStore.prototype.getDatabase>,
+  proposalId: string | null,
+  keys: Set<string>
+): Map<string, string> {
+  const map = new Map<string, string>();
+  if (keys.size === 0) return map;
+  const pairs = Array.from(keys).map((key) => key.split('::'));
+  const placeholders = pairs.map(() => '(?, ?)').join(', ');
+  const params: Array<string> = [];
+  for (const [project, id] of pairs) {
+    params.push(project, id);
   }
 
-  return {
-    status: 'passed',
-    message: 'DSL 引用正确',
-    dangling_count: 0,
-  };
+  if (!proposalId) {
+    const rows = db.prepare(`
+      SELECT source_project, id, type, proposal_id
+      FROM entities
+      WHERE (proposal_id IS NULL OR proposal_id = '')
+        AND (source_project, id) IN (${placeholders})
+    `).all(...params) as Array<{ source_project: string; id: string; type: string }>;
+    for (const row of rows) {
+      map.set(`${row.source_project ?? ''}::${row.id}`, row.type);
+    }
+    return map;
+  }
+
+  const rows = db.prepare(`
+    SELECT source_project, id, type, proposal_id
+    FROM entities
+    WHERE (proposal_id IS NULL OR proposal_id = '' OR proposal_id = ?)
+      AND (source_project, id) IN (${placeholders})
+  `).all(proposalId, ...params) as Array<{
+    source_project: string;
+    id: string;
+    type: string;
+    proposal_id: string;
+  }>;
+
+  for (const row of rows) {
+    const key = `${row.source_project ?? ''}::${row.id}`;
+    const existing = map.get(key);
+    if (!existing || row.proposal_id === proposalId) {
+      map.set(key, row.type);
+    }
+  }
+
+  return map;
+}
+
+function resolveExpectedTargetType(
+  fromType: string | undefined,
+  relType: string
+): string | null {
+  if (!fromType) return null;
+  if (fromType === 'container') {
+    if (relType === 'DEPENDS_ON') return 'container';
+    if (relType === 'CONTAINS') return 'component';
+    if (relType === 'IMPLEMENTS') return 'contract';
+  }
+  if (fromType === 'component') {
+    if (relType === 'DEPENDS_ON') return 'component';
+    if (relType === 'REFERENCES') return 'container';
+    if (relType === 'IMPLEMENTS') return 'contract';
+  }
+  if (fromType === 'system') {
+    if (relType === 'DEPENDS_ON') return 'system';
+    if (relType === 'CONTAINS') return 'container';
+  }
+  return null;
+}
+
+function resolveReferenceSeverity(
+  featStatus: string | null,
+  proposalId: string | null
+): 'warning' | 'error' {
+  if (!proposalId) return 'error';
+  if (featStatus === 'draft' || featStatus === 'approved') {
+    return 'warning';
+  }
+  return 'error';
 }
 
 /**

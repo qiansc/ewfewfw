@@ -148,25 +148,31 @@ export function mergeFeatToMain(
   featId: string,
   options: { recordHistory?: boolean; publishedBy?: string | null } = {}
 ): { merged: string[]; conflicts: FeatConflict[] } {
+  return storage.transaction((tx) => mergeFeatToMainInternal(tx, featId, options));
+}
+
+export function mergeFeatToMainInternal(
+  storage: StorageOperations,
+  featId: string,
+  options: { recordHistory?: boolean; publishedBy?: string | null } = {}
+): { merged: string[]; conflicts: FeatConflict[] } {
   const merged: string[] = [];
   const now = new Date().toISOString();
 
-  storage.transaction((tx) => {
-    if (options.recordHistory) {
-      const snapshot = buildFeatHistorySnapshot(tx, featId);
-      recordFeatHistory(tx, featId, now, options.publishedBy ?? null, snapshot);
-    }
+  if (options.recordHistory) {
+    const snapshot = buildFeatHistorySnapshot(storage, featId);
+    recordFeatHistory(storage, featId, now, options.publishedBy ?? null, snapshot);
+  }
 
-    const featEntities = tx.listFeatEntitiesForMerge(featId);
+  const featEntities = storage.listFeatEntitiesForMerge(featId);
 
-    for (const entity of featEntities) {
-      tx.deleteMainEntity(entity.id, entity.source_project);
-      merged.push(entity.id);
-    }
+  for (const entity of featEntities) {
+    storage.deleteMainEntity(entity.id, entity.source_project);
+    merged.push(entity.id);
+  }
 
-    tx.moveFeatEntitiesToMain(featId, now);
-    tx.clearFeatChecklist(featId);
-  });
+  storage.moveFeatEntitiesToMain(featId, now);
+  storage.clearFeatChecklist(featId);
 
   return { merged, conflicts: [] };
 }

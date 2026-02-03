@@ -63,7 +63,10 @@ export const StoreSaveInputSchema = z.object({
   content: z.string().optional().describe("实体内容（YAML/JSON 字符串，与 data 二选一）"),
   format: z.enum(["yaml", "json"]).optional().default("yaml").describe("content 的格式（当使用 content 时必填）"),
   id: z.string().optional().describe("指定 ID（不传则可由系统生成）"),
-  source_project: z.string().optional().describe("实体归属项目（用于权限校验）"),
+  source_project: z
+    .string()
+    .optional()
+    .describe("实体归属项目（可选，未传将从配置 project_id 自动补齐；Server 模式仍需有效值）"),
   proposal_id: ProposalIdSchema.describe("feat/提案隔离（主分支为 null）"),
   enforce_adr: z.boolean().optional().default(false).describe("是否强制 ADR 检查"),
   skip_adr_check: z.boolean().optional().default(false).describe("跳过 ADR 检查（需要特殊权限）"),
@@ -196,7 +199,10 @@ export const EntitySummarySchema = z.object({
   status: z.string().describe("实体状态"),
   updated_at: z.string().describe("更新时间"),
   content_hash: z.string().describe("内容哈希"),
-  source_project: z.string().optional().describe("归属项目"),
+  source_project: z
+    .string()
+    .optional()
+    .describe("归属项目（可选，未传将从配置 project_id 自动补齐；Server 模式仍需有效值）"),
   proposal_id: z.string().optional().describe("提案 ID"),
 });
 
@@ -880,6 +886,7 @@ export const StoreFeatChecklistInputSchema = z.object({
   action: ChecklistActionSchema.describe("操作类型"),
   feat_id: z.string().describe("Feat ID"),
   source: z.literal("technical_spec").optional().describe("Checklist 来源（generate 用）"),
+  expected_version: z.string().optional().describe("期望的 Checklist 版本（乐观锁）"),
   items: z.array(z.object({
     id: z.string().describe("任务 ID"),
     title: z.string().optional().describe("任务标题"),
@@ -945,6 +952,8 @@ export const StoreFeatChecklistResultSchema = z.object({
   cleared: z.boolean().optional().describe("是否已清除（clear 用）"),
   error: z.string().optional().describe("错误码"),
   message: z.string().optional().describe("错误消息"),
+  current_version: z.string().optional().describe("当前 Checklist 版本（冲突时返回）"),
+  conflicting_tasks: z.array(z.string()).optional().describe("发生冲突的任务 ID 列表"),
   missing_tasks: z.array(z.string()).optional().describe("缺失的任务 ID 列表"),
   validation_errors: z
     .array(

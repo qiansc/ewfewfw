@@ -20,17 +20,19 @@ export async function queryDepsHandler(
   if (!resolvedSourceProject) {
     throw new Error("缺少 source_project（project_id）");
   }
+  const depth = context.degraded ? 1 : args.depth;
   const result = await adapter.queryDeps({
     id: args.id,
     source_project: resolvedSourceProject,
     direction: args.direction,
-    depth: args.depth,
+    depth,
     proposal_id: args.proposal_id,
   });
 
   const degraded = result.degraded || context.degraded;
   const degraded_reason = result.degraded ? result.degraded_reason : context.degraded_reason;
   const degraded_message = result.degraded ? result.degraded_message : context.degraded_message;
+  const maxDepthAllowed = degraded ? 1 : undefined;
 
   return {
     success: true,
@@ -38,5 +40,6 @@ export async function queryDepsHandler(
     degraded,
     degraded_reason,
     degraded_message,
+    max_depth_allowed: maxDepthAllowed,
   };
 }

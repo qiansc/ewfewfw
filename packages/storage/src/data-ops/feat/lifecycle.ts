@@ -13,7 +13,7 @@ import type { DataOpsContext } from '../types.js';
 import {
   collectFeatEntitiesForVector,
   detectFeatConflicts,
-  mergeFeatToMain,
+  mergeFeatToMainInternal,
   removeVectorIndexForEntities,
   updateVectorIndexAfterMerge,
 } from './merge.js';
@@ -168,19 +168,25 @@ async function transitionFeat(
     }
   }
 
-  // 执行状态流转
   const now = new Date().toISOString();
-  ctx.storage.updateFeatStatus(featId, toStatus, now);
 
-  // 发布时合并实体到主分支
+  // 发布时合并实体到主分支（状态 + 合并 + 清理原子化）
   let mergeResult: { merged: string[]; conflicts: FeatConflict[] } | undefined;
   if (toStatus === 'published') {
     const vectorEntities = collectFeatEntitiesForVector(ctx.storage, featId);
-    mergeResult = mergeFeatToMain(ctx.storage, featId, {
-      recordHistory: true,
-      publishedBy: params.metadata?.created_by ?? null,
+    ctx.storage.transaction((tx) => {
+      const statusResult = tx.updateFeatStatus(featId, toStatus as FeatStatus, now);
+      if (statusResult.affectedRows === 0) {
+        throw new Error(`Feat ${featId} not found`);
+      }
+      mergeResult = mergeFeatToMainInternal(tx, featId, {
+        recordHistory: true,
+        publishedBy: params.metadata?.created_by ?? null,
+      });
     });
     await updateVectorIndexAfterMerge(ctx, featId, vectorEntities);
+  } else {
+    ctx.storage.updateFeatStatus(featId, toStatus, now);
   }
 
   return {

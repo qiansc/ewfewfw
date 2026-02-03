@@ -153,6 +153,7 @@ export interface ChecklistParams {
   action: ChecklistAction;
   feat_id: string;
   source?: 'technical_spec';
+  expected_version?: string | null;
   items?: Array<{
     id: string;
     title?: string;
@@ -178,6 +179,8 @@ export interface ChecklistResult {
   updated_checklist?: Checklist;
   error?: string;
   message?: string;
+  current_version?: string | null;
+  conflicting_tasks?: string[];
   missing_tasks?: string[];
   validation_errors?: Array<{ code: string; message: string; task_id?: string }>;
 }

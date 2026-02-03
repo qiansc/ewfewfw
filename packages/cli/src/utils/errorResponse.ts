@@ -10,7 +10,7 @@ export function buildErrorResponse(
   recoverableActions?: RecoverableAction[]
 ): ErrorResponse {
   return {
-    code,
+    code: code as ErrorResponse["code"],
     message,
     details,
     recoverable_actions: recoverableActions,

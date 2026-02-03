@@ -20,22 +20,50 @@ type PlanSyncStats = {
 };
 
 type PlanSyncAction = StorePlanSyncResult["actions"][number];
+type StorageSyncAction = SyncPlan["to_upload"][number];
+type StoreEntityType = Exclude<PlanSyncAction["type"], undefined>;
 
 type ExecutedStats = StorePlanSyncExecutedResult["stats"];
+
+const STORE_ENTITY_TYPES: StoreEntityType[] = [
+  "product",
+  "system",
+  "container",
+  "component",
+  "process",
+  "sor",
+  "adr",
+  "contract",
+];
+
+function isStoreEntityType(value: StorageSyncAction["type"]): value is StoreEntityType {
+  if (!value) {
+    return false;
+  }
+  return STORE_ENTITY_TYPES.includes(value as StoreEntityType);
+}
+
+function toPlanSyncAction(action: StorageSyncAction): PlanSyncAction {
+  if (!action.type || isStoreEntityType(action.type)) {
+    return action as PlanSyncAction;
+  }
+  const { type: _ignored, ...rest } = action;
+  return rest as PlanSyncAction;
+}
 
 function buildActions(plan: SyncPlan): PlanSyncAction[] {
   const actions: PlanSyncAction[] = [];
   for (const item of plan.to_upload) {
-    actions.push(item);
+    actions.push(toPlanSyncAction(item));
   }
   for (const item of plan.to_download) {
-    actions.push(item);
+    actions.push(toPlanSyncAction(item));
   }
   for (const item of plan.to_delete_local) {
-    actions.push(item);
+    actions.push(toPlanSyncAction(item));
   }
   for (const item of plan.to_delete_remote) {
-    actions.push(item);
+    actions.push(toPlanSyncAction(item));
   }
   for (const conflict of plan.conflicts) {
     actions.push({

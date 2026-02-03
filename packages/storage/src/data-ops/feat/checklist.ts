@@ -26,16 +26,17 @@ export async function featChecklist(
 ): Promise<ChecklistResult> {
   const featId = params.feat_id;
   const shouldValidate = params.validate !== false; // 默认 true
+  const expectedVersion = normalizeExpectedVersion(params.expected_version);
 
   switch (params.action) {
     case 'generate':
-      return generateChecklist(ctx, featId, params.source, shouldValidate);
+      return generateChecklist(ctx, featId, params.source, shouldValidate, expectedVersion);
     case 'get':
       return getChecklist(ctx, featId);
     case 'patch':
-      return patchChecklist(ctx, featId, params.patches || [], shouldValidate);
+      return patchChecklist(ctx, featId, params.patches || [], shouldValidate, expectedVersion);
     case 'clear':
-      return clearChecklist(ctx, featId);
+      return clearChecklist(ctx, featId, expectedVersion);
     default:
       return {
         success: false,
@@ -55,7 +56,8 @@ function generateChecklist(
   ctx: DataOpsContext,
   featId: string,
   source?: string,
-  validate?: boolean
+  validate?: boolean,
+  expectedVersion?: string | null
 ): ChecklistResult {
   const feat = ctx.storage.getFeat(featId);
   if (!feat) {
@@ -65,6 +67,11 @@ function generateChecklist(
       error: 'FEAT_NOT_FOUND',
       message: `Feat ${featId} not found`,
     };
+  }
+
+  const versionCheck = checkExpectedVersion(featId, feat.checklist_version ?? null, expectedVersion);
+  if (versionCheck) {
+    return versionCheck;
   }
 
   const entities = ctx.storage.listFeatEntitiesForMerge(featId);
@@ -158,7 +165,8 @@ function patchChecklist(
   ctx: DataOpsContext,
   featId: string,
   patches: ChecklistParams['patches'],
-  validate?: boolean
+  validate?: boolean,
+  expectedVersion?: string | null
 ): ChecklistResult {
   const feat = ctx.storage.getFeat(featId);
   if (!feat) {
@@ -168,6 +176,16 @@ function patchChecklist(
       error: 'FEAT_NOT_FOUND',
       message: `Feat ${featId} not found`,
     };
+  }
+
+  const versionCheck = checkExpectedVersion(
+    featId,
+    feat.checklist_version ?? null,
+    expectedVersion,
+    patches?.map((patch) => patch.task_id) ?? []
+  );
+  if (versionCheck) {
+    return versionCheck;
   }
 
   if (!feat.checklist) {
@@ -388,7 +406,11 @@ function validateChecklistStructure(
 /**
  * 清除 Checklist
  */
-function clearChecklist(ctx: DataOpsContext, featId: string): ChecklistResult {
+function clearChecklist(
+  ctx: DataOpsContext,
+  featId: string,
+  expectedVersion?: string | null
+): ChecklistResult {
   const feat = ctx.storage.getFeat(featId);
   if (!feat) {
     return {
@@ -397,6 +419,11 @@ function clearChecklist(ctx: DataOpsContext, featId: string): ChecklistResult {
       error: 'FEAT_NOT_FOUND',
       message: `Feat ${featId} not found`,
     };
+  }
+
+  const versionCheck = checkExpectedVersion(featId, feat.checklist_version ?? null, expectedVersion);
+  if (versionCheck) {
+    return versionCheck;
   }
 
   const now = new Date().toISOString();
@@ -462,6 +489,8 @@ function updateChecklistRecord(
   });
 
   if (result.affectedRows === 0) {
+    const latest = ctx.storage.getFeat(featId);
+    const currentVersion = latest?.checklist_version ?? null;
     return {
       success: false,
       result: {
@@ -469,6 +498,7 @@ function updateChecklistRecord(
         feat_id: featId,
         error: 'CHECKLIST_CONFLICT',
         message: 'Checklist 已被其他会话更新，请先执行 get 获取最新内容',
+        current_version: currentVersion ?? null,
       },
     };
   }
@@ -478,4 +508,34 @@ function updateChecklistRecord(
 
 function createChecklistVersion(): string {
   return new Date().toISOString();
+}
+
+function normalizeExpectedVersion(value: string | null | undefined): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === '') return null;
+  return value;
+}
+
+function checkExpectedVersion(
+  featId: string,
+  currentVersion: string | null,
+  expectedVersion?: string | null,
+  conflictingTasks: string[] = []
+): ChecklistResult | null {
+  if (expectedVersion === undefined) {
+    return null;
+  }
+
+  if (expectedVersion !== currentVersion) {
+    return {
+      success: false,
+      feat_id: featId,
+      error: 'CHECKLIST_CONFLICT',
+      message: 'Checklist 已被其他会话更新，请先执行 get 获取最新内容',
+      current_version: currentVersion ?? null,
+      conflicting_tasks: conflictingTasks.length > 0 ? conflictingTasks : undefined,
+    };
+  }
+
+  return null;
 }

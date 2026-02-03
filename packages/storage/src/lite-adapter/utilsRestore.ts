@@ -122,6 +122,7 @@ export async function restore(
     const conflicts: RestoreConflict[] = [];
     let entitiesRestored = 0;
     let relationsRestored = 0;
+    let vectorsRebuilt = 0;
 
     const now = new Date().toISOString();
 
@@ -230,6 +231,15 @@ export async function restore(
       }
     }
 
+    if (ctx.config.enableVectorSearch && ctx.store.isVectorSearchEnabled()) {
+      try {
+        const rebuild = await ctx.store.rebuildVectorIndex();
+        vectorsRebuilt = rebuild.indexed;
+      } catch {
+        // 向量重建失败时保持为 0，避免影响恢复主流程
+      }
+    }
+
     return {
       success: true,
       format_version: backupData.format_version,
@@ -237,7 +247,7 @@ export async function restore(
       stats: {
         entities: entitiesRestored,
         relations: relationsRestored,
-        vectors: 0,
+        vectors: vectorsRebuilt,
       },
       conflicts: conflicts.length > 0 ? conflicts : undefined,
     };

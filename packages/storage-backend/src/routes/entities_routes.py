@@ -296,7 +296,7 @@ async def read_entity(
         else None
     )
 
-    for proposal_id in proposal_ids:
+    for proposal_id in reversed(proposal_ids):
         entity_doc = await adapter.get_entity(params.id, source_project, proposal_id)
         if entity_doc:
             break

@@ -109,7 +109,7 @@ describe("MCP Query Integration", () => {
       expect(result.success).toBe(true);
       expect(result.items.some((item) => item.id === entityId)).toBe(true);
       const matched = result.items.find((item) => item.id === entityId);
-      expect(matched?.summary.toLowerCase()).toContain(token.toLowerCase());
+      expect((matched?.summary ?? "").toLowerCase()).toContain(token.toLowerCase());
     });
 
     it("should filter by entity type", async () => {
