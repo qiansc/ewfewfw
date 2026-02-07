@@ -199,7 +199,7 @@ export async function restoreFromStream(
           }
           entityIndex += 1;
           if (!hasDefaultProject) {
-            defaultProject = normalized.metadata.source_project || 'default';
+            defaultProject = normalized.metadata.root_id || 'default';
             hasDefaultProject = true;
           }
           reportProgress('entities', entityIndex, 0);

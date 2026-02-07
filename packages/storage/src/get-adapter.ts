@@ -31,6 +31,20 @@ export type StorageMode = 'local' | 'server' | 'remote';
  */
 export interface ServerConfig {
   url: string;
+  mongoUrl?: string;
+  neo4jUrl?: string;
+  neo4jUser?: string;
+  neo4jPassword?: string;
+  milvusUrl?: string;
+  milvusToken?: string;
+  embedding?: {
+    provider?: 'ollama' | 'openai' | 'claude' | 'doubao' | 'onnx' | 'pseudo';
+    model?: string;
+    baseUrl?: string;
+    apiKey?: string;
+    timeoutMs?: number;
+    vectorDim?: number;
+  };
   timeout?: number;
   retries?: number;
   retryDelayMs?: number;
@@ -46,8 +60,16 @@ export interface C4AConfig {
   mode?: StorageMode;
   server?: ServerConfig;
   remote?: ServerConfig;
-  project_id?: string;
+  root_id?: string;
   repo_id?: string;
+  embedding?: {
+    provider?: 'ollama' | 'openai' | 'claude' | 'doubao' | 'onnx' | 'pseudo';
+    model?: string;
+    base_url?: string;
+    api_key?: string;
+    timeout_ms?: number;
+    vector_dim?: number;
+  };
   adr_policy?: ADRPolicyConfig;
   feat?: {
     concurrent_warning?: boolean;
@@ -143,6 +165,22 @@ function buildAdapterConfigKey(params: {
     server: params.server
       ? {
           url: params.server.url ?? null,
+          mongoUrl: params.server.mongoUrl ?? null,
+          neo4jUrl: params.server.neo4jUrl ?? null,
+          neo4jUser: params.server.neo4jUser ?? null,
+          neo4jPassword: params.server.neo4jPassword ?? null,
+          milvusUrl: params.server.milvusUrl ?? null,
+          milvusToken: params.server.milvusToken ?? null,
+          embedding: params.server.embedding
+            ? {
+                provider: params.server.embedding.provider ?? null,
+                model: params.server.embedding.model ?? null,
+                baseUrl: params.server.embedding.baseUrl ?? null,
+                apiKey: params.server.embedding.apiKey ?? null,
+                timeoutMs: params.server.embedding.timeoutMs ?? null,
+                vectorDim: params.server.embedding.vectorDim ?? null,
+              }
+            : null,
           timeout: params.server.timeout ?? null,
           retries: params.server.retries ?? null,
           retryDelayMs: params.server.retryDelayMs ?? null,
@@ -154,6 +192,22 @@ function buildAdapterConfigKey(params: {
     remote: params.remote
       ? {
           url: params.remote.url ?? null,
+          mongoUrl: params.remote.mongoUrl ?? null,
+          neo4jUrl: params.remote.neo4jUrl ?? null,
+          neo4jUser: params.remote.neo4jUser ?? null,
+          neo4jPassword: params.remote.neo4jPassword ?? null,
+          milvusUrl: params.remote.milvusUrl ?? null,
+          milvusToken: params.remote.milvusToken ?? null,
+          embedding: params.remote.embedding
+            ? {
+                provider: params.remote.embedding.provider ?? null,
+                model: params.remote.embedding.model ?? null,
+                baseUrl: params.remote.embedding.baseUrl ?? null,
+                apiKey: params.remote.embedding.apiKey ?? null,
+                timeoutMs: params.remote.embedding.timeoutMs ?? null,
+                vectorDim: params.remote.embedding.vectorDim ?? null,
+              }
+            : null,
           timeout: params.remote.timeout ?? null,
           retries: params.remote.retries ?? null,
           retryDelayMs: params.remote.retryDelayMs ?? null,
@@ -195,7 +249,7 @@ export async function getAdapter(options?: {
     defaultProject:
       options?.config?.defaultProject ||
       config.local?.defaultProject ||
-      config.project_id,
+      config.root_id,
     enableVectorSearch:
       options?.config?.enableVectorSearch ?? config.local?.enableVectorSearch,
     repoId: options?.config?.repoId ?? config.repo_id ?? null,
@@ -204,8 +258,8 @@ export async function getAdapter(options?: {
   const configKey = buildAdapterConfigKey({
     mode,
     local: localConfig,
-    server: config.server,
-    remote: config.remote,
+    server: mergeEmbeddingConfig(config.server, config.embedding),
+    remote: mergeEmbeddingConfig(config.remote, config.embedding),
   });
 
   // 如果配置改变，需要重新创建实例
@@ -224,11 +278,12 @@ export async function getAdapter(options?: {
       adapterInstance = new LiteAdapter(localConfig);
     } else {
       const serverConfig = mode === 'server' ? config.server : config.remote;
+      const mergedServerConfig = mergeEmbeddingConfig(serverConfig, config.embedding);
       const modeLabel = mode === 'server' ? 'server' : 'remote';
-      if (!serverConfig?.url) {
+      if (!mergedServerConfig?.url) {
         throw new Error(`${modeLabel} mode requires ${modeLabel}.url in .context/.c4a.yaml`);
       }
-      adapterInstance = new ServerAdapter(serverConfig);
+      adapterInstance = new ServerAdapter(mergedServerConfig);
     }
   }
 
@@ -275,4 +330,24 @@ export function isLocalMode(): boolean {
  */
 export function isServerMode(): boolean {
   return currentMode === 'server' || currentMode === 'remote';
+}
+
+function mergeEmbeddingConfig(
+  server: ServerConfig | undefined,
+  embedding: C4AConfig['embedding'] | undefined
+): ServerConfig | undefined {
+  if (!server) return server;
+  if (!embedding) return server;
+  if (server.embedding) return server;
+  return {
+    ...server,
+    embedding: {
+      provider: embedding.provider,
+      model: embedding.model,
+      baseUrl: embedding.base_url,
+      apiKey: embedding.api_key,
+      timeoutMs: embedding.timeout_ms,
+      vectorDim: embedding.vector_dim,
+    },
+  };
 }

@@ -14,7 +14,9 @@ import type { EntityType, EntityMetadata } from './adapterBaseTypes.js';
 export interface SearchParams {
   query: string;
   scope?: EntityType | 'all';
-  proposal_id?: string | null;
+  root_id?: string;
+  versions?: string[];
+  requirement_id?: string | null;
   limit?: number;
   offset?: number;
 }
@@ -64,19 +66,21 @@ export interface SearchResult {
  * 依赖查询参数
  */
 export interface DepsParams {
-  id: string;
-  source_project?: string | null;
+  uuid?: string;
+  root_id?: string;
+  id?: string;
+  requirement_id?: string | null;
   direction?: 'upstream' | 'downstream' | 'both';
   depth?: number;
-  proposal_id?: string | null;
 }
 
 /**
  * 依赖节点
  */
 export interface DepsNode {
+  uuid: string;
   id: string;
-  source_project?: string | null;
+  root_id: string;
   type: EntityType;
   distance: number;
   relation_type: string;
@@ -96,19 +100,21 @@ export interface DepsResult {
  * 影响分析参数
  */
 export interface ImpactParams {
-  id: string;
-  source_project?: string | null;
+  uuid?: string;
+  root_id?: string;
+  id?: string;
+  requirement_id?: string | null;
   change_type?: 'upgrade' | 'deprecate' | 'remove';
   depth?: number;
-  proposal_id?: string | null;
 }
 
 /**
  * 影响节点
  */
 export interface ImpactNode {
+  uuid: string;
   id: string;
-  source_project?: string | null;
+  root_id: string;
   type: EntityType;
   distance: number;
   impact_level: 'direct' | 'indirect';

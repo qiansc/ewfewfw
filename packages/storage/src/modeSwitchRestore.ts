@@ -93,7 +93,7 @@ export class LocalRestore {
       const exportData = normalizeExportData(await this.readBackup(options.input));
 
       // 从第一个实体获取默认项目
-      const defaultProject = exportData.entities[0]?.metadata.source_project || 'default';
+      const defaultProject = exportData.entities[0]?.metadata.root_id || 'default';
 
       // 恢复 Feats
       let index = 0;
@@ -380,17 +380,17 @@ export class LocalRestore {
     policy: ConflictPolicy
   ): Promise<{ action: 'created' | 'updated' | 'skipped'; conflict?: ConflictEntry }> {
     // 检查是否存在
-    const dbProposalId = entity.proposal_id ?? '';
-    const proposalClause = dbProposalId === ''
-      ? '(proposal_id IS NULL OR proposal_id = \'\')'
-      : 'proposal_id = ?';
+    const dbRequirementId = entity.requirement_id ?? '';
+    const requirementClause = dbRequirementId === ''
+      ? '(requirement_id IS NULL OR requirement_id = \'\')'
+      : 'requirement_id = ?';
     const existing = db.prepare(`
       SELECT content_hash, updated_at FROM metadata
-      WHERE source_project = ? AND entity_id = ? AND ${proposalClause}
+      WHERE root_id = ? AND entity_id = ? AND ${requirementClause}
     `).get(
-      ...(dbProposalId === ''
-        ? [entity.metadata.source_project, entity.id]
-        : [entity.metadata.source_project, entity.id, dbProposalId])
+      ...(dbRequirementId === ''
+        ? [entity.metadata.root_id, entity.id]
+        : [entity.metadata.root_id, entity.id, dbRequirementId])
     ) as {
       content_hash: string;
       updated_at: string;
@@ -497,15 +497,15 @@ export class LocalRestore {
     entity: ExportEntity
   ): void {
     const now = new Date().toISOString();
-    const dbProposalId = entity.proposal_id ?? '';
+    const dbRequirementId = entity.requirement_id ?? '';
 
     db.prepare(`
-      INSERT INTO entities (id, source_project, proposal_id, type, kind, scope, perspective, data)
+      INSERT INTO entities (id, root_id, requirement_id, type, kind, scope, perspective, data)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       entity.id,
-      entity.metadata.source_project,
-      dbProposalId,
+      entity.metadata.root_id,
+      dbRequirementId,
       entity.type,
       entity.kind || null,
       entity.scope || null,
@@ -514,12 +514,12 @@ export class LocalRestore {
     );
 
     db.prepare(`
-      INSERT INTO metadata (entity_id, source_project, proposal_id, source_repo, status, content_hash, created_at, updated_at)
+      INSERT INTO metadata (entity_id, root_id, requirement_id, source_repo, status, content_hash, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       entity.id,
-      entity.metadata.source_project,
-      dbProposalId,
+      entity.metadata.root_id,
+      dbRequirementId,
       entity.metadata.source_repo || null,
       entity.metadata.status,
       entity.metadata.content_hash ?? null,
@@ -536,36 +536,36 @@ export class LocalRestore {
     entity: ExportEntity
   ): void {
     const now = new Date().toISOString();
-    const dbProposalId = entity.proposal_id ?? '';
-    const proposalClause = dbProposalId === ''
-      ? '(proposal_id IS NULL OR proposal_id = \'\')'
-      : 'proposal_id = ?';
+    const dbRequirementId = entity.requirement_id ?? '';
+    const requirementClause = dbRequirementId === ''
+      ? '(requirement_id IS NULL OR requirement_id = \'\')'
+      : 'requirement_id = ?';
 
     db.prepare(`
       UPDATE entities SET type = ?, kind = ?, scope = ?, perspective = ?, data = ?
-      WHERE source_project = ? AND id = ? AND ${proposalClause}
+      WHERE root_id = ? AND id = ? AND ${requirementClause}
     `).run(
       entity.type,
       entity.kind || null,
       entity.scope || null,
       entity.perspective || null,
       JSON.stringify(entity.data),
-      entity.metadata.source_project,
+      entity.metadata.root_id,
       entity.id,
-      ...(dbProposalId === '' ? [] : [dbProposalId])
+      ...(dbRequirementId === '' ? [] : [dbRequirementId])
     );
 
     db.prepare(`
       UPDATE metadata SET source_repo = ?, status = ?, content_hash = ?, updated_at = ?
-      WHERE source_project = ? AND entity_id = ? AND ${proposalClause}
+      WHERE root_id = ? AND entity_id = ? AND ${requirementClause}
     `).run(
       entity.metadata.source_repo || null,
       entity.metadata.status,
       entity.metadata.content_hash ?? null,
       entity.metadata.updated_at || now,
-      entity.metadata.source_project,
+      entity.metadata.root_id,
       entity.id,
-      ...(dbProposalId === '' ? [] : [dbProposalId])
+      ...(dbRequirementId === '' ? [] : [dbRequirementId])
     );
   }
 
@@ -580,23 +580,23 @@ export class LocalRestore {
     relation: ExportRelation,
     defaultProject: string = 'default'
   ): void {
-    const fromProject = relation.from_project === undefined ? defaultProject : (relation.from_project ?? '');
-    const toProject = relation.to_project === undefined ? defaultProject : (relation.to_project ?? '');
+    const fromRootId = relation.from_root_id === undefined ? defaultProject : (relation.from_root_id ?? '');
+    const toRootId = relation.to_root_id === undefined ? defaultProject : (relation.to_root_id ?? '');
 
     // 生成关系 ID
     const relationId = relation.id || `${relation.from_id}-${relation.rel_type}-${relation.to_id}`;
 
-    const dbProposalId = relation.proposal_id ?? '';
+    const dbRequirementId = relation.requirement_id ?? '';
     db.prepare(`
       INSERT OR REPLACE INTO relations
-      (id, proposal_id, from_project, from_id, to_project, to_id, rel_type, status, properties)
+      (id, requirement_id, from_root_id, from_id, to_root_id, to_id, rel_type, status, properties)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       relationId,
-      dbProposalId,
-      fromProject,
+      dbRequirementId,
+      fromRootId,
       relation.from_id,
-      toProject,
+      toRootId,
       relation.to_id,
       relation.rel_type,
       relation.status ?? 'active',

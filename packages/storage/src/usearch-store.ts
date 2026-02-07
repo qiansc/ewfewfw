@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { Index, MetricKind, ScalarKind } from 'usearch';
+import { createRequire } from 'node:module';
+import type { Index as UsearchIndex } from 'usearch';
 
 export type VectorStoreConfig = {
   dimensions: number;
@@ -22,41 +23,61 @@ type KeyMapFile = {
   entries: Array<[string, string]>;
 };
 
-function toMetricKind(metric: VectorStoreConfig['metric']): MetricKind {
+type UsearchRuntime = {
+  Index: new (options: Record<string, unknown>) => UsearchIndex;
+  MetricKind: Record<string, number>;
+  ScalarKind: Record<string, number>;
+};
+
+let cachedRuntime: UsearchRuntime | null = null;
+
+function loadUsearch(): UsearchRuntime {
+  if (cachedRuntime) {
+    return cachedRuntime;
+  }
+  const runtime = createRequire(import.meta.url)('usearch') as UsearchRuntime;
+  cachedRuntime = runtime;
+  return runtime;
+}
+
+function toMetricKind(metric: VectorStoreConfig['metric'], runtime: UsearchRuntime): number {
   switch (metric) {
     case 'ip':
-      return MetricKind.IP;
+      return runtime.MetricKind.IP;
     case 'l2':
-      return MetricKind.L2sq;
+      return runtime.MetricKind.L2sq;
     case 'cos':
     default:
-      return MetricKind.Cos;
+      return runtime.MetricKind.Cos;
   }
 }
 
 export class VectorStore {
-  private index: Index;
+  private index: UsearchIndex;
+  private runtime: UsearchRuntime;
   private keyMap: Map<bigint, string> = new Map();
   private reverseMap: Map<string, bigint> = new Map();
   private nextKey: bigint = 1n;
   private readonly: boolean;
   private indexPath: string;
   private keyMapPath: string;
-  private config: { dimensions: number; metric: MetricKind };
+  private config: { dimensions: number; metric: number };
   private saveDelayMs: number;
   private pendingSave: ReturnType<typeof setTimeout> | null = null;
   private dirty = false;
   private suspendAutoSave = false;
 
   constructor(config: VectorStoreConfig) {
+    const runtime = loadUsearch();
+    this.runtime = runtime;
     this.config = {
       dimensions: config.dimensions,
-      metric: toMetricKind(config.metric),
+      metric: toMetricKind(config.metric, runtime),
     };
-    this.index = new Index({
+    this.index = new runtime.Index({
       dimensions: this.config.dimensions,
       metric: this.config.metric,
-      quantization: ScalarKind.F32,
+      quantization: runtime.ScalarKind.F32,
       connectivity: 0,
       expansion_add: 0,
       expansion_search: 0,
@@ -273,10 +294,10 @@ export class VectorStore {
   }
 
   private reset(): void {
-    this.index = new Index({
+    this.index = new this.runtime.Index({
       dimensions: this.config.dimensions,
       metric: this.config.metric,
-      quantization: ScalarKind.F32,
+      quantization: this.runtime.ScalarKind.F32,
       connectivity: 0,
       expansion_add: 0,
       expansion_search: 0,

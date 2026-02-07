@@ -52,6 +52,9 @@ export { MigrationError } from './mode-switch.js';
 // SQLite Store
 export { SQLiteStore } from './sqlite-store.js';
 export type { SQLiteStoreConfig } from './sqlite-store.js';
+export { migrateLegacySchema } from './migrations/sqliteMigrate.js';
+export { migrateLegacyEntities } from './migrations/serverMigrate.js';
+export type { LegacyEntityRecord } from './migrations/serverMigrate.js';
 
 export {
   generateEmbedding,

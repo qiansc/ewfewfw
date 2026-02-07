@@ -8,7 +8,7 @@ const EXCLUDE_FIELDS = new Set([
   'created_at',
   'updated_at',
   'content_hash',
-  'proposal_id',
+  'requirement_id',
   '_id',
   '__v',
 ]);

@@ -208,14 +208,14 @@ export interface ExportEntity {
   perspective?: string;
   data: Record<string, unknown>;
   metadata: {
-    source_project: string;
+    root_id: string;
     source_repo?: string;
     status: EntityStatus;
     content_hash?: string;
     created_at: string;
     updated_at: string;
   };
-  proposal_id: string | null;
+  requirement_id: string | null;
 }
 
 /**
@@ -223,10 +223,10 @@ export interface ExportEntity {
  */
 export interface ExportRelation {
   id?: string;
-  proposal_id?: string | null;
-  from_project?: string | null;
+  requirement_id?: string | null;
+  from_root_id?: string | null;
   from_id: string;
-  to_project?: string | null;
+  to_root_id?: string | null;
   to_id: string;
   rel_type: string;
   status?: 'active' | 'deleted';
@@ -247,4 +247,4 @@ export interface ExportFeat {
   updated_at: string;
 }
 
-export const EXPORT_VERSION = '0.3.0';
+export const EXPORT_VERSION = '0.3.1';

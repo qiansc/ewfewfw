@@ -4,7 +4,7 @@
  * 设计文档: v0.3.0/detailed-design/local-mode/appendix.md §A.9.3.2
  *
  * 提供 Local 模式数据自动修复：
- * - 补全 source_project 字段
+ * - 补全 root_id 字段
  * - 补全 source_repo 字段
  * - 修复字段格式
  * - 移除错误的层级字段
@@ -18,7 +18,7 @@ import type { EntityType } from './adapter.js';
 import { parseYAML, CONFIG_FILENAME, CONTEXT_ROOT_DIR } from '@c4a/core';
 
 interface LocalProjectConfig {
-  project_id?: string;
+  root_id?: string;
   repo_id?: string;
 }
 
@@ -43,8 +43,8 @@ function loadLocalProjectConfig(basePath: string = process.cwd()): LocalProjectC
  * 修复配置
  */
 export interface RepairConfig {
-  /** 默认项目 ID */
-  projectId?: string;
+  /** 默认 root_id */
+  rootId?: string;
   /** 默认仓库 ID */
   repoId?: string;
 }
@@ -184,10 +184,10 @@ export class DataRepair {
   }
 
   /**
-   * 修复缺少 source_project
+   * 修复缺少 root_id
    */
   private fixMissingSourceProject(issue: ValidationIssue, dryRun: boolean): RepairAction {
-    const newValue = this.config.projectId;
+    const newValue = this.config.rootId;
 
     if (!newValue) {
       return {
@@ -195,12 +195,12 @@ export class DataRepair {
         entityType: issue.entityType,
         code: issue.code,
         action: 'skipped',
-        description: '跳过: 未配置默认 projectId',
+        description: '跳过: 未配置默认 root_id',
       };
     }
 
     if (!dryRun) {
-      this.updateMetadataField(issue.entityId, 'source_project', newValue);
+      this.updateEntityField(issue.entityId, 'root_id', newValue);
     }
 
     return {
@@ -208,7 +208,7 @@ export class DataRepair {
       entityType: issue.entityType,
       code: issue.code,
       action: 'fixed',
-      description: `补全 source_project: ${newValue}`,
+      description: `补全 root_id: ${newValue}`,
       oldValue: null,
       newValue,
     };
@@ -246,15 +246,15 @@ export class DataRepair {
   }
 
   /**
-   * 修复 source_project 格式
+   * 修复 root_id 格式
    */
   private fixSourceProjectFormat(issue: ValidationIssue, dryRun: boolean): RepairAction {
     const db = this.store.getDatabase();
 
     // 获取当前值
     const row = db.prepare(`
-      SELECT source_project FROM metadata WHERE entity_id = ? LIMIT 1
-    `).get(issue.entityId) as { source_project: string } | undefined;
+      SELECT root_id FROM entities WHERE id = ? LIMIT 1
+    `).get(issue.entityId) as { root_id: string } | undefined;
 
     if (!row) {
       return {
@@ -266,7 +266,7 @@ export class DataRepair {
       };
     }
 
-    const oldValue = row.source_project;
+    const oldValue = row.root_id;
     // 转换为小写，替换非法字符为连字符
     const newValue = oldValue
       .toLowerCase()
@@ -275,7 +275,7 @@ export class DataRepair {
       .replace(/^-|-$/g, '');
 
     if (!dryRun) {
-      this.updateMetadataField(issue.entityId, 'source_project', newValue);
+      this.updateEntityField(issue.entityId, 'root_id', newValue);
     }
 
     return {
@@ -283,7 +283,7 @@ export class DataRepair {
       entityType: issue.entityType,
       code: issue.code,
       action: 'fixed',
-      description: `修复 source_project 格式: ${oldValue} → ${newValue}`,
+      description: `修复 root_id 格式: ${oldValue} → ${newValue}`,
       oldValue,
       newValue,
     };
@@ -296,7 +296,11 @@ export class DataRepair {
     const fieldName = this.getFieldNameFromCode(issue.code);
 
     if (!dryRun) {
-      this.updateMetadataField(issue.entityId, fieldName, null);
+      if (fieldName === 'root_id') {
+        this.updateEntityField(issue.entityId, fieldName, '');
+      } else {
+        this.updateMetadataField(issue.entityId, fieldName, null);
+      }
     }
 
     return {
@@ -315,7 +319,7 @@ export class DataRepair {
     switch (code) {
       case 'C4A-MIGRATE-005':
       case 'C4A-MIGRATE-007':
-        return 'source_project';
+        return 'root_id';
       case 'C4A-MIGRATE-006':
         return 'source_repo';
       default:
@@ -332,9 +336,24 @@ export class DataRepair {
     value: string | null
   ): void {
     const db = this.store.getDatabase();
-    db.prepare(`
-      UPDATE metadata SET ${field} = ? WHERE entity_id = ?
-    `).run(value, entityId);
+    db.prepare(
+      `
+      UPDATE metadata
+      SET ${field} = ?
+      WHERE entity_uuid IN (SELECT uuid FROM entities WHERE id = ?)
+    `
+    ).run(value, entityId);
+  }
+
+  private updateEntityField(entityId: string, field: string, value: string): void {
+    const db = this.store.getDatabase();
+    db.prepare(
+      `
+      UPDATE entities
+      SET ${field} = ?
+      WHERE id = ?
+    `
+    ).run(value, entityId);
   }
 
   /**
@@ -391,15 +410,15 @@ export class DataRepair {
   }
 
   private ensureConfig(): void {
-    if (this.config.projectId && this.config.repoId) {
+    if (this.config.rootId && this.config.repoId) {
       return;
     }
     const fileConfig = loadLocalProjectConfig();
     if (!fileConfig) {
       return;
     }
-    if (!this.config.projectId && fileConfig.project_id) {
-      this.config.projectId = fileConfig.project_id;
+    if (!this.config.rootId && fileConfig.root_id) {
+      this.config.rootId = fileConfig.root_id;
     }
     if (!this.config.repoId && fileConfig.repo_id) {
       this.config.repoId = fileConfig.repo_id;

@@ -160,9 +160,9 @@ export class LocalBackup {
       kind: string | null;
       scope: string | null;
       perspective: string | null;
-      source_project: string;
+      root_id: string;
       source_repo: string | null;
-      proposal_id: string | null;
+      requirement_id: string | null;
       data: string;
       status: EntityStatus;
       content_hash: string;
@@ -172,11 +172,10 @@ export class LocalBackup {
 
     const rawEntities = db.prepare(`
       SELECT e.id, e.type, e.kind, e.scope, e.perspective,
-             e.source_project, e.proposal_id, e.data,
+             e.root_id, e.requirement_id, e.data,
              m.source_repo, m.status, m.content_hash, m.created_at, m.updated_at
       FROM entities e
-      JOIN metadata m ON e.source_project = m.source_project
-        AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
+      JOIN metadata m ON e.uuid = m.entity_uuid
     `).all() as RawEntity[];
 
     // 转换为导出格式（修复 legacy 字段）
@@ -201,14 +200,14 @@ export class LocalBackup {
         perspective: normalized.perspective,
         data: normalized.data,
         metadata: {
-          source_project: e.source_project,
+          root_id: e.root_id,
           source_repo: e.source_repo || undefined,
           status: e.status,
           content_hash: e.content_hash,
           created_at: e.created_at,
           updated_at: e.updated_at,
         },
-        proposal_id: e.proposal_id === '' ? null : e.proposal_id,
+        requirement_id: e.requirement_id === '' ? null : e.requirement_id,
       });
       index += 1;
       reportProgress('entities', index, rawEntities.length);
@@ -217,10 +216,10 @@ export class LocalBackup {
     // 导出关系
     interface RawRelation {
       id: string;
-      proposal_id: string | null;
-      from_project: string;
+      requirement_id: string | null;
+      from_root_id: string;
       from_id: string;
-      to_project: string;
+      to_root_id: string;
       to_id: string;
       rel_type: string;
       status: string | null;
@@ -230,10 +229,10 @@ export class LocalBackup {
     const rawRelations = db.prepare(`
       SELECT
         id,
-        proposal_id,
-        IFNULL(from_project, '') as from_project,
+        requirement_id,
+        IFNULL(from_root_id, '') as from_root_id,
         from_id,
-        IFNULL(to_project, '') as to_project,
+        IFNULL(to_root_id, '') as to_root_id,
         to_id,
         rel_type,
         status,
@@ -246,10 +245,10 @@ export class LocalBackup {
     for (const r of rawRelations) {
       relations.push({
         id: r.id,
-        proposal_id: r.proposal_id === '' ? null : r.proposal_id,
-        from_project: r.from_project,
+        requirement_id: r.requirement_id === '' ? null : r.requirement_id,
+        from_root_id: r.from_root_id,
         from_id: r.from_id,
-        to_project: r.to_project,
+        to_root_id: r.to_root_id,
         to_id: r.to_id,
         rel_type: r.rel_type,
         status: (r.status as ExportRelation['status']) || 'active',
@@ -394,11 +393,11 @@ function shouldFailFast(options: MigrateOptions | undefined): boolean {
 
 async function rollbackEntities(
   serverAdapter: ServerAdapter,
-  items: Array<{ id: string; proposal_id?: string | null }>
+  items: Array<{ id: string; requirement_id?: string | null }>
 ): Promise<void> {
   for (const item of items) {
     try {
-      await serverAdapter.delete({ id: item.id, proposal_id: item.proposal_id ?? null, force: true });
+      await serverAdapter.delete({ id: item.id, requirement_id: item.requirement_id ?? null, force: true });
     } catch {
       // 忽略回滚失败，避免阻断主流程
     }
@@ -498,7 +497,7 @@ export async function migrateLocalToServer(
   const saveInterval = options.checkpoint?.saveInterval ?? 50;
   const failures: MigrateFailure[] = [];
   const conflicts: NonNullable<MigrateResult['conflicts']> = [];
-  const createdEntities: Array<{ id: string; proposal_id?: string | null }> = [];
+  const createdEntities: Array<{ id: string; requirement_id?: string | null }> = [];
 
   reportMigrationProgress(options, 'read', 0, 1);
   const backup = await readBackupData(backupPath);
@@ -620,7 +619,7 @@ export async function migrateLocalToServer(
 
         const existing = await serverAdapter.read({
           id: entity.id,
-          proposal_id: entity.proposal_id ?? null,
+          requirement_id: entity.requirement_id ?? null,
           format: 'object',
         });
 
@@ -692,8 +691,8 @@ export async function migrateLocalToServer(
           id: entity.id,
           type: entity.type,
           data: buildEntityPayload(entity),
-          source_project: entity.metadata.source_project,
-          proposal_id: entity.proposal_id ?? null,
+          root_id: entity.metadata.root_id,
+          requirement_id: entity.requirement_id ?? null,
           force_save: true,
           ignore_concurrent_warning: true,
         });
@@ -706,7 +705,7 @@ export async function migrateLocalToServer(
           stats.entities.updated += 1;
         } else {
           stats.entities.created += 1;
-          createdEntities.push({ id: entity.id, proposal_id: entity.proposal_id ?? null });
+          createdEntities.push({ id: entity.id, requirement_id: entity.requirement_id ?? null });
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

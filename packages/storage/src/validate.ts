@@ -4,7 +4,7 @@
  * 设计文档: v0.3.0/detailed-design/local-mode/appendix.md §A.9.3
  *
  * 提供 Local 模式数据完整性检查：
- * - 检查 source_project 字段
+ * - 检查 root_id 字段
  * - 检查 source_repo 字段
  * - 检查字段格式
  * - 检查层级字段
@@ -25,9 +25,9 @@ import { ERROR_MESSAGES, MIGRATE_ERROR_CODES as MIGRATE_ERROR_CODE_MAP } from '@
  * 设计文档: appendix.md §A.9.7
  */
 export const MIGRATE_ERROR_CODES = {
-  [MIGRATE_ERROR_CODE_MAP.MISSING_SOURCE_PROJECT]: {
-    code: MIGRATE_ERROR_CODE_MAP.MISSING_SOURCE_PROJECT,
-    message: ERROR_MESSAGES[MIGRATE_ERROR_CODE_MAP.MISSING_SOURCE_PROJECT].zh,
+  [MIGRATE_ERROR_CODE_MAP.MISSING_ROOT_ID]: {
+    code: MIGRATE_ERROR_CODE_MAP.MISSING_ROOT_ID,
+    message: ERROR_MESSAGES[MIGRATE_ERROR_CODE_MAP.MISSING_ROOT_ID].zh,
     fix: '使用 repair 自动补全',
     autoFix: true,
   },
@@ -37,9 +37,9 @@ export const MIGRATE_ERROR_CODES = {
     fix: '使用 repair 自动补全',
     autoFix: true,
   },
-  [MIGRATE_ERROR_CODE_MAP.INVALID_SOURCE_PROJECT_FORMAT]: {
-    code: MIGRATE_ERROR_CODE_MAP.INVALID_SOURCE_PROJECT_FORMAT,
-    message: ERROR_MESSAGES[MIGRATE_ERROR_CODE_MAP.INVALID_SOURCE_PROJECT_FORMAT].zh,
+  [MIGRATE_ERROR_CODE_MAP.INVALID_ROOT_ID_FORMAT]: {
+    code: MIGRATE_ERROR_CODE_MAP.INVALID_ROOT_ID_FORMAT,
+    message: ERROR_MESSAGES[MIGRATE_ERROR_CODE_MAP.INVALID_ROOT_ID_FORMAT].zh,
     fix: '使用 repair 自动修复格式',
     autoFix: true,
   },
@@ -49,9 +49,9 @@ export const MIGRATE_ERROR_CODES = {
     fix: '手动修改为 owner/repo 格式',
     autoFix: false,
   },
-  [MIGRATE_ERROR_CODE_MAP.NON_PROJECT_SCOPE_HAS_SOURCE_PROJECT]: {
-    code: MIGRATE_ERROR_CODE_MAP.NON_PROJECT_SCOPE_HAS_SOURCE_PROJECT,
-    message: ERROR_MESSAGES[MIGRATE_ERROR_CODE_MAP.NON_PROJECT_SCOPE_HAS_SOURCE_PROJECT].zh,
+  [MIGRATE_ERROR_CODE_MAP.NON_PROJECT_SCOPE_HAS_ROOT_ID]: {
+    code: MIGRATE_ERROR_CODE_MAP.NON_PROJECT_SCOPE_HAS_ROOT_ID,
+    message: ERROR_MESSAGES[MIGRATE_ERROR_CODE_MAP.NON_PROJECT_SCOPE_HAS_ROOT_ID].zh,
     fix: '使用 repair 自动移除',
     autoFix: true,
   },
@@ -61,9 +61,9 @@ export const MIGRATE_ERROR_CODES = {
     fix: '使用 repair 自动移除',
     autoFix: true,
   },
-  [MIGRATE_ERROR_CODE_MAP.EXTERNAL_ENTITY_HAS_SOURCE_PROJECT]: {
-    code: MIGRATE_ERROR_CODE_MAP.EXTERNAL_ENTITY_HAS_SOURCE_PROJECT,
-    message: ERROR_MESSAGES[MIGRATE_ERROR_CODE_MAP.EXTERNAL_ENTITY_HAS_SOURCE_PROJECT].zh,
+  [MIGRATE_ERROR_CODE_MAP.EXTERNAL_ENTITY_HAS_ROOT_ID]: {
+    code: MIGRATE_ERROR_CODE_MAP.EXTERNAL_ENTITY_HAS_ROOT_ID,
+    message: ERROR_MESSAGES[MIGRATE_ERROR_CODE_MAP.EXTERNAL_ENTITY_HAS_ROOT_ID].zh,
     fix: '使用 repair 自动移除',
     autoFix: true,
   },
@@ -119,10 +119,9 @@ export interface ValidateOptions {
 // ============================================================
 
 /**
- * source_project 格式正则
- * 只能包含小写字母、数字和连字符
+ * root_id (npm 包名) 格式正则
  */
-const SOURCE_PROJECT_PATTERN = /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/;
+const ROOT_ID_PATTERN = /^(?:@[a-z0-9-]+\/)?[a-z][a-z0-9-]*$/;
 
 /**
  * source_repo 格式正则
@@ -136,7 +135,7 @@ const SOURCE_REPO_PATTERN = /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+$/;
 const NON_PROJECT_SCOPES = ['domain', 'enterprise'];
 
 /**
- * 需要 source_project 的实体类型
+ * 需要 root_id 的实体类型
  */
 const PROJECT_LEVEL_TYPES: EntityType[] = [
   'system',
@@ -172,11 +171,10 @@ export class DataValidator {
 
     // 构建查询
     let query = `
-      SELECT e.id, e.type, e.scope, e.data,
-             m.source_project, m.source_repo, m.external_url, m.status
+      SELECT e.id, e.type, e.scope, e.data, e.root_id,
+             m.source_repo, m.external_url, m.status
       FROM entities e
-      JOIN metadata m ON e.source_project = m.source_project
-        AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
+      JOIN metadata m ON e.uuid = m.entity_uuid
     `;
 
     const params: SQLQueryBindings[] = [];
@@ -202,7 +200,7 @@ export class DataValidator {
       type: EntityType;
       scope: string | null;
       data: string;
-      source_project: string | null;
+      root_id: string | null;
       source_repo: string | null;
       external_url: string | null;
       status: EntityStatus;
@@ -242,7 +240,7 @@ export class DataValidator {
       id: string;
       type: EntityType;
       scope: string | null;
-      source_project: string | null;
+      root_id: string | null;
       source_repo: string | null;
       external_url: string | null;
     },
@@ -257,8 +255,8 @@ export class DataValidator {
 
     // 检查 external 实体
     if (isExternal) {
-      // external 实体不应有 source_project
-      if (entity.source_project) {
+      // external 实体不应有 root_id
+      if (entity.root_id) {
         issues.push(this.createIssue(entity, 'C4A-MIGRATE-007', 'warning'));
       }
       // external 实体应有 external_url
@@ -270,7 +268,7 @@ export class DataValidator {
 
     // 检查 Domain/Enterprise 层级
     if (isNonProjectScope) {
-      if (entity.source_project) {
+      if (entity.root_id) {
         issues.push(this.createIssue(entity, 'C4A-MIGRATE-005', 'warning'));
       }
       if (entity.source_repo) {
@@ -281,11 +279,11 @@ export class DataValidator {
 
     // 检查 Project 层级实体
     if (isProjectLevel) {
-      // 缺少 source_project
-      if (!entity.source_project) {
+      // 缺少 root_id
+      if (!entity.root_id) {
         issues.push(this.createIssue(entity, 'C4A-MIGRATE-001', 'error'));
-      } else if (!SOURCE_PROJECT_PATTERN.test(entity.source_project)) {
-        // source_project 格式不正确
+      } else if (!ROOT_ID_PATTERN.test(entity.root_id)) {
+        // root_id 格式不正确
         issues.push(this.createIssue(entity, 'C4A-MIGRATE-003', 'error'));
       }
 

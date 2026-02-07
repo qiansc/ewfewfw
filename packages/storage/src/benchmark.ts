@@ -187,9 +187,9 @@ export class Benchmark {
     const db = this.store.getDatabase();
 
     // 清理现有测试数据
-    db.exec("DELETE FROM entities WHERE source_project = 'benchmark'");
-    db.exec("DELETE FROM metadata WHERE source_project = 'benchmark'");
-    db.exec("DELETE FROM relations WHERE from_project = 'benchmark'");
+    db.exec("DELETE FROM entities WHERE root_id = 'benchmark'");
+    db.exec("DELETE FROM metadata WHERE root_id = 'benchmark'");
+    db.exec("DELETE FROM relations WHERE from_root_id = 'benchmark'");
   }
 
   /**
@@ -233,12 +233,12 @@ export class Benchmark {
     const now = new Date().toISOString();
 
     db.prepare(`
-      INSERT INTO entities (id, source_project, proposal_id, type, data)
+      INSERT INTO entities (id, root_id, requirement_id, type, data)
       VALUES (?, 'benchmark', '', 'component', ?)
     `).run(id, JSON.stringify({ name: `Test ${id}`, description: 'Benchmark test entity' }));
 
     db.prepare(`
-      INSERT INTO metadata (entity_id, source_project, proposal_id, status, content_hash, created_at, updated_at)
+      INSERT INTO metadata (entity_id, root_id, requirement_id, status, content_hash, created_at, updated_at)
       VALUES (?, 'benchmark', '', 'draft', ?, ?, ?)
     `).run(id, `hash-${id}`, now, now);
   }
@@ -260,8 +260,8 @@ export class Benchmark {
       db.prepare(`
         SELECT e.*, m.status, m.content_hash
         FROM entities e
-        JOIN metadata m ON e.source_project = m.source_project
-          AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
+        JOIN metadata m ON e.root_id = m.root_id
+          AND e.id = m.entity_id AND e.requirement_id = m.requirement_id
         WHERE e.id = ?
       `).get(`bench-query-${i % 100}`);
     }
@@ -272,8 +272,8 @@ export class Benchmark {
       db.prepare(`
         SELECT e.*, m.status, m.content_hash
         FROM entities e
-        JOIN metadata m ON e.source_project = m.source_project
-          AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
+        JOIN metadata m ON e.root_id = m.root_id
+          AND e.id = m.entity_id AND e.requirement_id = m.requirement_id
         WHERE e.id = ?
       `).get(`bench-query-${i % 100}`);
       const end = performance.now();

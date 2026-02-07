@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { existsSync, mkdirSync } from 'node:fs';
 import { VectorStore } from './usearch-store.js';
 import { generateEmbedding, generateVectorKey, getEmbeddingDimension } from './vector-search.js';
+import { migrateLegacySchema } from './migrations/sqliteMigrate.js';
 
 /**
  * SQLite Store for Local Mode
@@ -11,7 +12,7 @@ import { generateEmbedding, generateVectorKey, getEmbeddingDimension } from './v
  *
  * 核心特性:
  * - 单文件数据库 (SQLite)
- * - 复合主键支持 (source_project, id, proposal_id)
+ * - UUID 主键 + root_id 查询
  * - Copy-on-Write (CoW) 机制
  * - WAL 模式并发访问
  */
@@ -166,9 +167,8 @@ export class SQLiteStore {
 
       this.db.exec(`
         CREATE VIRTUAL TABLE IF NOT EXISTS entities_fts USING fts5(
-          entity_id UNINDEXED,
-          source_project UNINDEXED,
-          proposal_id UNINDEXED,
+          entity_uuid UNINDEXED,
+          root_id UNINDEXED,
           search_text,
           tokenize = 'unicode61'
         );
@@ -177,11 +177,10 @@ export class SQLiteStore {
       this.db.exec(`
         CREATE TRIGGER IF NOT EXISTS entities_fts_insert AFTER INSERT ON entities
         BEGIN
-          INSERT INTO entities_fts(entity_id, source_project, proposal_id, search_text)
+          INSERT INTO entities_fts(entity_uuid, root_id, search_text)
           SELECT
-            NEW.id,
-            NEW.source_project,
-            NEW.proposal_id,
+            NEW.uuid,
+            NEW.root_id,
             ${buildSearchText('NEW')};
         END;
       `);
@@ -190,14 +189,11 @@ export class SQLiteStore {
         CREATE TRIGGER IF NOT EXISTS entities_fts_update AFTER UPDATE ON entities
         BEGIN
           DELETE FROM entities_fts
-          WHERE entity_id = OLD.id
-            AND source_project = OLD.source_project
-            AND proposal_id = OLD.proposal_id;
-          INSERT INTO entities_fts(entity_id, source_project, proposal_id, search_text)
+          WHERE entity_uuid = OLD.uuid;
+          INSERT INTO entities_fts(entity_uuid, root_id, search_text)
           SELECT
-            NEW.id,
-            NEW.source_project,
-            NEW.proposal_id,
+            NEW.uuid,
+            NEW.root_id,
             ${buildSearchText('NEW')};
         END;
       `);
@@ -206,19 +202,16 @@ export class SQLiteStore {
         CREATE TRIGGER IF NOT EXISTS entities_fts_delete AFTER DELETE ON entities
         BEGIN
           DELETE FROM entities_fts
-          WHERE entity_id = OLD.id
-            AND source_project = OLD.source_project
-            AND proposal_id = OLD.proposal_id;
+          WHERE entity_uuid = OLD.uuid;
         END;
       `);
 
       this.db.exec(`
         DELETE FROM entities_fts;
-        INSERT INTO entities_fts(entity_id, source_project, proposal_id, search_text)
+        INSERT INTO entities_fts(entity_uuid, root_id, search_text)
         SELECT
-          e.id,
-          e.source_project,
-          e.proposal_id,
+          e.uuid,
+          e.root_id,
           ${buildSearchText('e')}
         FROM entities e;
       `);
@@ -286,28 +279,29 @@ export class SQLiteStore {
       );
     `);
 
-    // 实体数据表 (复合主键: source_project, id, proposal_id)
-    // 设计文档: L89-107
+    // 实体数据表 (主键: uuid)
+    // 设计文档: v0.3.1 PRD §1.5
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS entities (
+        uuid TEXT PRIMARY KEY,
+        root_id TEXT NOT NULL DEFAULT '',
         id TEXT NOT NULL,
-        source_project TEXT NOT NULL DEFAULT '',
-        proposal_id TEXT NOT NULL DEFAULT '',
         type TEXT NOT NULL,
         kind TEXT,
         scope TEXT,
         perspective TEXT,
         data TEXT NOT NULL,
+        requirement_id TEXT,
+        component_id TEXT,
         orphaned INTEGER DEFAULT 0,
-        orphaned_at TEXT,
-        PRIMARY KEY (source_project, id, proposal_id)
+        orphaned_at TEXT
       );
 
-      CREATE INDEX IF NOT EXISTS idx_entities_proposal_id ON entities(proposal_id);
+      CREATE INDEX IF NOT EXISTS idx_entities_lookup ON entities(root_id, id);
       CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(type);
-      CREATE INDEX IF NOT EXISTS idx_entities_source_project ON entities(source_project);
+      CREATE INDEX IF NOT EXISTS idx_entities_root ON entities(root_id);
+      CREATE INDEX IF NOT EXISTS idx_entities_requirement ON entities(requirement_id);
       CREATE INDEX IF NOT EXISTS idx_entities_id ON entities(id);
-      CREATE INDEX IF NOT EXISTS idx_entities_composite ON entities(source_project, id, proposal_id);
     `);
 
     try {
@@ -329,12 +323,9 @@ export class SQLiteStore {
     `);
 
     // 实体元数据表
-    // 设计文档: L108-127
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS metadata (
-        entity_id TEXT NOT NULL,
-        source_project TEXT NOT NULL DEFAULT '',
-        proposal_id TEXT NOT NULL DEFAULT '',
+        entity_uuid TEXT NOT NULL PRIMARY KEY,
         source_repo TEXT,
         external_url TEXT,
         status TEXT NOT NULL,
@@ -343,19 +334,22 @@ export class SQLiteStore {
         updated_at TEXT NOT NULL,
         created_by TEXT,
         updated_by TEXT,
-        PRIMARY KEY (source_project, entity_id, proposal_id),
-        FOREIGN KEY (source_project, entity_id, proposal_id)
-          REFERENCES entities(source_project, id, proposal_id) ON DELETE CASCADE
+        FOREIGN KEY (entity_uuid) REFERENCES entities(uuid) ON DELETE CASCADE
       );
 
       CREATE INDEX IF NOT EXISTS idx_metadata_content_hash ON metadata(content_hash);
     `);
 
+    // 实体版本表（SQLite 使用关联表）
     this.db.exec(`
-      UPDATE entities SET source_project = '' WHERE source_project IS NULL;
-      UPDATE entities SET proposal_id = '' WHERE proposal_id IS NULL;
-      UPDATE metadata SET source_project = '' WHERE source_project IS NULL;
-      UPDATE metadata SET proposal_id = '' WHERE proposal_id IS NULL;
+      CREATE TABLE IF NOT EXISTS entity_versions (
+        entity_uuid TEXT NOT NULL,
+        version TEXT NOT NULL,
+        PRIMARY KEY (entity_uuid, version),
+        FOREIGN KEY (entity_uuid) REFERENCES entities(uuid) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_entity_version ON entity_versions(version);
     `);
 
     // Workflow 状态表
@@ -389,15 +383,29 @@ export class SQLiteStore {
       CREATE INDEX IF NOT EXISTS idx_compensation_logs_tx ON compensation_logs(transaction_id);
     `);
 
-    // 实体关系表 (无外键约束，支持跨项目引用)
-    // 设计文档: L128-148
+    // Feat 历史表（兼容 feat 发布快照）
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS feat_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        feat_id TEXT NOT NULL,
+        published_at TEXT NOT NULL,
+        entities_snapshot TEXT NOT NULL,
+        published_by TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_feat_history_feat_id ON feat_history(feat_id);
+      CREATE INDEX IF NOT EXISTS idx_feat_history_published_at ON feat_history(published_at);
+    `);
+
+    // 实体关系表 (无外键约束，支持跨包引用)
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS relations (
         id TEXT PRIMARY KEY,
-        proposal_id TEXT NOT NULL DEFAULT '',
-        from_project TEXT NOT NULL DEFAULT '',
+        from_uuid TEXT NOT NULL,
+        to_uuid TEXT,
+        from_root_id TEXT NOT NULL DEFAULT '',
         from_id TEXT NOT NULL,
-        to_project TEXT NOT NULL DEFAULT '',
+        to_root_id TEXT NOT NULL DEFAULT '',
         to_id TEXT NOT NULL,
         rel_type TEXT NOT NULL,
         status TEXT DEFAULT 'active',
@@ -406,43 +414,30 @@ export class SQLiteStore {
         updated_at TEXT DEFAULT (datetime('now'))
       );
 
-      CREATE INDEX IF NOT EXISTS idx_relations_proposal_id ON relations(proposal_id);
-      CREATE INDEX IF NOT EXISTS idx_relations_from ON relations(from_project, from_id);
-      CREATE INDEX IF NOT EXISTS idx_relations_to ON relations(to_project, to_id);
+      CREATE INDEX IF NOT EXISTS idx_relations_from_uuid ON relations(from_uuid);
+      CREATE INDEX IF NOT EXISTS idx_relations_to_uuid ON relations(to_uuid);
+      CREATE INDEX IF NOT EXISTS idx_relations_from ON relations(from_root_id, from_id);
+      CREATE INDEX IF NOT EXISTS idx_relations_to ON relations(to_root_id, to_id);
       CREATE INDEX IF NOT EXISTS idx_relations_type ON relations(rel_type);
     `);
-
-    this.db.exec(`
-      UPDATE relations SET proposal_id = '' WHERE proposal_id IS NULL;
-      UPDATE relations SET from_project = '' WHERE from_project IS NULL;
-      UPDATE relations SET to_project = '' WHERE to_project IS NULL;
-    `);
-
-    try {
-      this.db.exec(`ALTER TABLE relations ADD COLUMN status TEXT DEFAULT 'active';`);
-    } catch {
-      // column already exists
-    }
 
     try {
       this.db.exec(`
         CREATE UNIQUE INDEX IF NOT EXISTS idx_relations_unique
-          ON relations(proposal_id, from_project, from_id, to_project, to_id, rel_type);
+          ON relations(from_uuid, to_uuid, rel_type);
       `);
     } catch {
       // duplicates may exist; ignore to avoid breaking startup
     }
 
     // 实体变更历史表
-    // 设计文档: L166-188
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS entity_history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        entity_uuid TEXT NOT NULL,
+        root_id TEXT NOT NULL DEFAULT '',
         entity_id TEXT NOT NULL,
-        source_project TEXT NOT NULL DEFAULT '',
-        proposal_id TEXT NOT NULL DEFAULT '',
         entity_type TEXT NOT NULL,
-        feat_id TEXT NOT NULL DEFAULT '',
         action TEXT NOT NULL,
         changed_fields TEXT,
         snapshot_after TEXT,
@@ -450,56 +445,10 @@ export class SQLiteStore {
         changed_at TEXT DEFAULT (datetime('now'))
       );
 
+      CREATE INDEX IF NOT EXISTS idx_entity_history_uuid ON entity_history(entity_uuid);
+      CREATE INDEX IF NOT EXISTS idx_entity_history_root_id ON entity_history(root_id);
       CREATE INDEX IF NOT EXISTS idx_entity_history_entity_id ON entity_history(entity_id);
-      CREATE INDEX IF NOT EXISTS idx_entity_history_source_project ON entity_history(source_project);
-      CREATE INDEX IF NOT EXISTS idx_entity_history_proposal_id ON entity_history(proposal_id);
-      CREATE INDEX IF NOT EXISTS idx_entity_history_feat_id ON entity_history(feat_id);
       CREATE INDEX IF NOT EXISTS idx_entity_history_changed_at ON entity_history(changed_at);
-    `);
-
-    // Feat 表 (feat 生命周期管理)
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS feats (
-        id TEXT PRIMARY KEY,
-        status TEXT NOT NULL DEFAULT 'draft',
-        title TEXT,
-        description TEXT,
-        created_by TEXT,
-        checklist TEXT,
-        checklist_version TEXT,
-        workflow_steps TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_feats_status ON feats(status);
-    `);
-
-    try {
-      this.db.exec(`ALTER TABLE feats ADD COLUMN workflow_steps TEXT;`);
-    } catch {
-      // column already exists
-    }
-    try {
-      this.db.exec(`ALTER TABLE feats ADD COLUMN checklist_version TEXT;`);
-    } catch {
-      // column already exists
-    }
-
-    // Feat 发布历史表 (用于回滚)
-    // 设计文档: L219-231
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS feat_history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        feat_id TEXT NOT NULL,
-        published_at TEXT NOT NULL,
-        entities_snapshot TEXT NOT NULL,
-        published_by TEXT,
-        UNIQUE (feat_id, published_at)
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_feat_history_feat_id ON feat_history(feat_id);
-      CREATE INDEX IF NOT EXISTS idx_feat_history_published_at ON feat_history(published_at);
     `);
 
     // 图查询缓存表
@@ -526,83 +475,8 @@ export class SQLiteStore {
   }
 
   // ============================================================
-  // Merge View 查询 (设计文档 §3)
+  // Merge View 查询 (v0.3.1 起已废弃)
   // ============================================================
-
-  /**
-   * 获取合并视图的实体列表
-   *
-   * 设计文档: sqlite-schema.md L300-370
-   *
-   * Merge View 核心原则:
-   * 1. Feat 优先: 当前 Feat 中的版本覆盖主分支版本
-   * 2. 主分支兜底: Feat 中不存在的实体从主分支获取
-   * 3. 其他 Feat 不可见
-   *
-   * @param proposalId - 当前 Feat ID (null 表示只查主分支)
-   */
-  getMergedEntities(proposalId: string | null = null): unknown[] {
-    if (proposalId === null) {
-      // 只查主分支
-      return this.db.prepare(`
-        SELECT * FROM entities WHERE proposal_id IS NULL OR proposal_id = ''
-      `).all();
-    }
-
-    // Merge View: Feat 优先 + 主分支兜底
-    return this.db.prepare(`
-      WITH ranked AS (
-        SELECT *,
-          ROW_NUMBER() OVER (
-            PARTITION BY source_project, id
-            ORDER BY
-              CASE
-                WHEN proposal_id = ? THEN 1
-                WHEN proposal_id IS NULL OR proposal_id = '' THEN 2
-                ELSE 3
-              END
-          ) AS rn
-        FROM entities
-        WHERE proposal_id = ? OR proposal_id = '' OR proposal_id IS NULL
-      )
-      SELECT id, source_project, proposal_id, type, kind, scope, perspective, data
-      FROM ranked WHERE rn = 1
-    `).all(proposalId, proposalId);
-  }
-
-  /**
-   * 获取合并视图的关系列表
-   *
-   * @param proposalId - 当前 Feat ID (null 表示只查主分支)
-   */
-  getMergedRelations(proposalId: string | null = null): unknown[] {
-    if (proposalId === null) {
-      return this.db.prepare(`
-        SELECT * FROM relations
-        WHERE (proposal_id IS NULL OR proposal_id = '')
-          AND (status IS NULL OR status != 'deleted')
-      `).all();
-    }
-
-    return this.db.prepare(`
-      WITH ranked AS (
-        SELECT *,
-          ROW_NUMBER() OVER (
-            PARTITION BY from_project, from_id, to_project, to_id, rel_type
-            ORDER BY
-              CASE
-                WHEN proposal_id = ? THEN 1
-                WHEN proposal_id IS NULL OR proposal_id = '' THEN 2
-                ELSE 3
-              END
-          ) AS rn
-        FROM relations
-        WHERE proposal_id = ? OR proposal_id = '' OR proposal_id IS NULL
-      )
-      SELECT id, proposal_id, from_project, from_id, to_project, to_id, rel_type, properties, created_at, updated_at
-      FROM ranked WHERE rn = 1 AND (status IS NULL OR status != 'deleted')
-    `).all(proposalId, proposalId);
-  }
 
   /**
    * 获取 SQLiteStore 单例实例
@@ -692,11 +566,11 @@ export class SQLiteStore {
     }
 
     const stmt = this.db.prepare(`
-      SELECT e.id, e.source_project, e.proposal_id, e.data, m.status
+      SELECT e.uuid, e.id, e.root_id, e.type, e.data, m.status
       FROM entities e
-      JOIN metadata m ON e.source_project = m.source_project
-        AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
+      JOIN metadata m ON e.uuid = m.entity_uuid
       WHERE m.status NOT IN ('archived', 'deprecated')
+        AND e.type NOT IN ('feat', 'checklist')
     `);
 
     let total = 0;
@@ -707,9 +581,10 @@ export class SQLiteStore {
 
     try {
       for (const row of stmt.iterate() as Iterable<{
+        uuid: string;
         id: string;
-        source_project: string;
-        proposal_id: string | null;
+        root_id: string;
+        type: string;
         data: string;
         status: string;
       }>) {
@@ -730,8 +605,7 @@ export class SQLiteStore {
 
         try {
           const embedding = await generateEmbedding(text);
-          const proposalId = row.proposal_id === '' ? null : row.proposal_id;
-          const key = generateVectorKey(row.source_project ?? '', row.id, proposalId);
+          const key = generateVectorKey(row.uuid);
           this.vectorStore.add(key, embedding);
           indexed += 1;
         } catch {
@@ -747,6 +621,13 @@ export class SQLiteStore {
       indexed,
       skipped,
     };
+  }
+
+  /**
+   * 运行 v0.3.1 迁移（从 legacy schema）
+   */
+  migrateLegacySchema(): { migrated: boolean; entities: number; relations: number } {
+    return migrateLegacySchema(this.db);
   }
 
 }

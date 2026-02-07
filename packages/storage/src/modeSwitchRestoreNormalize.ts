@@ -60,12 +60,12 @@ export function normalizeExportData(data: ExportData): ExportData {
 export function normalizeExportEntity(entity: ExportEntity): ExportEntity {
   const normalizedMetadata = {
     ...entity.metadata,
-    source_project: entity.metadata.source_project ?? '',
+    root_id: entity.metadata.root_id ?? '',
   };
   const data = isPlainObject(entity.data) ? { ...entity.data } : entity.data;
   const normalized: ExportEntity = {
     ...entity,
-    proposal_id: entity.proposal_id === '' ? null : entity.proposal_id ?? null,
+    requirement_id: entity.requirement_id === '' ? null : entity.requirement_id ?? null,
     data,
     metadata: normalizedMetadata,
   };
@@ -119,9 +119,9 @@ export function normalizeExportEntity(entity: ExportEntity): ExportEntity {
 export function normalizeExportRelation(relation: ExportRelation): ExportRelation {
   return {
     ...relation,
-    proposal_id: relation.proposal_id === '' ? null : relation.proposal_id ?? null,
-    from_project: relation.from_project === null ? '' : relation.from_project,
-    to_project: relation.to_project === null ? '' : relation.to_project,
+    requirement_id: relation.requirement_id === '' ? null : relation.requirement_id ?? null,
+    from_root_id: relation.from_root_id === null ? '' : relation.from_root_id,
+    to_root_id: relation.to_root_id === null ? '' : relation.to_root_id,
   };
 }
 
@@ -202,8 +202,8 @@ export function validateEntity(entity: unknown): void {
   }
 
   const m = e.metadata as Record<string, unknown>;
-  if (m.source_project !== null && typeof m.source_project !== 'string') {
-    throw new Error(`Invalid entity ${e.id}: invalid metadata.source_project`);
+  if (m.root_id !== null && typeof m.root_id !== 'string') {
+    throw new Error(`Invalid entity ${e.id}: invalid metadata.root_id`);
   }
   if (typeof m.status !== 'string') {
     throw new Error(`Invalid entity ${e.id}: missing metadata.status`);
@@ -220,8 +220,8 @@ export function validateEntity(entity: unknown): void {
   if (m.content_hash !== undefined && typeof m.content_hash !== 'string') {
     throw new Error(`Invalid entity ${e.id}: invalid metadata.content_hash`);
   }
-  if (e.proposal_id !== undefined && e.proposal_id !== null && typeof e.proposal_id !== 'string') {
-    throw new Error(`Invalid entity ${e.id}: invalid proposal_id`);
+  if (e.requirement_id !== undefined && e.requirement_id !== null && typeof e.requirement_id !== 'string') {
+    throw new Error(`Invalid entity ${e.id}: invalid requirement_id`);
   }
 }
 
@@ -235,17 +235,17 @@ export function validateRelation(relation: unknown): void {
   if (r.id !== undefined && typeof r.id !== 'string') {
     throw new Error('Invalid relation: invalid id');
   }
-  if (r.proposal_id !== undefined && r.proposal_id !== null && typeof r.proposal_id !== 'string') {
-    throw new Error('Invalid relation: invalid proposal_id');
+  if (r.requirement_id !== undefined && r.requirement_id !== null && typeof r.requirement_id !== 'string') {
+    throw new Error('Invalid relation: invalid requirement_id');
   }
-  if (r.from_project !== undefined && r.from_project !== null && typeof r.from_project !== 'string') {
-    throw new Error('Invalid relation: invalid from_project');
+  if (r.from_root_id !== undefined && r.from_root_id !== null && typeof r.from_root_id !== 'string') {
+    throw new Error('Invalid relation: invalid from_root_id');
   }
   if (typeof r.from_id !== 'string') {
     throw new Error('Invalid relation: missing from_id');
   }
-  if (r.to_project !== undefined && r.to_project !== null && typeof r.to_project !== 'string') {
-    throw new Error('Invalid relation: invalid to_project');
+  if (r.to_root_id !== undefined && r.to_root_id !== null && typeof r.to_root_id !== 'string') {
+    throw new Error('Invalid relation: invalid to_root_id');
   }
   if (typeof r.to_id !== 'string') {
     throw new Error('Invalid relation: missing to_id');

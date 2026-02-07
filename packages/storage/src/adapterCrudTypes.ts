@@ -2,19 +2,82 @@
  * Storage Adapter Layer - CRUD 类型定义
  */
 
-import type { EntityType, EntityStatus, OutputFormat, Entity, Relation } from './adapterBaseTypes.js';
+import type {
+  Entity,
+  EntityMetadata,
+  EntityType,
+  EntityStatus,
+  OutputFormat,
+  Relation,
+} from './adapterBaseTypes.js';
 
 // ============================================================
-// 操作参数类型
+// CRUD 类型定义
+// ============================================================
+
+/**
+ * 保存选项
+ */
+export interface SaveOptions {
+  expected_updated_at?: string;
+  force?: boolean;
+}
+
+/**
+ * 保存输入（允许缺省 uuid/versions/metadata）
+ */
+export type EntityInput = Omit<Entity, 'uuid' | 'versions' | 'metadata'> & {
+  uuid?: string;
+  versions?: string[];
+  metadata?: Partial<EntityMetadata>;
+};
+
+/**
+ * 实体过滤条件
+ */
+export interface EntityFilter {
+  root_id?: string;
+  id?: string;
+  version?: string;
+  requirement_id?: string;
+  type?: EntityType | EntityType[];
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * 保存结果
+ */
+export type SaveResult = LegacySaveResult;
+
+/**
+ * 读取结果
+ */
+export type ReadResult = Entity | null;
+
+/**
+ * 列表结果
+ */
+export type ListResult = LegacyListResult;
+
+/**
+ * 删除结果
+ */
+export type DeleteResult = LegacyDeleteResult;
+
+// ============================================================
+// Legacy CRUD types (v0.3.0 compatibility)
 // ============================================================
 
 /**
  * ADR 缺失时的行为
+ * @deprecated v0.3.1
  */
 export type ADROnMissing = 'error' | 'warning' | 'ignore';
 
 /**
  * ADR 策略配置
+ * @deprecated v0.3.1
  */
 export interface ADRPolicyConfig {
   enforce?: boolean;
@@ -23,8 +86,19 @@ export interface ADRPolicyConfig {
 }
 
 /**
- * 保存实体参数
- * 设计文档: store-crud.md §3.1
+ * 警告信息
+ * @deprecated v0.3.1
+ */
+export interface Warning {
+  code: string;
+  message: string;
+  severity: 'info' | 'warning' | 'error';
+  details?: Record<string, unknown>;
+}
+
+/**
+ * 保存实体参数（旧版）
+ * @deprecated v0.3.1
  */
 export interface SaveParams {
   type: EntityType;
@@ -32,8 +106,8 @@ export interface SaveParams {
   content?: string;
   format?: 'yaml' | 'json';
   id?: string;
-  source_project?: string;
-  proposal_id?: string | null;
+  root_id?: string;
+  requirement_id?: string | null;
   enforce_adr?: boolean;
   adr_policy?: ADRPolicyConfig;
   skip_adr_check?: boolean;
@@ -42,9 +116,10 @@ export interface SaveParams {
 }
 
 /**
- * 保存结果
+ * 保存结果（旧版）
+ * @deprecated v0.3.1
  */
-export interface SaveResult {
+export interface LegacySaveResult {
   success: boolean;
   id: string;
   status: EntityStatus;
@@ -64,23 +139,13 @@ export interface SaveResult {
 }
 
 /**
- * 警告信息
- */
-export interface Warning {
-  code: string;
-  message: string;
-  severity: 'info' | 'warning' | 'error';
-  details?: Record<string, unknown>;
-}
-
-/**
- * 读取实体参数
- * 设计文档: store-crud.md §3.2
+ * 读取实体参数（旧版）
+ * @deprecated v0.3.1
  */
 export interface ReadParams {
   id?: string;
   format?: OutputFormat;
-  proposal_id?: string | string[] | null;
+  requirement_id?: string | string[] | null;
   filter?: Record<string, unknown>;
   limit?: number;
   include_relations?: boolean;
@@ -88,7 +153,8 @@ export interface ReadParams {
 }
 
 /**
- * 读取结果（对象格式）
+ * 读取结果（对象格式，旧版）
+ * @deprecated v0.3.1
  */
 export interface ReadResultObject {
   entity: Entity | null;
@@ -96,7 +162,8 @@ export interface ReadResultObject {
 }
 
 /**
- * 读取结果（字符串格式）
+ * 读取结果（字符串格式，旧版）
+ * @deprecated v0.3.1
  */
 export interface ReadResultString {
   id: string;
@@ -107,14 +174,14 @@ export interface ReadResultString {
 }
 
 /**
- * 列表参数
- * 设计文档: store-crud.md §3.3
+ * 列表参数（旧版）
+ * @deprecated v0.3.1
  */
 export interface ListParams {
   filter?: Record<string, unknown>;
   type?: EntityType | 'all';
-  project_id?: string;
-  proposal_id?: string | null;
+  root_id?: string;
+  requirement_id?: string | null;
   status?: EntityStatus;
   updated_after?: string;
   limit?: number;
@@ -124,7 +191,8 @@ export interface ListParams {
 }
 
 /**
- * 列表项概要
+ * 列表项概要（旧版）
+ * @deprecated v0.3.1
  */
 export interface ListItem {
   id: string;
@@ -132,12 +200,13 @@ export interface ListItem {
   status: EntityStatus;
   updated_at: string;
   content_hash: string;
-  source_project?: string;
-  proposal_id?: string | null;
+  root_id?: string;
+  requirement_id?: string | null;
 }
 
 /**
- * 分页信息
+ * 分页信息（旧版）
+ * @deprecated v0.3.1
  */
 export interface Pagination {
   total: number;
@@ -147,9 +216,10 @@ export interface Pagination {
 }
 
 /**
- * 列表结果
+ * 列表结果（旧版）
+ * @deprecated v0.3.1
  */
-export interface ListResult {
+export interface LegacyListResult {
   items?: ListItem[];
   pagination?: Pagination;
   total?: number;
@@ -159,19 +229,20 @@ export interface ListResult {
 }
 
 /**
- * 删除参数
- * 设计文档: store-crud.md §3.4
+ * 删除参数（旧版）
+ * @deprecated v0.3.1
  */
 export interface DeleteParams {
   id: string;
-  proposal_id?: string | null;
+  requirement_id?: string | null;
   force?: boolean;
 }
 
 /**
- * 删除结果
+ * 删除结果（旧版）
+ * @deprecated v0.3.1
  */
-export interface DeleteResult {
+export interface LegacyDeleteResult {
   success: boolean;
   id: string;
   deleted_relations?: number;

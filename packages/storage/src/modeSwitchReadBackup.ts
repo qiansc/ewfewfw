@@ -13,7 +13,7 @@ import { computeChecksum } from './lite-adapter/utilsCommon.js';
 type StoreBackupEntity = {
   id: string;
   type: string;
-  source_project?: string;
+  root_id?: string;
   status?: string;
   data?: Record<string, unknown>;
   metadata?: {
@@ -25,10 +25,10 @@ type StoreBackupEntity = {
 
 type StoreBackupRelation = {
   id?: string | null;
-  proposal_id?: string | null;
-  from_project?: string | null;
+  requirement_id?: string | null;
+  from_root_id?: string | null;
   from_id: string;
-  to_project?: string | null;
+  to_root_id?: string | null;
   to_id: string;
   rel_type: string;
   status?: 'active' | 'deleted';
@@ -83,23 +83,23 @@ function normalizeStoreBackup(data: StoreBackupData): ExportData {
       type: entity.type as ExportEntity['type'],
       data: entity.data ?? {},
       metadata: {
-        source_project: entity.source_project ?? '',
+        root_id: entity.root_id ?? '',
         source_repo: sourceRepo,
         status: (entity.status ?? 'published') as ExportEntity['metadata']['status'],
         content_hash: contentHash,
         created_at: createdAt,
         updated_at: updatedAt,
       },
-      proposal_id: null,
+      requirement_id: null,
     };
   });
 
   const relations: ExportRelation[] = (data.relations ?? []).map((relation) => ({
     id: relation.id ?? undefined,
-    proposal_id: relation.proposal_id ?? null,
-    from_project: relation.from_project ?? null,
+    requirement_id: relation.requirement_id ?? null,
+    from_root_id: relation.from_root_id ?? null,
     from_id: relation.from_id,
-    to_project: relation.to_project ?? null,
+    to_root_id: relation.to_root_id ?? null,
     to_id: relation.to_id,
     rel_type: relation.rel_type,
     status: relation.status ?? 'active',

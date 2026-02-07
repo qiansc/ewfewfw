@@ -18,7 +18,10 @@ export type EntityType =
   | 'product'
   | 'process'
   | 'sor'
-  | 'concept';
+  | 'concept'
+  | 'feat'
+  | 'checklist'
+  | 'spec';
 
 /**
  * 实体状态
@@ -44,22 +47,24 @@ export type OutputFormat = 'object' | 'yaml' | 'json';
  */
 export interface EntityData {
   id: string;
+  root_id?: string;
   type: EntityType;
   kind?: string;
   scope?: string;
   perspective?: string;
   data: Record<string, unknown>;
+  requirement_id?: string;
+  component_id?: string;
 }
 
 /**
  * 实体元数据
  */
 export interface EntityMetadata {
-  source_project: string;
   source_repo?: string;
-  external_url?: string;
+  external_url?: string | null;
   status: EntityStatus;
-  content_hash: string;
+  content_hash?: string;
   created_at: string;
   updated_at: string;
   created_by?: string;
@@ -70,7 +75,8 @@ export interface EntityMetadata {
  * 完整实体（数据 + 元数据）
  */
 export interface Entity extends EntityData {
-  proposal_id: string | null;
+  uuid?: string;
+  versions?: string[];
   metadata: EntityMetadata;
 }
 
@@ -79,10 +85,11 @@ export interface Entity extends EntityData {
  */
 export interface Relation {
   id: string;
-  proposal_id: string | null;
-  from_project: string;
+  from_uuid: string;
+  from_root_id: string;
   from_id: string;
-  to_project: string;
+  to_uuid: string | null;
+  to_root_id: string;
   to_id: string;
   rel_type: string;
   properties?: Record<string, unknown>;

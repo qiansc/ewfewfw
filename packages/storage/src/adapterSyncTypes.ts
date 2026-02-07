@@ -54,6 +54,17 @@ export interface SyncResult {
 }
 
 /**
+ * 同步状态 (Server 模式)
+ */
+export interface SyncStatus {
+  pending_count: number;
+  failed_count: number;
+  processing_count: number;
+  last_sync_at: string | null;
+  lag_seconds: number;
+}
+
+/**
  * 同步详情
  */
 export interface SyncDetail {
@@ -83,7 +94,8 @@ export interface PlanSyncParams {
   local_manifest: LocalManifest;
   snapshot?: SyncSnapshot | null;
   options?: {
-    proposal_id?: string;
+    root_id?: string;
+    requirement_id?: string;
     status_filter?: 'published' | 'approved' | 'all';
     conflict_policy?: ConflictPolicy;
   };
@@ -106,7 +118,8 @@ export interface LocalFileInfo {
   type: EntityType;
   content_hash: string;
   updated_at: string;
-  proposal_id?: string;
+  root_id?: string;
+  requirement_id?: string;
   content?: string;
 }
 
@@ -119,7 +132,8 @@ export interface SyncSnapshot {
     string,
     {
       content_hash: string;
-      proposal_id?: string;
+      root_id?: string;
+      requirement_id?: string;
     }
   >;
 }

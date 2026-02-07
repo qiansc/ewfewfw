@@ -14,7 +14,7 @@ Data Ops 提供以下子模块：
 
 ## Server 模式
 
-Server 模式通过 storage-backend（Python）访问 MongoDB/Neo4j/Milvus。配置文件位于 `.context/.c4a.yaml`：
+Server 模式通过 TypeScript 适配层直连 MongoDB/Neo4j/Milvus。配置文件位于 `.context/.c4a.yaml`：
 
 ```yaml
 mode: server
@@ -31,8 +31,8 @@ const adapter = await getAdapter();
 await adapter.save({
   type: "system",
   id: "demo-system",
-  source_project: "demo",
-  data: { id: "demo-system", name: "Demo System", source_project: "demo" },
+  root_id: "demo",
+  data: { id: "demo-system", name: "Demo System", root_id: "demo" },
 });
 ```
 
@@ -108,7 +108,7 @@ await featLifecycle(ctx, {
   },
 });
 
-const ref = parseReference('project:alpha/sys-1');
+const ref = parseReference('root:alpha/sys-1');
 await sync(ctx, {
   direction: 'db-to-file',
   path: process.cwd(),

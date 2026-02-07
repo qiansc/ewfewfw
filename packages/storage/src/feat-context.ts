@@ -1,12 +1,12 @@
 /**
- * proposal_id 上下文管理 - CoW 防护机制
+ * requirement_id 上下文管理 - CoW 防护机制
  *
  * 基于设计文档：v0.3.0/detailed-design/mcp/store-feat-lifecycle.md §3.7.3
  *
  * 防护机制：
- * 1. Skill 层注入 - 启动 feat 相关 Skill 时注入 proposal_id
+ * 1. Skill 层注入 - 启动 feat 相关 Skill 时注入 requirement_id
  * 2. CLI Session 上下文 - CLI 维护当前 feat，自动填充
- * 3. Server 端校验 - 检测可疑的无 proposal_id 写入
+ * 3. Server 端校验 - 检测可疑的无 requirement_id 写入
  */
 
 // ============================================================
@@ -21,8 +21,8 @@ export interface FeatSessionState {
   currentFeatId: string | null;
   /** 进入 feat 的时间 */
   enteredAt: string | null;
-  /** 是否自动填充 proposal_id */
-  autoFillProposalId: boolean;
+  /** 是否自动填充 requirement_id */
+  autoFillRequirementId: boolean;
 }
 
 /**
@@ -30,7 +30,7 @@ export interface FeatSessionState {
  */
 export interface WriteValidationResult {
   valid: boolean;
-  error?: "MISSING_PROPOSAL_ID" | "PROPOSAL_ID_MISMATCH";
+  error?: "MISSING_REQUIREMENT_ID" | "REQUIREMENT_ID_MISMATCH";
   message?: string;
   suggestion?: string;
 }
@@ -50,7 +50,7 @@ export type StoreWriteTool =
 // ============================================================
 
 /**
- * 需要 proposal_id 的写入工具列表
+ * 需要 requirement_id 的写入工具列表
  */
 export const STORE_WRITE_TOOLS: StoreWriteTool[] = [
   "c4a_store_save",
@@ -67,13 +67,13 @@ export const STORE_WRITE_TOOLS: StoreWriteTool[] = [
 /**
  * Feat Session 上下文管理
  *
- * CLI 层使用，维护当前 feat 上下文，自动填充 proposal_id
+ * CLI 层使用，维护当前 feat 上下文，自动填充 requirement_id
  */
 export class FeatSession {
   private state: FeatSessionState = {
     currentFeatId: null,
     enteredAt: null,
-    autoFillProposalId: true,
+    autoFillRequirementId: true,
   };
 
   /**
@@ -114,10 +114,10 @@ export class FeatSession {
   }
 
   /**
-   * 设置是否自动填充 proposal_id
+   * 设置是否自动填充 requirement_id
    */
-  setAutoFillProposalId(enabled: boolean): void {
-    this.state.autoFillProposalId = enabled;
+  setAutoFillRequirementId(enabled: boolean): void {
+    this.state.autoFillRequirementId = enabled;
   }
 
   /**
@@ -128,22 +128,22 @@ export class FeatSession {
   }
 
   /**
-   * 包装 MCP 调用参数，自动填充 proposal_id
+   * 包装 MCP 调用参数，自动填充 requirement_id
    */
   wrapMcpCallParams<T extends Record<string, unknown>>(
     toolName: string,
     params: T
   ): T {
     if (
-      this.state.autoFillProposalId &&
+      this.state.autoFillRequirementId &&
       this.state.currentFeatId &&
       this.isStoreWriteTool(toolName)
     ) {
-      // 如果参数中没有 proposal_id，自动填充
-      if (params.proposal_id === undefined || params.proposal_id === null) {
+      // 如果参数中没有 requirement_id，自动填充
+      if (params.requirement_id === undefined || params.requirement_id === null) {
         return {
           ...params,
-          proposal_id: this.state.currentFeatId,
+          requirement_id: this.state.currentFeatId,
         };
       }
     }
@@ -163,7 +163,7 @@ export class FeatSession {
 export function generateSkillContext(featId: string): string {
   return `
 当前正在 feat "${featId}" 中工作。
-所有 c4a_store_* 调用必须携带 proposal_id: "${featId}"
+所有 c4a_store_* 调用必须携带 requirement_id: "${featId}"
 `.trim();
 }
 
@@ -182,12 +182,12 @@ export function generateDetailedSkillContext(
 
 ### 重要提醒
 
-1. **所有写入操作必须携带 proposal_id**
-   - c4a_store_save: proposal_id="${featId}"
-   - c4a_store_delete: proposal_id="${featId}"
+1. **所有写入操作必须携带 requirement_id**
+   - c4a_store_save: requirement_id="${featId}"
+   - c4a_store_delete: requirement_id="${featId}"
 
 2. **不要直接修改主分支**
-   - 除非明确需要，否则不要使用 proposal_id=null
+   - 除非明确需要，否则不要使用 requirement_id=null
    - 如果需要修改主分支，请先确认用户意图
 
 3. **发布前请确认**
@@ -200,18 +200,18 @@ export function generateDetailedSkillContext(
 // ============================================================
 
 /**
- * 校验写入操作的 proposal_id
+ * 校验写入操作的 requirement_id
  *
- * Server 端使用，检测可疑的无 proposal_id 写入
+ * Server 端使用，检测可疑的无 requirement_id 写入
  *
  * @param entityId - 实体 ID
- * @param proposalId - 请求中的 proposal_id
+ * @param requirementId - 请求中的 requirement_id
  * @param entityExists - 实体是否已存在
  * @param forceMainBranch - 是否强制写入主分支
  */
-export function validateWriteProposalId(
+export function validateWriteRequirementId(
   entityId: string,
-  proposalId: string | null | undefined,
+  requirementId: string | null | undefined,
   entityExists: boolean,
   forceMainBranch = false
 ): WriteValidationResult {
@@ -220,13 +220,13 @@ export function validateWriteProposalId(
     return { valid: true };
   }
 
-  // 如果实体已存在但没有指定 proposal_id，这是可疑的
-  if (!proposalId && entityExists) {
+  // 如果实体已存在但没有指定 requirement_id，这是可疑的
+  if (!requirementId && entityExists) {
     return {
       valid: false,
-      error: "MISSING_PROPOSAL_ID",
-      message: `修改已存在的实体 "${entityId}" 需要指定 proposal_id`,
-      suggestion: "请指定 proposal_id，或使用 force_main_branch=true 强制写入主分支",
+      error: "MISSING_REQUIREMENT_ID",
+      message: `修改已存在的实体 "${entityId}" 需要指定 requirement_id`,
+      suggestion: "请指定 requirement_id，或使用 force_main_branch=true 强制写入主分支",
     };
   }
 
@@ -234,24 +234,24 @@ export function validateWriteProposalId(
 }
 
 /**
- * 校验 proposal_id 是否与当前上下文匹配
+ * 校验 requirement_id 是否与当前上下文匹配
  */
-export function validateProposalIdMatch(
-  requestProposalId: string | null | undefined,
-  expectedProposalId: string | null
+export function validateRequirementIdMatch(
+  requestRequirementId: string | null | undefined,
+  expectedRequirementId: string | null
 ): WriteValidationResult {
-  // 如果没有期望的 proposal_id，不校验
-  if (!expectedProposalId) {
+  // 如果没有期望的 requirement_id，不校验
+  if (!expectedRequirementId) {
     return { valid: true };
   }
 
-  // 如果请求中的 proposal_id 与期望不匹配
-  if (requestProposalId && requestProposalId !== expectedProposalId) {
+  // 如果请求中的 requirement_id 与期望不匹配
+  if (requestRequirementId && requestRequirementId !== expectedRequirementId) {
     return {
       valid: false,
-      error: "PROPOSAL_ID_MISMATCH",
-      message: `请求的 proposal_id "${requestProposalId}" 与当前上下文 "${expectedProposalId}" 不匹配`,
-      suggestion: `请使用 proposal_id="${expectedProposalId}" 或退出当前 feat 上下文`,
+      error: "REQUIREMENT_ID_MISMATCH",
+      message: `请求的 requirement_id "${requestRequirementId}" 与当前上下文 "${expectedRequirementId}" 不匹配`,
+      suggestion: `请使用 requirement_id="${expectedRequirementId}" 或退出当前 feat 上下文`,
     };
   }
 

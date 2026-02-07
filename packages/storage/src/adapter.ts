@@ -23,8 +23,9 @@
  * ```
  */
 
-import type { SaveParams, SaveResult, ReadParams, ReadResultObject, ReadResultString, ListParams, ListResult, DeleteParams, DeleteResult } from './adapterCrudTypes.js';
-import type { SyncParams, SyncResult, PlanSyncParams, PlanSyncResult } from './adapterSyncTypes.js';
+import type { SaveOptions, EntityFilter, EntityInput } from './adapterCrudTypes.js';
+import type { Entity } from './adapterBaseTypes.js';
+import type { SyncParams, SyncResult, PlanSyncParams, PlanSyncResult, SyncStatus } from './adapterSyncTypes.js';
 import type { SearchParams, SearchResult, DepsParams, DepsResult, ImpactParams, ImpactResult } from './adapterSearchTypes.js';
 import type { FeatLifecycleParams, FeatLifecycleResult, FeatMergeParams, FeatMergeResult, ChecklistParams, ChecklistResult, UpdateWorkflowStepParams, UpdateWorkflowStepResult } from './adapterFeatTypes.js';
 import type { ReadHistoryParams, ReadHistoryResult, BackupParams, BackupResult, RestoreParams, RestoreResult, RepairParams, RepairResult, ValidateParams, ValidateResult } from './adapterUtilsTypes.js';
@@ -44,7 +45,7 @@ export type * from './adapterUtilsTypes.js';
  * 存储适配器抽象接口
  *
  * 所有 MCP Store/Query 工具通过此接口访问存储，
- * 不直接调用 SQLiteStore 或 Python 服务。
+ * 不直接调用 SQLiteStore 或其他后端实现。
  *
  * 实现:
  * - LiteAdapter: Local 模式，调用 SQLiteStore
@@ -59,25 +60,39 @@ export interface StorageAdapter {
    * 保存/更新实体
    * 对应 MCP 工具: c4a_store_save
    */
-  save(params: SaveParams): Promise<SaveResult>;
+  save(entity: EntityInput, options?: SaveOptions): Promise<Entity>;
 
   /**
    * 读取实体
    * 对应 MCP 工具: c4a_store_read
    */
-  read(params: ReadParams): Promise<ReadResultObject | ReadResultString | null>;
+  read(rootId: string, id: string, version?: string): Promise<Entity | null>;
+
+  /**
+   * 按 UUID 读取实体
+   */
+  readByUuid(uuid: string): Promise<Entity | null>;
 
   /**
    * 列出实体概要
    * 对应 MCP 工具: c4a_store_list
    */
-  list(params: ListParams): Promise<ListResult>;
+  list(filter: EntityFilter): Promise<Entity[]>;
 
   /**
    * 删除实体
    * 对应 MCP 工具: c4a_store_delete
    */
-  delete(params: DeleteParams): Promise<DeleteResult>;
+  delete(uuid: string): Promise<void>;
+
+  // ============================================================
+  // 版本操作 (c4a_store_* version)
+  // ============================================================
+
+  addVersion(uuid: string, version: string): Promise<Entity>;
+  removeVersion(uuid: string, version: string): Promise<Entity>;
+  splitEntity(uuid: string, version: string, newData: Record<string, unknown>): Promise<string>;
+  listVersions(rootId: string): Promise<string[]>;
 
   // ============================================================
   // 同步操作 (c4a_store_sync / c4a_store_plan_sync)
@@ -94,6 +109,11 @@ export interface StorageAdapter {
    * 对应 MCP 工具: c4a_store_plan_sync
    */
   planSync(params: PlanSyncParams): Promise<PlanSyncResult>;
+
+  /**
+   * 同步状态查询 (Server 模式)
+   */
+  syncStatus(): Promise<SyncStatus>;
 
   // ============================================================
   // 查询操作 (c4a_query_*)
@@ -182,6 +202,11 @@ export interface StorageAdapter {
   // ============================================================
   // 生命周期
   // ============================================================
+
+  /**
+   * 在事务中执行操作
+   */
+  transaction<T>(fn: (adapter: StorageAdapter) => Promise<T>): Promise<T>;
 
   /**
    * 初始化适配器

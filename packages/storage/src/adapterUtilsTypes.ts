@@ -221,7 +221,7 @@ export interface ValidateCheckResult {
  * 设计文档: store-utils.md §3.16
  */
 export interface ValidateParams {
-  proposal_id?: string;
+  requirement_id?: string;
   checks?: ValidateCheckType[];
   options?: {
     check_depth?: number;
@@ -234,7 +234,7 @@ export interface ValidateParams {
  */
 export interface ValidateResult {
   success: boolean;
-  proposal_id?: string;
+  requirement_id?: string;
   summary?: {
     passed: number;
     warnings: number;
