@@ -14,9 +14,9 @@ description: |
 
 ## 当前工作上下文
 
-{{#if current_proposal_id}}
-**当前 Feature**: `{{current_proposal_id}}`
-**Feature 状态**: `{{current_proposal_status}}`
+{{#if current_feat_uuid}}
+**当前 Feature**: `{{current_feat_uuid}}`
+**Feature 状态**: `{{current_feat_status}}`
 {{else}}
 **当前 Feature**: 无（主分支模式）
 {{/if}}
@@ -72,7 +72,7 @@ description: |
 ## 工具调用规则
 
 - `c4a_store_feat_lifecycle` 使用 `feat_id` 进行创建/流转
-- 读取 feat 内实体时必须传递 `proposal_id: "{{current_proposal_id}}"`（如已选择）
+- 读取 feat 内实体时必须传递 `requirement_id: "{{current_feat_uuid}}"`（如已选择）
 
 ## 工具依赖
 

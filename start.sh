@@ -20,12 +20,7 @@ if [ -d "$HOME/.bun/bin" ]; then
     export PATH="$BUN_INSTALL/bin:$PATH"
 fi
 
-# uv (Python)
-if [ -d "$HOME/.local/bin" ]; then
-    export PATH="$HOME/.local/bin:$PATH"
-fi
-
-# cargo (Rust，uv 可能需要)
+# cargo (Rust)
 if [ -d "$HOME/.cargo/bin" ]; then
     export PATH="$HOME/.cargo/bin:$PATH"
 fi

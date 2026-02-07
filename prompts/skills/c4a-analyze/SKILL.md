@@ -12,11 +12,11 @@ description: |
 
 ## 当前工作上下文
 
-{{#if current_proposal_id}}
-**当前 Feature**: `{{current_proposal_id}}`
-**Feature 状态**: `{{current_proposal_status}}`
+{{#if current_feat_uuid}}
+**当前 Feature**: `{{current_feat_uuid}}`
+**Feature 状态**: `{{current_feat_status}}`
 
-⚠️ 所有 MCP 工具调用必须传递 `proposal_id: "{{current_proposal_id}}"`。
+⚠️ 所有 MCP 工具调用必须传递 `requirement_id: "{{current_feat_uuid}}"`。
 {{else}}
 **当前 Feature**: 无（主分支模式）
 
@@ -25,12 +25,12 @@ description: |
 
 ## 前置检查
 
-1. 检查 `current_proposal_id` 是否存在
+1. 检查 `current_feat_uuid` 是否存在
 2. 若不存在，提示用户创建或切换 Feature
 
 ## 工具调用规则
 
-`c4a_store_validate` 必须传递 `proposal_id: "{{current_proposal_id}}"`。
+`c4a_store_validate` 必须传递 `requirement_id: "{{current_feat_uuid}}"`。
 ## 职责
 
 在 plan 后到 publish 前的实现过程中，随时检查 Spec、契约、实现清单和实际实现的一致性。
@@ -46,7 +46,7 @@ description: |
 ```
 1. 调用 c4a_store_validate 执行服务端检查：
    c4a_store_validate({
-     proposal_id: "{{current_proposal_id}}",
+     requirement_id: "{{current_feat_uuid}}",
      checks: [
        "functional_spec",
        "technical_spec",

@@ -1,12 +1,13 @@
 # C4A TypeScript MCP Server Dockerfile
 # 用于 mcp-store, mcp-extract, mcp-query, mcp-visual
 
-FROM oven/bun:1.1-alpine
+FROM oven/bun:1.1.45
 
 WORKDIR /app
 
 # Install curl for health checks
-RUN apk add --no-cache curl
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /app/.context
 
 # Copy workspace config
 COPY package.json bun.lockb* ./
@@ -31,6 +32,9 @@ COPY packages/mcp-extract packages/mcp-extract
 COPY packages/mcp-query packages/mcp-query
 COPY packages/mcp-visual packages/mcp-visual
 
+# Ensure workspace packages can resolve hoisted deps
+RUN for p in /app/packages/*; do ln -s /app/node_modules "$p/node_modules"; done
+
 # Default to HTTP transport for Docker
 ENV MCP_TRANSPORT=streamable-http
 
@@ -39,4 +43,4 @@ ENV MCP_TRANSPORT=streamable-http
 # MCP_PORT: 8051 (store), 8052 (extract), 8054 (query), or 8053 (visual)
 
 # Run the specified MCP server
-CMD ["sh", "-c", "bun run packages/${MCP_SERVER}/src/index.ts"]
+CMD ["sh", "-c", "bun /app/packages/${MCP_SERVER}/src/index.ts"]

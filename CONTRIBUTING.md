@@ -64,6 +64,15 @@
 - 假想的故障处理、性能指标
 - 不存在的版本兼容性
 
+## 数据模型变更检查
+
+当新增/移除字段或实体类型时，必须同步检查以下位置是否需要更新：
+- `packages/core/src/types/` 与 Schema 文件
+- `packages/storage/src/` 的适配器与迁移逻辑
+- MCP 工具输入/输出（`packages/mcp-*/src/schemas.ts`）
+- 文档与变更日志（`README.md`、`ARCHITECTURE.md`、`changelog/`）
+- Server 模式配置（`docker/docker-compose.server.yml`）
+
 ## 禁止词汇
 
 | 类别 | 禁止词汇 | 替代方案 |
@@ -72,7 +81,7 @@
 | 营销语言 | 革命性、突破性、领先、卓越、完美 | 使用具体数据或承认限制 |
 | 模糊量词 | 大量、许多、少量、若干、部分 | 使用具体数量或范围 |
 | 未来语言 | 将要、计划实现、未来将、即将、TODO、待实现 | 移到 issues 或不写 |
-| 冗余版本号 | `version: v0.1`、`C4A v0.3.0` | 仅在 JSON Schema、发布文档中使用 |
+| 冗余版本号 | `version: v0.1`、`C4A v0.3.1` | 仅在 JSON Schema、发布文档中使用 |
 
 ## 代码块规则
 
@@ -99,21 +108,35 @@
 ### 示例对比
 
 **✅ 允许 - 扩展点说明**
-```python
-class BaseStrategy(ABC):
-    @abstractmethod
-    def analyze(self, symbol: str, data: pd.DataFrame) -> Signal:
-        pass
+```ts
+interface Signal {
+  direction: "BUY" | "SELL";
+  confidence: number;
+}
+
+type DataFrame = unknown;
+
+abstract class BaseStrategy {
+  abstract analyze(symbol: string, data: DataFrame): Signal;
+}
 ```
 
 **❌ 禁止 - 内部实现**
-```python
-# 不要展示具体策略的完整实现
-class RSIStrategy(BaseStrategy):
-    def analyze(self, symbol: str, data: pd.DataFrame) -> Signal:
-        rsi = self._calculate_rsi(data)  # 内部算法细节
-        if rsi < 30:
-            return Signal(direction="BUY", confidence=0.7)
+```ts
+// 不要展示具体策略的完整实现
+class RsiStrategy extends BaseStrategy {
+  analyze(symbol: string, data: DataFrame): Signal {
+    const rsi = this.calculateRsi(data); // 内部算法细节
+    if (rsi < 30) {
+      return { direction: "BUY", confidence: 0.7 };
+    }
+    return { direction: "SELL", confidence: 0.4 };
+  }
+
+  private calculateRsi(_data: DataFrame): number {
+    return 42;
+  }
+}
 ```
 
 ## 正反对比原则
@@ -179,7 +202,7 @@ changelog/
 ├── unreleased/           # 未发布的变更碎片
 │   ├── feat-xxx.md
 │   └── fix-yyy.md
-├── v0.3.0.md             # 已发布版本
+├── v0.3.1.md             # 已发布版本
 └── v0.2.0.md
 ```
 

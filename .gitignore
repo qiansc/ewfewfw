@@ -47,5 +47,7 @@ bun.lockb
 .c4a/cache/
 .c4a/research/
 
+.codex
+
 # 测试临时文件
 packages/*/.tmp/

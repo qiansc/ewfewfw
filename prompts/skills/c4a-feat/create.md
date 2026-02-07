@@ -2,9 +2,9 @@
 
 ## 当前工作上下文
 
-{{#if current_proposal_id}}
-**当前 Feature**: `{{current_proposal_id}}`
-**Feature 状态**: `{{current_proposal_status}}`
+{{#if current_feat_uuid}}
+**当前 Feature**: `{{current_feat_uuid}}`
+**Feature 状态**: `{{current_feat_status}}`
 {{else}}
 **当前 Feature**: 无（主分支模式）
 {{/if}}

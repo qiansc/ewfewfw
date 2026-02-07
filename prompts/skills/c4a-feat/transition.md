@@ -2,18 +2,18 @@
 
 ## 当前工作上下文
 
-{{#if current_proposal_id}}
-**当前 Feature**: `{{current_proposal_id}}`
-**Feature 状态**: `{{current_proposal_status}}`
+{{#if current_feat_uuid}}
+**当前 Feature**: `{{current_feat_uuid}}`
+**Feature 状态**: `{{current_feat_status}}`
 
-⚠️ 一致性检查等工具调用必须携带 `proposal_id: "{{current_proposal_id}}"`。
+⚠️ 一致性检查等工具调用必须携带 `requirement_id: "{{current_feat_uuid}}"`。
 {{else}}
 **当前 Feature**: 无（主分支模式）
 {{/if}}
 
 ## 工具调用规则
 
-- `c4a_store_validate` 必须传递 `proposal_id`
+- `c4a_store_validate` 必须传递 `requirement_id`
 - `c4a_store_feat_lifecycle` 使用 `feat_id` 进行状态流转
 
 ## 状态机
@@ -102,7 +102,7 @@ draft ──批准──► approved ──发布──► published
 
 2. 一致性检查（内部调用 /c4a:analyze）：
    c4a_store_validate({
-     proposal_id: "<current-feat-id>",
+     requirement_id: "<current-feat-id>",
      checks: ["functional_spec", "technical_spec", "contracts", "references", "adr_completeness", "checklist"]
    })
 

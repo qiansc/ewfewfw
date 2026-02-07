@@ -75,4 +75,4 @@ description: |
 
 ## 工具依赖
 
-- `c4a_query_search`: 语义搜索（参数：query, scope, proposal_id, limit, offset）
+- `c4a_query_search`: 语义搜索（参数：query, scope, requirement_id, limit, offset）

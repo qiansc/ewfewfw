@@ -2,9 +2,9 @@
 
 ## 当前工作上下文
 
-{{#if current_proposal_id}}
-**当前 Feature**: `{{current_proposal_id}}`
-**Feature 状态**: `{{current_proposal_status}}`
+{{#if current_feat_uuid}}
+**当前 Feature**: `{{current_feat_uuid}}`
+**Feature 状态**: `{{current_feat_status}}`
 {{else}}
 **当前 Feature**: 无（主分支模式）
 {{/if}}
@@ -12,7 +12,7 @@
 ## 工具调用规则
 
 - 读取 feat 元数据使用 `c4a_store_read({ id: "<feat-id>" })`
-- 读取 feat 内实体使用 `proposal_id: "<feat-id>"`
+- 读取 feat 内实体使用 `requirement_id: "<feat-id>"`
 - 读取 checklist 使用 `feat_id: "<feat-id>"`
 
 ## 触发条件
@@ -42,8 +42,8 @@
 
 4. 读取 Feature 详情：
    - 类型、状态、创建时间（feat 元数据）
-   - 关联实体列表（使用 `proposal_id: "<feat-id>"` 读取）
-   - 实现进度（如有 checklist，使用 `proposal_id: "<feat-id>"`）
+   - 关联实体列表（使用 `requirement_id: "<feat-id>"` 读取）
+   - 实现进度（如有 checklist，使用 `requirement_id: "<feat-id>"`）
 
 5. 展示状态概览并建议下一步
 ```
@@ -113,12 +113,12 @@ Agent:
 
 ## 上下文信息
 
-切换后，后续操作自动使用当前 Feature 的 `proposal_id`：
+切换后，后续操作自动使用当前 Feature 的 `requirement_id`：
 
-- `/c4a:specify` → 使用当前 feat 的 proposal_id
-- `/c4a:plan` → 使用当前 feat 的 proposal_id
-- `/c4a:implement` → 使用当前 feat 的 proposal_id
-- `/c4a:analyze` → 使用当前 feat 的 proposal_id
+- `/c4a:specify` → 使用当前 feat 的 requirement_id
+- `/c4a:plan` → 使用当前 feat 的 requirement_id
+- `/c4a:implement` → 使用当前 feat 的 requirement_id
+- `/c4a:analyze` → 使用当前 feat 的 requirement_id
 
 ## 错误处理
 

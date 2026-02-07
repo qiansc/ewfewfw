@@ -10,23 +10,17 @@ C4A 为 AI Agent 提供结构化的上下文，实现从业务需求到代码实
 
 ## 知识模型
 
-8 种实体类型，覆盖业务、架构、契约三个层面：
+实体类型覆盖三个层面：
+- **业务层**：产品、流程、数据源
+- **架构层**：系统、容器、组件、决策
+- **契约层**：API 契约
 
-| 层面 | 实体 | 说明 |
-|------|------|------|
-| **业务** | Product | 产品定义、用户故事 |
-| | Process | 业务流程 |
-| | SoR | 权威数据源 |
-| **架构** | System | 系统边界 |
-| | Container | 服务、应用 |
-| | Component | 模块、类 |
-| | ADR | 架构决策记录 |
-| **契约** | Contract | API 契约 |
+> 具体类型定义参见 `packages/core/src/types/`
 
 ## 工作模式
 
 - **Local**：SQLite + 本地向量，个人开发
-- **Server**：MongoDB + Neo4j + Milvus，团队协作
+- **Server**：分布式存储，团队协作
 - **Remote**：云端托管
 
 ## Feat 分支
@@ -37,20 +31,17 @@ C4A 为 AI Agent 提供结构化的上下文，实现从业务需求到代码实
 
 ```
 c4a/
-├── packages/                  # 所有模块
-│   ├── cli/                   # 交互式 CLI (TypeScript + Ink)
-│   ├── config-generator/      # 配置生成器 (TypeScript)
-│   ├── core/                  # 共享核心库 (TypeScript)
-│   ├── storage/               # 存储适配层 (TypeScript)
-│   ├── mcp-extract/           # 知识采集 MCP (c4a_extract_*)
-│   ├── mcp-store/             # 知识存储 MCP (c4a_store_*)
-│   └── mcp-query/             # 知识查询 MCP (c4a_query_*)
+├── packages/                  # 所有模块（参见各模块 README）
+│   ├── core/                  # 共享核心库
+│   ├── storage/               # 存储适配层
+│   └── mcp-*/                 # MCP 服务
 ├── prompts/                   # Agent Prompts
 ├── docker/                    # Docker 配置
-├── docs/                      # 项目文档
 ├── .context/                  # 架构知识本地存储
-└── start.sh                   # CLI 入口 (查看所有命令: ./start.sh)
+└── start.sh                   # CLI 入口
 ```
+
+> 完整模块列表参见根目录 `package.json` 的 workspaces 配置
 
 ## 开发约定
 
@@ -153,43 +144,47 @@ if (relations.length > 0) {
 
 ### SQLite NULL 值归一化规则 (必须遵守)
 
-SQLite 表中用于 JOIN 的字段必须统一为空字符串 `''`，**禁止使用 NULL**：
+SQLite 表中用于 JOIN 的可空字段必须统一为空字符串 `''`，**禁止使用 NULL**：
 
 ```sql
 -- ❌ 错误：NULL = NULL 在 SQL 中为 false，导致 JOIN 失败
 SELECT * FROM entities e
-JOIN metadata m ON e.proposal_id = m.proposal_id  -- 如果两边都是 NULL，不会匹配！
+JOIN metadata m ON e.some_field = m.some_field  -- 如果两边都是 NULL，不会匹配！
 
 -- ✅ 正确：统一使用空字符串
-UPDATE entities SET proposal_id = '' WHERE proposal_id IS NULL;
-UPDATE metadata SET proposal_id = '' WHERE proposal_id IS NULL;
+UPDATE entities SET some_field = '' WHERE some_field IS NULL;
 ```
 
-**适用字段**：`proposal_id`、`source_project`、`from_project`、`to_project` 等可能为空的字段。
+**适用场景**：所有可能为空且用于 JOIN 的字段（如分支标识、项目标识等）。
 
 ### 路径安全规则 (必须遵守)
 
 所有接受用户路径输入的 API 必须执行以下校验：
 
-```python
-# ✅ 正确的路径安全校验
-def validate_safe_path(input_path: str, root: Path) -> Path:
-    candidate = Path(input_path)
+```ts
+import { isAbsolute, resolve, sep } from "node:path";
 
-    # 1. 禁止绝对路径（防止越权访问）
-    if candidate.is_absolute():
-        raise HTTPException(400, "不允许绝对路径")
+// ✅ 正确的路径安全校验
+function validateSafePath(inputPath: string, root: string): string {
+  // 1. 禁止绝对路径（防止越权访问）
+  if (isAbsolute(inputPath)) {
+    throw new Error("不允许绝对路径");
+  }
 
-    # 2. 禁止父目录引用（防止路径穿越）
-    if ".." in candidate.parts:
-        raise HTTPException(400, "不允许父目录引用")
+  // 2. 禁止父目录引用（防止路径穿越）
+  if (inputPath.split(sep).includes("..")) {
+    throw new Error("不允许父目录引用");
+  }
 
-    # 3. 验证解析后路径在允许的根目录内
-    resolved = (root / candidate).resolve()
-    if root.resolve() not in resolved.parents and root.resolve() != resolved:
-        raise HTTPException(400, "路径必须在项目根目录内")
+  // 3. 验证解析后路径在允许的根目录内
+  const resolved = resolve(root, inputPath);
+  const rootResolved = resolve(root);
+  if (resolved !== rootResolved && !resolved.startsWith(`${rootResolved}${sep}`)) {
+    throw new Error("路径必须在项目根目录内");
+  }
 
-    return resolved
+  return resolved;
+}
 ```
 
 ### 代码风格
@@ -197,10 +192,6 @@ def validate_safe_path(input_path: str, root: Path) -> Path:
 **TypeScript:**
 - 模块系统: ESM (`"type": "module"`)
 - 文件命名: `camelCase.ts`，类: `PascalCase`，函数/变量: `camelCase`，常量: `UPPER_SNAKE_CASE`
-
-**Python:**
-- 格式化: Ruff (行长度 100)，类型检查: MyPy (strict)
-- 文件: `snake_case.py`，类: `PascalCase`，函数/变量: `snake_case`，常量: `UPPER_SNAKE_CASE`
 
 ### DSL 文件
 - 扩展名：`.c4a.yaml`
@@ -269,34 +260,15 @@ cp .env.example .env    # 复制环境变量模板
 - 类型检查/测试/构建应参考 `package.json` 中的 `scripts`（如 `bun run test`、`bun run build`）。
 - **单包测试**：不要用 `bun run test --filter <name>`（会把过滤器传给所有包导致无匹配报错）；请使用 `bun run --filter @c4a/<package> test`，或在根 `package.json` 中添加对应的 `test:<package>` 脚本。
 
-### Python 服务测试（storage-backend）
-
-```bash
-cd packages/storage-backend
-python3 -m venv .venv && . .venv/bin/activate
-python -m pip install -e ".[dev]"
-python -m pytest
-```
-
 ## 服务端口
 
-| 端口 | 服务 |
-|------|------|
-| 27017 | MongoDB (Server 模式) |
-| 7474 | Neo4j Browser (Server 模式) |
-| 7687 | Neo4j Bolt (Server 模式) |
-| 19530 | Milvus (Server 模式) |
-| 7681 | ttyd (Web 终端，仅 dev 模式) |
-| 8051 | mcp-store (知识存储) |
-| 8052 | mcp-extract (知识采集，仅 docker/prod 模式) |
-| 8053 | mcp-visual (可视化服务) |
-| 8054 | mcp-query (知识查询) |
+> 端口配置参见 `docker/docker-compose.yml`
 
 ## 核心概念
 
 > 详见 [ARCHITECTURE.md](ARCHITECTURE.md)
 
-- **8 种实体类型**：System, Container, Component, ADR, Contract, Product, Process, SoR
+- **实体类型**：业务层、架构层、契约层的知识单元
 - **知识点类型 (kind)**：`implementation`（实现）、`external`（外部）、`concept`（概念）
 - **Feat 分支**：类似 Git 分支的知识隔离机制
 - **MCP**：Model Context Protocol，Agent 工具调用协议
@@ -352,27 +324,4 @@ python -m pytest
 
 ## Skills 使用指南
 
-### 工作流 Skills
-
-| Skill | 用途 |
-|-------|------|
-| `/c4a:feat` | Feature 管理（创建/修改/切换/流转） |
-| `/c4a:specify` | 功能规格（Functional Spec） |
-| `/c4a:plan` | 技术方案（Technical Spec + 契约 + 验收清单） |
-| `/c4a:analyze` | 一致性检查 |
-| `/c4a:implement` | 实现代码辅助 |
-
-### 知识技能 Skills
-
-| Skill | 用途 |
-|-------|------|
-| `/c4a:know:learn` | 快速录入知识 |
-| `/c4a:know:search` | 搜索知识库 |
-
-### CLI Commands
-
-- `c4a init` - 初始化项目
-- `c4a install` - 安装并配置工作模式
-- `c4a sync` - 同步知识到数据库
-- `c4a status` - 查看状态
-- `c4a validate` - 验证 DSL 文件
+Skills 通过 `/skill-name` 调用，具体列表参见 Claude Code 的 system-reminder 或 `.claude/` 目录。

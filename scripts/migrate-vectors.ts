@@ -7,8 +7,8 @@ import { generateVectorKey, getEmbeddingDimension } from '../packages/storage/sr
 type VectorRow = {
   vector_key?: string;
   entity_id: string;
-  source_project: string | null;
-  proposal_id: string | null;
+  root_id: string | null;
+  requirement_id: string | null;
   embedding: unknown;
 };
 
@@ -59,8 +59,8 @@ function main(): void {
 
   const hasVectorKey = columns.includes('vector_key');
   const selectColumns = hasVectorKey
-    ? 'vector_key, entity_id, source_project, proposal_id, embedding'
-    : 'entity_id, source_project, proposal_id, embedding';
+    ? 'vector_key, entity_id, root_id, requirement_id, embedding'
+    : 'entity_id, root_id, requirement_id, embedding';
 
   const rows = db.prepare(`SELECT ${selectColumns} FROM vectors`).all() as VectorRow[];
 
@@ -72,9 +72,9 @@ function main(): void {
   });
 
   for (const row of rows) {
-    const sourceProject = row.source_project ?? '';
-    const proposalId = row.proposal_id ?? '';
-    const vectorKey = row.vector_key ?? generateVectorKey(sourceProject, row.entity_id, proposalId);
+    const rootId = row.root_id ?? '';
+    const requirementId = row.requirement_id ?? '';
+    const vectorKey = row.vector_key ?? generateVectorKey(rootId, row.entity_id, requirementId);
     const embedding = toFloat32Array(row.embedding);
     vectorStore.add(vectorKey, embedding);
   }

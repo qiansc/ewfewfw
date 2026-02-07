@@ -92,45 +92,6 @@ services:
         fi
     restart: "no"
 
-  # ==================== storage-backend ====================
-  storage-backend:
-    build:
-      context: ..
-      dockerfile: packages/storage-backend/Dockerfile
-    container_name: c4a-storage-backend
-    ports:
-      - "8055:8055"
-    depends_on:
-      mongodb:
-        condition: service_healthy
-      neo4j:
-        condition: service_healthy
-      milvus:
-        condition: service_healthy
-      ollama:
-        condition: service_healthy
-    environment:
-      STORAGE_MONGODB_URI: mongodb://mongodb:27017/c4a
-      STORAGE_NEO4J_URI: bolt://neo4j:7687
-      STORAGE_NEO4J_USER: neo4j
-      STORAGE_NEO4J_PASSWORD: ${NEO4J_PASSWORD:-c4a_password}
-      STORAGE_MILVUS_HOST: milvus
-      STORAGE_MILVUS_PORT: 19530
-      STORAGE_OLLAMA_URL: http://ollama:11434
-    volumes:
-      - /tmp/c4a-shared:/tmp/c4a-shared
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "python",
-          "-c",
-          "import urllib.request, sys; sys.exit(0) if urllib.request.urlopen('http://localhost:8055/health').status == 200 else 1",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   # ==================== MCP Servers ====================
   c4a-store-mcp:
     build:
@@ -143,10 +104,17 @@ services:
       MCP_SERVER: mcp-store
       MCP_TRANSPORT: streamable-http
       MCP_PORT: 8051
-      C4A_STORAGE_BACKEND_URL: http://storage-backend:8055
     depends_on:
-      storage-backend:
+      mongodb:
         condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      milvus:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    volumes:
+      - ./c4a.server.yaml:/app/.context/.c4a.yaml:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8051/health"]
       interval: 10s
@@ -164,10 +132,17 @@ services:
       MCP_SERVER: mcp-query
       MCP_TRANSPORT: streamable-http
       MCP_PORT: 8054
-      C4A_STORAGE_BACKEND_URL: http://storage-backend:8055
     depends_on:
-      storage-backend:
+      mongodb:
         condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      milvus:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    volumes:
+      - ./c4a.server.yaml:/app/.context/.c4a.yaml:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8054/health"]
       interval: 10s

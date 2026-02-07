@@ -28,6 +28,18 @@ C4A 定义了 8 种知识实体，覆盖业务、架构、技术三个层面：
 | | ADR | 架构决策记录 |
 | **契约层** | Contract | API 契约（OpenAPI/AsyncAPI/Proto） |
 
+## 数据模型速览
+
+- `uuid`: 物理主键（UUID v4），全局唯一
+- `root_id`: 包边界标识，由工具链从 `package.json` 或 `.c4a.yaml` 注入
+- `versions`: 版本集合（受控字段），不允许通过 DSL 直接修改
+- `requirement_id`: 关联 Feat 的 UUID（可选）
+- `component_id`: 关联父 Component（可选）
+- 新增实体类型：`feat` / `checklist` / `spec`（`feat`/`checklist` 不入图谱与向量索引）
+- 移除旧字段（项目/提案相关 legacy 字段）
+
+版本管理通过 MCP 工具完成：`c4a_store_add_version`、`c4a_store_remove_version`、`c4a_store_publish_version`。
+
 ## 工作模式
 
 | 模式 | 存储 | 适用场景 |
@@ -65,6 +77,15 @@ c4a schema <type|all>    # 输出 JSON Schema
 c4a server <subcommand>  # 服务管理 (Server 模式)
 c4a local <subcommand>   # 本地管理 (Local 模式)
 ```
+
+## 迁移提示
+
+当旧数据需要升级到新模型时：
+- Local 模式可使用 `@c4a/storage` 的 `migrateLegacySchema` 进行 SQLite 结构与数据迁移
+- Server 模式可使用 `@c4a/storage` 的 `migrateLegacyEntities` 迁移旧文档结构
+
+迁移后需确保 `root_id`、`uuid`、`versions` 字段已补齐。
+同时清理项目/提案相关 legacy 字段。
 
 ## Skills
 

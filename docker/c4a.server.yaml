@@ -1,0 +1,13 @@
+# C4A Docker Server Mode Config
+mode: server
+server:
+  url: http://localhost:8055
+  mongoUrl: mongodb://mongodb:27017/c4a
+  neo4jUrl: bolt://neo4j:7687
+  neo4jUser: neo4j
+  neo4jPassword: c4a_password
+  milvusUrl: milvus:19530
+  embedding:
+    provider: ollama
+    baseUrl: http://ollama:11434
+    model: nomic-embed-text

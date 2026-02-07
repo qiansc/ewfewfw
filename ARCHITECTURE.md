@@ -11,10 +11,7 @@
                                   ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                         MCP Server 层                           │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────┐ │
-│  │ mcp-store   │  │ mcp-query   │  │ mcp-extract │  │mcp-visual│ │
-│  │ 知识存储    │  │ 知识查询    │  │ 代码提取    │  │ 可视化  │ │
-│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────┘ │
+│         知识存储 / 知识查询 / 代码提取 / 可视化                  │
 └─────────────────────────────────────────────────────────────────┘
                                   │
                                   ▼
@@ -22,7 +19,7 @@
 │                        Storage 适配层                           │
 │  ┌─────────────────────────┐  ┌─────────────────────────────┐   │
 │  │     Lite Adapter        │  │      Server Adapter         │   │
-│  │  SQLite + USearch       │  │  MongoDB + Neo4j + Milvus   │   │
+│  │  SQLite + USearch       │  │  分布式存储                 │   │
 │  │  (Local 模式)           │  │  (Server/Remote 模式)       │   │
 │  └─────────────────────────┘  └─────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────┘
@@ -32,16 +29,22 @@
 
 ### 实体类型
 
-| 类型 | 层面 | 说明 | 典型字段 |
-|------|------|------|----------|
-| **Product** | 业务 | 产品定义 | user_stories, acceptance_criteria |
-| **Process** | 业务 | 业务流程 | steps, triggers, outcomes |
-| **SoR** | 业务 | 权威数据源 | schema, owner, consumers |
-| **System** | 架构 | 系统边界 | external_systems, boundaries |
-| **Container** | 架构 | 服务/应用 | technology, system_id |
-| **Component** | 架构 | 模块/类 | container_id, interfaces |
-| **ADR** | 架构 | 架构决策 | status, context, decision, consequences |
-| **Contract** | 契约 | API 契约 | spec_type (openapi/asyncapi/proto), spec |
+实体分为三个层面：
+
+- **业务层**：产品定义、业务流程、权威数据源
+- **架构层**：系统边界、服务容器、模块组件、架构决策
+- **契约层**：API 契约（OpenAPI/AsyncAPI/Proto）
+
+> 具体类型定义参见 `packages/core/src/types/`
+
+### 实体字段与版本管理
+
+- **物理主键**：`uuid`（UUID v4）
+- **包边界**：`root_id`（由 CLI/Adapter 注入）
+- **版本集合**：`versions: string[]`（受控字段，通过版本管理工具修改）
+- **关联字段**：`requirement_id`（Feat UUID）、`component_id`（父 Component）
+
+新增实体类型 `feat` / `checklist` / `spec`，其中 `feat`/`checklist` 仅用于流程与任务管理，不进入图谱与向量索引。
 
 ### 实体状态流转
 
@@ -62,17 +65,13 @@ draft → approved → published → deprecated → archived
 
 ## Feat 分支机制
 
-Feat 是知识的隔离单元，类似 Git 分支：
+Feat 是知识的隔离单元，类似 Git 分支，支持并行开发和知识演进。
 
-```
-main (proposal_id = null)
-  │
-  ├── feat-user-auth (proposal_id = "feat-user-auth")
-  │     └── 修改 System A, 新增 Container B
-  │
-  └── feat-payment (proposal_id = "feat-payment")
-        └── 新增 ADR-003, Contract-payment
-```
+### 核心概念
+
+- **主分支**：已发布的权威知识
+- **Feat 分支**：开发中的知识变更，与主分支隔离
+- **合并**：Feat 审核通过后合并到主分支
 
 ### Feat 生命周期
 
@@ -82,146 +81,46 @@ create → draft → approved → published (合并到 main)
                     └── deprecated/archived
 ```
 
-### 查询隔离
-
-- `proposal_id = null`：查询主分支
-- `proposal_id = "feat-xxx"`：查询特定 Feat（包含主分支 + Feat 变更）
+> 具体实现参见 `packages/storage/src/`
 
 ## 存储架构
 
 ### Local 模式 (Lite Adapter)
 
-```
-SQLite (单文件)
-├── entities        # 实体主表
-├── relations       # 关系表
-├── metadata        # 元数据
-└── feat_registry   # Feat 注册表
-
-USearch (WASM)
-└── 本地向量索引
-```
+单文件 SQLite + 本地向量索引，适合个人开发。
 
 ### Server 模式 (Server Adapter)
 
-```
-MongoDB (文档存储)
-├── entities        # 实体文档
-├── feat_registry   # Feat 元数据
-└── checklist       # 任务清单
+分布式存储（TypeScript 直连三库），适合团队协作：
+- 文档存储：实体数据
+- 图数据库：关系图谱
+- 向量数据库：语义搜索
 
-Neo4j (图数据库)
-└── 实体关系图谱
-
-Milvus (向量数据库)
-└── 语义搜索索引
-```
+> 具体配置参见 `docker/docker-compose.server.yml`
 
 ## MCP 工具集
 
-### mcp-store (知识存储)
+MCP Server 通过 Model Context Protocol 向 AI Agent 暴露工具：
 
-| 工具 | 功能 |
-|------|------|
-| `c4a_store_save` | 保存/更新实体 |
-| `c4a_store_read` | 读取实体 |
-| `c4a_store_list` | 列出实体 |
-| `c4a_store_delete` | 删除实体 |
-| `c4a_store_sync` | 文件系统同步 |
-| `c4a_store_validate` | 一致性检查 |
-| `c4a_store_feat_lifecycle` | Feat 生命周期 |
-| `c4a_store_feat_merge` | Feat 合并 |
-| `c4a_store_feat_checklist` | Checklist 管理 |
+- **知识存储**：实体 CRUD、文件同步、一致性检查
+- **知识查询**：语义搜索、依赖查询、影响分析
+- **代码提取**：接口提取、代码分析、契约生成
+- **可视化**：C4 架构图渲染
 
-### mcp-query (知识查询)
-
-| 工具 | 功能 |
-|------|------|
-| `c4a_query_search` | 语义搜索 |
-| `c4a_query_deps` | 依赖查询 |
-| `c4a_query_impact` | 影响分析 |
-
-### mcp-extract (代码提取)
-
-| 工具 | 功能 |
-|------|------|
-| `c4a_extract_interfaces` | 提取接口定义 |
-| `c4a_extract_analyze` | 分析代码结构 |
-| `c4a_extract_ast` | 获取 AST |
-| `c4a_extract_contract` | 生成 API 契约 |
-
-### mcp-visual (可视化)
-
-| 工具 | 功能 |
-|------|------|
-| `c4a_visual_generate` | AI 生成图片 |
-| `c4a_visual_render_c4` | 渲染 C4 架构图 |
+> 具体工具列表参见各 MCP 包的 `src/tools/`
 
 ## 数据流
 
-### 知识写入流程
+### 知识写入
 
 ```
-Agent 调用 c4a_store_save
-        │
-        ▼
-┌───────────────────┐
-│  Schema 校验      │
-│  (Zod validation) │
-└───────────────────┘
-        │
-        ▼
-┌───────────────────┐
-│  ADR 合规检查     │
-│  (可选)           │
-└───────────────────┘
-        │
-        ▼
-┌───────────────────┐
-│  写入主存储       │
-│  (SQLite/MongoDB) │
-└───────────────────┘
-        │
-        ▼
-┌───────────────────┐
-│  同步关系图谱     │
-│  (Neo4j)          │
-└───────────────────┘
-        │
-        ▼
-┌───────────────────┐
-│  更新向量索引     │
-│  (USearch/Milvus) │
-└───────────────────┘
+Agent 调用 → Schema 校验 → ADR 合规检查(可选) → 写入主存储 → 同步关系图谱 → 更新向量索引
 ```
 
-### 知识查询流程
+### 知识查询
 
 ```
-Agent 调用 c4a_query_search
-        │
-        ▼
-┌───────────────────┐
-│  文本向量化       │
-│  (Embedding)      │
-└───────────────────┘
-        │
-        ▼
-┌───────────────────┐
-│  向量相似度搜索   │
-│  (USearch/Milvus) │
-└───────────────────┘
-        │
-        ▼
-┌───────────────────┐
-│  获取实体详情     │
-│  (SQLite/MongoDB) │
-└───────────────────┘
-        │
-        ▼
-┌───────────────────┐
-│  返回结果         │
-└───────────────────┘
+Agent 调用 → 文本向量化 → 向量相似度搜索 → 获取实体详情 → 返回结果
 ```
 
 ## 文件系统同步
@@ -230,10 +129,26 @@ Agent 调用 c4a_query_search
 
 ```
 .context/
-├── drafts/         # 草稿 (可自由修改)
-├── approved/       # 已审核 (设计冻结)
-├── published/      # 已发布 (禁止修改)
-└── archive/        # 归档 (禁止修改)
+├── .c4a.yaml                 # 项目配置
+├── assets/                   # 主分支资源
+├── business/                 # 业务视角
+│   ├── products/
+│   ├── processes/
+│   └── sors/
+├── technical/                # 技术视角
+│   ├── adrs/
+│   ├── systems/
+│   ├── containers/
+│   ├── components/
+│   ├── contracts/
+│   ├── processes/
+│   └── sors/
+└── feat/                      # 需求迭代
+    └── feat-xxx/
+        ├── feat.yaml
+        ├── assets/
+        ├── business/
+        └── technical/
 ```
 
 ### 同步方向
@@ -241,28 +156,14 @@ Agent 调用 c4a_query_search
 - **import**：文件 → 数据库
 - **export**：数据库 → 文件
 
-## 服务端口
-
-| 端口 | 服务 | 说明 |
-|------|------|------|
-| 8051 | mcp-store | 知识存储 |
-| 8052 | mcp-extract | 代码提取 |
-| 8053 | mcp-visual | 可视化 |
-| 8054 | mcp-query | 知识查询 |
-| 8055 | storage-backend | Python 后端 (Server 模式) |
-| 27017 | MongoDB | 文档存储 |
-| 7474 | Neo4j Browser | 图数据库 UI |
-| 7687 | Neo4j Bolt | 图数据库协议 |
-| 19530 | Milvus | 向量数据库 |
-
 ## 技术栈
 
 | 层级 | 技术 |
 |------|------|
 | 运行时 | Bun (Node.js 兼容) |
-| 语言 | TypeScript, Python |
+| 语言 | TypeScript |
 | MCP 框架 | @modelcontextprotocol/sdk |
 | Schema | Zod |
 | 本地存储 | bun:sqlite, USearch (WASM) |
-| 远程存储 | MongoDB, Neo4j, Milvus |
-| 后端框架 | FastAPI |
+
+> Server 模式的存储配置参见 `docker/docker-compose.server.yml`

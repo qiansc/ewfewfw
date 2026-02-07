@@ -12,11 +12,11 @@ description: |
 
 ## 当前工作上下文
 
-{{#if current_proposal_id}}
-**当前 Feature**: `{{current_proposal_id}}`
-**Feature 状态**: `{{current_proposal_status}}`
+{{#if current_feat_uuid}}
+**当前 Feature**: `{{current_feat_uuid}}`
+**Feature 状态**: `{{current_feat_status}}`
 
-⚠️ 所有 MCP 工具调用必须传递 `proposal_id: "{{current_proposal_id}}"`（除非明确读取主分支）。
+⚠️ 所有 MCP 工具调用必须传递 `requirement_id: "{{current_feat_uuid}}"`（除非明确读取主分支）。
 {{else}}
 **当前 Feature**: 无（主分支模式）
 
@@ -25,13 +25,13 @@ description: |
 
 ## 工具调用规则
 
-在调用以下 MCP 工具时，必须传递 `proposal_id`：
+在调用以下 MCP 工具时，必须传递 `requirement_id`：
 
-| 工具 | proposal_id 要求 |
+| 工具 | requirement_id 要求 |
 |------|-----------------|
-| `c4a_store_read` | 必须传递 `current_proposal_id`（读取 feat 实体本身除外） |
-| `c4a_store_save` | 必须传递 `current_proposal_id` |
-| `c4a_store_feat_checklist` | 使用 `feat_id: "{{current_proposal_id}}"` |
+| `c4a_store_read` | 必须传递 `current_feat_uuid`（读取 feat 实体本身除外） |
+| `c4a_store_save` | 必须传递 `current_feat_uuid` |
+| `c4a_store_feat_checklist` | 使用 `feat_id: "{{current_feat_uuid}}"` |
 
 ## 命令格式
 
@@ -47,7 +47,7 @@ description: |
 **必须检查 Feature 状态**：
 
 1. 调用 `c4a_store_read` 读取当前 Feature 元数据：
-   - `c4a_store_read({ id: "{{current_proposal_id}}" })`
+   - `c4a_store_read({ id: "{{current_feat_uuid}}" })`
 2. 未找到 Feature → 提示切换或创建
 3. 状态为 `draft` → 提示："⚠️ 方案尚未批准，请先执行 `/c4a:feat --status=approved`"，终止
 4. 状态为 `approved` → 继续执行
