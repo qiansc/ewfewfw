@@ -52,12 +52,12 @@ export async function legacySync(
         const entityId = data.id as string;
         const entityType = data.type as EntityType;
         const contentHash = legacyComputeContentHash(content);
-        const sourceProject = ctx.config.defaultProject;
+        const rootId = ctx.config.defaultProject;
 
         // 检查是否已存在
         const existing = ctx.storage.getEntityContentHash({
           entityId,
-          sourceProject,
+          rootId,
         });
 
         if (existing) {
@@ -69,7 +69,7 @@ export async function legacySync(
           // 更新
           ctx.storage.updateEntity({
             entityId,
-            sourceProject,
+            rootId,
             entityType,
             data,
             contentHash,
@@ -82,7 +82,7 @@ export async function legacySync(
           const now = new Date().toISOString();
           ctx.storage.insertEntity({
             entityId,
-            sourceProject,
+            rootId,
             entityType,
             data,
             contentHash,

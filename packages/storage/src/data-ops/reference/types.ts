@@ -2,7 +2,7 @@
  * Reference 解析类型
  */
 
-export type ReferenceFormat = 'simple' | 'project' | 'repo' | 'scope';
+export type ReferenceFormat = 'simple' | 'root' | 'repo' | 'scope';
 
 export type ReferenceScope = 'domain' | 'enterprise' | 'project';
 
@@ -23,7 +23,7 @@ export function normalizeReferenceScope(value?: string | null): ReferenceScope |
 
 export interface ReferenceCandidate {
   id: string;
-  sourceProject?: string | null;
+  rootId?: string | null;
   sourceRepo?: string | null;
   scope?: ReferenceScope | null;
 }
@@ -32,13 +32,13 @@ export interface ParsedReference {
   original: string;
   format: ReferenceFormat;
   id: string;
-  projectId?: string;
+  rootId?: string;
   repoId?: string;
   scope?: ReferenceScope;
 }
 
 export interface ResolveContext {
-  projectId: string;
+  rootId: string;
   repoId?: string | null;
   scope?: ReferenceScope | null;
   candidates?: ReferenceCandidate[];
@@ -49,7 +49,7 @@ export interface ResolvedReference {
   original: string;
   format: ReferenceFormat;
   id: string;
-  targetProject?: string | null;
+  targetRootId?: string | null;
   targetRepo?: string | null;
   scope?: ReferenceScope | null;
   resolved: boolean;

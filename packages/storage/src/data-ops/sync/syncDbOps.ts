@@ -139,11 +139,11 @@ export function syncFileToDb(params: {
       try {
         params.ctx.storage.insertEntity({
           entityId: file.id,
-          sourceProject: params.ctx.config.defaultProject,
+          rootId: params.ctx.config.defaultProject,
           entityType: file.type,
           data,
           contentHash: file.content_hash,
-          proposalId: params.featId ?? null,
+          requirementId: params.featId ?? null,
           status: 'published',
           createdAt: now,
           updatedAt: now,
@@ -226,11 +226,11 @@ export function syncBidirectional(params: {
       try {
         params.ctx.storage.insertEntity({
           entityId: fileEntity.id,
-          sourceProject: params.ctx.config.defaultProject,
+          rootId: params.ctx.config.defaultProject,
           entityType: fileEntity.type,
           data,
           contentHash: fileEntity.content_hash,
-          proposalId: params.featId ?? null,
+          requirementId: params.featId ?? null,
           status: 'published',
           createdAt: now,
           updatedAt: now,

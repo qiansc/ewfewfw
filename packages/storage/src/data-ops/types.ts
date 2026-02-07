@@ -41,6 +41,7 @@ export interface DataOpsContext {
 // ============================================================
 
 export interface FeatRecord {
+  uuid?: string;
   id: string;
   status: FeatStatus;
   checklist?: string | null;
@@ -56,7 +57,7 @@ export interface FeatEntityContentHash {
 
 export interface FeatEntityConflictRow {
   id: string;
-  source_project: string;
+  root_id: string;
   type: string;
   kind: string | null;
   data: string;
@@ -72,7 +73,7 @@ export interface MainEntityConflictRow {
 
 export interface FeatMergeEntity {
   id: string;
-  source_project: string;
+  root_id: string;
   type: string;
   kind: string | null;
   scope: string | null;
@@ -84,8 +85,9 @@ export interface FeatMergeEntity {
 }
 
 export interface VectorEntity {
+  uuid: string;
   id: string;
-  source_project: string | null;
+  root_id: string | null;
   data: string;
 }
 
@@ -139,22 +141,22 @@ export interface StorageOperations {
   listFeatEntitiesForConflict(featId: string): FeatEntityConflictRow[];
   getMainEntityForConflict(
     entityId: string,
-    sourceProject: string
+    rootId: string
   ): MainEntityConflictRow | null;
   listFeatEntityProjects(
     featId: string,
     entityId: string
-  ): Array<{ source_project: string | null }>;
+  ): Array<{ uuid: string }>;
   deleteFeatEntity(featId: string, entityId: string): void;
   listFeatEntitiesForMerge(featId: string): FeatMergeEntity[];
-  deleteMainEntity(entityId: string, sourceProject: string): void;
+  deleteMainEntity(entityId: string, rootId: string): void;
   moveFeatEntitiesToMain(featId: string, updatedAt: string): void;
 
   // Feat 向量/清理
   listFeatEntitiesForVector(featId: string): VectorEntity[];
-  deleteEntitiesByProposalId(featId: string): void;
-  deleteMetadataByProposalId(featId: string): void;
-  deleteRelationsByProposalId(featId: string): void;
+  deleteEntitiesByRequirementId(featId: string): void;
+  deleteMetadataByRequirementId(featId: string): void;
+  deleteRelationsByRequirementId(featId: string): void;
 
   // Compensation logs
   insertCompensationLog(input: {
@@ -183,27 +185,27 @@ export interface StorageOperations {
   // Sync 操作
   getEntityContentHash(params: {
     entityId: string;
-    sourceProject: string;
-    proposalId?: string | null;
+    rootId: string;
+    requirementId?: string | null;
   }): string | null;
   insertEntity(params: {
     entityId: string;
-    sourceProject: string;
+    rootId: string;
     entityType: EntityType;
     entityKind?: string | null;
     entityScope?: string | null;
     entityPerspective?: string | null;
     data: Record<string, unknown>;
     contentHash: string;
-    proposalId?: string | null;
+    requirementId?: string | null;
     status?: string;
     createdAt: string;
     updatedAt: string;
   }): void;
   updateEntity(params: {
     entityId: string;
-    sourceProject: string;
-    proposalId?: string | null;
+    rootId: string;
+    requirementId?: string | null;
     entityType: EntityType;
     data: Record<string, unknown>;
     contentHash: string;
@@ -220,7 +222,7 @@ export interface StorageOperations {
     updated_at?: string;
   }>;
   listEntitiesForPlanSync(params: {
-    proposalId?: string | null;
+    requirementId?: string | null;
     statusFilter: 'published' | 'approved' | 'all';
   }): Array<{
     id: string;
@@ -234,7 +236,7 @@ export interface StorageOperations {
   listMainEntities(entityId: string): Entity[];
   insertEntityWithMetadata(params: {
     entity: Entity;
-    proposalId: string;
+    requirementId: string;
     status: EntityStatus;
     createdAt: string;
     updatedAt: string;
@@ -243,7 +245,7 @@ export interface StorageOperations {
   // Workflow 状态管理
   getWorkflowStateRecord(workflowId: string): WorkflowStateRecord | null;
   upsertWorkflowState(record: WorkflowStateRecord): void;
-  markEntitiesOrphaned(proposalId: string, timestamp: string): void;
-  cleanupOrphanedEntities(cutoff: string): Array<{ id: string; source_project: string; proposal_id: string }>;
+  markEntitiesOrphaned(requirementId: string, timestamp: string): void;
+  cleanupOrphanedEntities(cutoff: string): Array<{ id: string; root_id: string; requirement_id: string }>;
 
 }

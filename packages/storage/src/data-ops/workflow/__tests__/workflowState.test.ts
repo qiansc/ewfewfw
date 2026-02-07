@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
+import { randomUUID } from 'node:crypto';
 import { mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { SQLiteStore } from '../../../sqlite-store.js';
@@ -20,6 +21,7 @@ function resetStoreInstance(): void {
 function resetDb(): void {
   const db = store.getDatabase();
   db.exec('DELETE FROM workflow_states;');
+  db.exec('DELETE FROM entity_versions;');
   db.exec('DELETE FROM metadata;');
   db.exec('DELETE FROM entities;');
 }
@@ -94,19 +96,40 @@ describe('workflowState', () => {
   test('updateWorkflowState marks entities orphaned on failure', () => {
     const db = store.getDatabase();
     const storage = createStorageOperationsFromDatabase(db);
+    const now = new Date().toISOString();
+    const uuid = randomUUID();
     db.prepare(
       `
-        INSERT INTO entities (id, source_project, proposal_id, type, data, orphaned)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO entities (
+          uuid, root_id, id, type, kind, scope, perspective, data, requirement_id, component_id, orphaned, orphaned_at
+        )
+        VALUES (?, ?, ?, ?, NULL, NULL, NULL, ?, ?, NULL, ?, NULL)
       `
-    ).run('entity-1', 'alpha', 'wf-3', 'system', JSON.stringify({ id: 'entity-1' }), 0);
+    ).run(
+      uuid,
+      'alpha',
+      'entity-1',
+      'system',
+      JSON.stringify({ id: 'entity-1' }),
+      'wf-3',
+      0
+    );
+    db.prepare(
+      `
+        INSERT INTO metadata (
+          entity_uuid, source_repo, external_url, status, content_hash, created_at, updated_at, created_by, updated_by
+        )
+        VALUES (?, NULL, NULL, 'draft', 'hash-entity-1', ?, ?, NULL, NULL)
+      `
+    ).run(uuid, now, now);
+    db.prepare(`INSERT INTO entity_versions (entity_uuid, version) VALUES (?, '0.0.0')`).run(uuid);
 
     updateWorkflowState(storage, 'wf-3', 'failed');
 
     const entity = db
       .prepare(
         `
-          SELECT orphaned FROM entities WHERE proposal_id = ?
+          SELECT orphaned FROM entities WHERE requirement_id = ?
         `
       )
       .get('wf-3') as { orphaned: number } | undefined;

@@ -7,15 +7,14 @@ const now = new Date().toISOString();
 function createEntity(status: Entity['metadata']['status'], references: unknown[], candidates?: unknown[]): Entity {
   return {
     id: 'svc',
+    root_id: 'alpha',
     type: 'system',
     data: {
       id: 'svc',
       references,
       reference_candidates: candidates ?? [],
     },
-    proposal_id: null,
     metadata: {
-      source_project: 'alpha',
       source_repo: 'company/backend',
       status,
       content_hash: 'hash',
@@ -46,7 +45,7 @@ describe('reference validator', () => {
 
   test('passes when references are resolved', () => {
     const entity = createEntity('draft', ['existing'], [
-      { id: 'existing', source_project: 'alpha', source_repo: 'company/backend' },
+      { id: 'existing', root_id: 'alpha', source_repo: 'company/backend' },
     ]);
     const result = validateReferences(entity);
 

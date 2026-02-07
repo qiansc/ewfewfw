@@ -8,10 +8,10 @@ describe('reference parser', () => {
     expect(parsed.id).toBe('payment-service');
   });
 
-  test('parses project reference', () => {
-    const parsed = parseReference('project:frontend-app/auth');
-    expect(parsed.format).toBe('project');
-    expect(parsed.projectId).toBe('frontend-app');
+  test('parses root reference', () => {
+    const parsed = parseReference('root:frontend-app/auth');
+    expect(parsed.format).toBe('root');
+    expect(parsed.rootId).toBe('frontend-app');
     expect(parsed.id).toBe('auth');
   });
 
@@ -22,11 +22,11 @@ describe('reference parser', () => {
     expect(parsed.id).toBe('jwt-utils');
   });
 
-  test('parses repo reference with nested project path', () => {
-    const parsed = parseReference('repo:other/repo/project:app/svc');
+  test('parses repo reference with nested root path', () => {
+    const parsed = parseReference('repo:other/repo/root:app/svc');
     expect(parsed.format).toBe('repo');
     expect(parsed.repoId).toBe('other/repo');
-    expect(parsed.id).toBe('project:app/svc');
+    expect(parsed.id).toBe('root:app/svc');
   });
 
   test('parses scope reference', () => {

@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
+import { randomUUID } from 'node:crypto';
 import { mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { SQLiteStore } from '../../../sqlite-store.js';
@@ -23,31 +24,35 @@ function resetDb(): void {
   const db = store.getDatabase();
   db.exec('DELETE FROM workflow_states;');
   db.exec('DELETE FROM relations;');
+  db.exec('DELETE FROM entity_versions;');
   db.exec('DELETE FROM metadata;');
   db.exec('DELETE FROM entities;');
-  db.exec('DELETE FROM feats;');
 }
 
 function insertEntity(params: {
   id: string;
-  proposalId: string;
+  requirementId: string;
   orphaned?: number;
   orphanedAt?: string | null;
-}): void {
+}): string {
   const db = store.getDatabase();
   const now = new Date().toISOString();
+  const uuid = randomUUID();
 
   db.prepare(
     `
-      INSERT INTO entities (id, source_project, proposal_id, type, data, orphaned, orphaned_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO entities (
+        uuid, root_id, id, type, kind, scope, perspective, data, requirement_id, component_id, orphaned, orphaned_at
+      )
+      VALUES (?, ?, ?, ?, NULL, NULL, NULL, ?, ?, NULL, ?, ?)
     `
   ).run(
-    params.id,
+    uuid,
     'alpha',
-    params.proposalId,
+    params.id,
     'system',
     JSON.stringify({ id: params.id }),
+    params.requirementId,
     params.orphaned ?? 0,
     params.orphanedAt ?? null
   );
@@ -55,24 +60,14 @@ function insertEntity(params: {
   db.prepare(
     `
       INSERT INTO metadata (
-        entity_id, source_project, proposal_id, source_repo, external_url,
+        entity_uuid, source_repo, external_url,
         status, content_hash, created_at, updated_at, created_by, updated_by
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, NULL, NULL, 'draft', 'hash', ?, ?, NULL, NULL)
     `
-  ).run(
-    params.id,
-    'alpha',
-    params.proposalId,
-    null,
-    null,
-    'draft',
-    'hash',
-    now,
-    now,
-    null,
-    null
-  );
+  ).run(uuid, now, now);
+  db.prepare(`INSERT INTO entity_versions (entity_uuid, version) VALUES (?, '0.0.0')`).run(uuid);
+  return uuid;
 }
 
 describe('workflow recovery', () => {
@@ -141,10 +136,15 @@ describe('workflow recovery', () => {
 
   test('cleanupOrphanedEntities marks workflow entities and deletes stale orphans', async () => {
     const storage = createStorageOperationsFromDatabase(store.getDatabase());
-    insertEntity({ id: 'entity-active', proposalId: 'wf-clean' });
+    insertEntity({ id: 'entity-active', requirementId: 'wf-clean' });
 
     const oldTimestamp = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
-    insertEntity({ id: 'entity-old', proposalId: 'wf-old', orphaned: 1, orphanedAt: oldTimestamp });
+    const oldUuid = insertEntity({
+      id: 'entity-old',
+      requirementId: 'wf-old',
+      orphaned: 1,
+      orphanedAt: oldTimestamp,
+    });
 
     await cleanupOrphanedEntities(storage, 'wf-clean');
 
@@ -171,10 +171,19 @@ describe('workflow recovery', () => {
     const metadata = db
       .prepare(
         `
-          SELECT entity_id FROM metadata WHERE entity_id = ?
+          SELECT entity_uuid FROM metadata WHERE entity_uuid = ?
         `
       )
-      .get('entity-old') as { entity_id: string } | undefined | null;
+      .get(oldUuid) as { entity_uuid: string } | undefined | null;
     expect(metadata).toBeFalsy();
+
+    const versions = db
+      .prepare(
+        `
+          SELECT entity_uuid FROM entity_versions WHERE entity_uuid = ?
+        `
+      )
+      .get(oldUuid) as { entity_uuid: string } | undefined | null;
+    expect(versions).toBeFalsy();
   });
 });

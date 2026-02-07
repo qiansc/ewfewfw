@@ -97,8 +97,8 @@ function collectFeatProjectIds(ctx: DataOpsContext, featId: string): string[] {
   const projects = new Set<string>();
   const entities = ctx.storage.listFeatEntitiesForMerge(featId);
   for (const entity of entities) {
-    if (entity.source_project) {
-      projects.add(entity.source_project);
+    if (entity.root_id) {
+      projects.add(entity.root_id);
     }
   }
   return Array.from(projects);

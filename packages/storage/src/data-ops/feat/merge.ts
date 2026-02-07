@@ -55,7 +55,7 @@ export async function featMerge(
 
         if (vectorStore) {
           for (const project of projects) {
-            removeVectorIndex(ctx, project.source_project ?? null, resolution.entity_id, featId);
+            removeVectorIndex(ctx, project.uuid);
           }
         }
       }
@@ -89,7 +89,7 @@ export function detectFeatConflicts(
   const conflicts: FeatConflict[] = [];
 
   for (const entity of featEntities) {
-    const mainEntity = storage.getMainEntityForConflict(entity.id, entity.source_project);
+    const mainEntity = storage.getMainEntityForConflict(entity.id, entity.root_id);
 
     if (!mainEntity) {
       continue;
@@ -167,7 +167,6 @@ export function mergeFeatToMainInternal(
   const featEntities = storage.listFeatEntitiesForMerge(featId);
 
   for (const entity of featEntities) {
-    storage.deleteMainEntity(entity.id, entity.source_project);
     merged.push(entity.id);
   }
 
@@ -195,8 +194,7 @@ export async function updateVectorIndexAfterMerge(
   }
 
   for (const entity of entities) {
-    const dbSourceProject = entity.source_project ?? '';
-    const oldKey = generateVectorKey(dbSourceProject, entity.id, featId);
+    const oldKey = generateVectorKey(entity.uuid);
     let data: Record<string, unknown>;
     try {
       data = JSON.parse(entity.data) as Record<string, unknown>;
@@ -213,9 +211,8 @@ export async function updateVectorIndexAfterMerge(
 
     try {
       const embedding = await generateEmbedding(text);
-      const newKey = generateVectorKey(dbSourceProject, entity.id, '');
       vectorStore.remove(oldKey);
-      vectorStore.add(newKey, embedding);
+      vectorStore.add(oldKey, embedding);
     } catch {
       vectorStore.remove(oldKey);
       // 向量更新失败不影响主流程
@@ -236,27 +233,19 @@ export function removeVectorIndexForEntities(
   }
 
   for (const entity of entities) {
-    const dbSourceProject = entity.source_project ?? '';
-    const vectorKey = generateVectorKey(dbSourceProject, entity.id, featId);
+    const vectorKey = generateVectorKey(entity.uuid);
     vectorStore.remove(vectorKey);
   }
 
   vectorStore.save();
 }
 
-function removeVectorIndex(
-  ctx: DataOpsContext,
-  sourceProject: string | null,
-  entityId: string,
-  proposalId: string
-): void {
+function removeVectorIndex(ctx: DataOpsContext, uuid: string): void {
   const vectorStore = getVectorStore(ctx);
   if (!vectorStore) {
     return;
   }
-  const dbSourceProject = sourceProject ?? '';
-  const vectorKey = generateVectorKey(dbSourceProject, entityId, proposalId);
-  vectorStore.remove(vectorKey);
+  vectorStore.remove(generateVectorKey(uuid));
   vectorStore.save();
 }
 

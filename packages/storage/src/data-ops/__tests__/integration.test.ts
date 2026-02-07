@@ -61,8 +61,8 @@ function resetDb(): void {
   db.exec('DELETE FROM feat_history;');
   db.exec('DELETE FROM relations;');
   db.exec('DELETE FROM metadata;');
+  db.exec('DELETE FROM entity_versions;');
   db.exec('DELETE FROM entities;');
-  db.exec('DELETE FROM feats;');
 }
 
 function computeHash(data: Record<string, unknown>): string {
@@ -106,24 +106,25 @@ describe('Data Ops integration', () => {
         created_by: 'tester',
       },
     });
+    const featUuid = dataOpsCtx.storage.getFeat(featId)?.uuid ?? featId;
 
     const entityData = { id: 'sys-e2e', type: 'system', name: 'E2E' };
     dataOpsCtx.storage.insertEntity({
       entityId: entityData.id,
-      sourceProject: ctx.config.defaultProject,
+      rootId: ctx.config.defaultProject,
       entityType: 'system',
       data: entityData,
       contentHash: computeHash(entityData),
-      proposalId: featId,
+      requirementId: featUuid,
       status: 'draft',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
 
-    const parsed = parseReference(`project:${ctx.config.defaultProject}/${entityData.id}`);
-    expect(parsed.format).toBe('project');
-    const resolved = resolveReference(`project:${ctx.config.defaultProject}/${entityData.id}`, {
-      projectId: ctx.config.defaultProject,
+    const parsed = parseReference(`root:${ctx.config.defaultProject}/${entityData.id}`);
+    expect(parsed.format).toBe('root');
+    const resolved = resolveReference(`root:${ctx.config.defaultProject}/${entityData.id}`, {
+      rootId: ctx.config.defaultProject,
       repoId: ctx.config.repoId,
     });
     expect(resolved.resolved).toBe(true);
@@ -172,9 +173,9 @@ describe('Data Ops integration', () => {
     const row = store
       .getDatabase()
       .prepare(
-        `SELECT proposal_id FROM entities WHERE id = ? AND (proposal_id IS NULL OR proposal_id = '')`
+        `SELECT requirement_id FROM entities WHERE id = ? AND (requirement_id IS NULL OR requirement_id = '')`
       )
-      .get(entityData.id) as { proposal_id: string | null } | undefined;
+      .get(entityData.id) as { requirement_id: string | null } | undefined;
     expect(row).toBeTruthy();
   });
 
@@ -192,14 +193,15 @@ describe('Data Ops integration', () => {
       created_at: now,
       updated_at: now,
     });
+    const featUuid = dataOpsCtx.storage.getFeat('feat-cross')?.uuid ?? 'feat-cross';
 
     dataOpsCtx.storage.insertEntity({
       entityId: 'svc-1',
-      sourceProject: 'alpha',
+      rootId: 'alpha',
       entityType: 'system',
       data: { id: 'svc-1', type: 'system' },
       contentHash: computeHash({ id: 'svc-1', type: 'system' }),
-      proposalId: 'feat-cross',
+      requirementId: featUuid,
       status: 'draft',
       createdAt: now,
       updatedAt: now,
@@ -207,11 +209,11 @@ describe('Data Ops integration', () => {
 
     dataOpsCtx.storage.insertEntity({
       entityId: 'svc-2',
-      sourceProject: 'beta',
+      rootId: 'beta',
       entityType: 'system',
       data: { id: 'svc-2', type: 'system' },
       contentHash: computeHash({ id: 'svc-2', type: 'system' }),
-      proposalId: 'feat-cross',
+      requirementId: featUuid,
       status: 'draft',
       createdAt: now,
       updatedAt: now,
@@ -223,26 +225,36 @@ describe('Data Ops integration', () => {
     const db = store.getDatabase();
     const alphaMain = db
       .prepare(
-        `SELECT proposal_id FROM entities WHERE id = ? AND source_project = ? AND (proposal_id IS NULL OR proposal_id = '')`
+        `SELECT requirement_id FROM entities WHERE id = ? AND root_id = ? AND (requirement_id IS NULL OR requirement_id = '')`
       )
-      .get('svc-1', 'alpha') as { proposal_id: string | null } | undefined;
+      .get('svc-1', 'alpha') as { requirement_id: string | null } | undefined;
     const betaMain = db
       .prepare(
-        `SELECT proposal_id FROM entities WHERE id = ? AND source_project = ? AND (proposal_id IS NULL OR proposal_id = '')`
+        `SELECT requirement_id FROM entities WHERE id = ? AND root_id = ? AND (requirement_id IS NULL OR requirement_id = '')`
       )
-      .get('svc-2', 'beta') as { proposal_id: string | null } | undefined;
+      .get('svc-2', 'beta') as { requirement_id: string | null } | undefined;
     expect(alphaMain).toBeTruthy();
     expect(betaMain).toBeTruthy();
   });
 
-  test('conflict detection + resolution report', () => {
+  test('conflict detection + resolution report', async () => {
     const ctx = createContext();
     const dataOpsCtx = createDataOpsContext(ctx);
     const now = new Date().toISOString();
+    await featLifecycle(dataOpsCtx, {
+      action: 'create',
+      feat_id: 'feat-conflict',
+      metadata: {
+        title: 'feat-conflict',
+        description: '',
+        created_by: 'tester',
+      },
+    });
+    const featUuid = dataOpsCtx.storage.getFeat('feat-conflict')?.uuid ?? 'feat-conflict';
 
     dataOpsCtx.storage.insertEntity({
       entityId: 'svc-conflict',
-      sourceProject: 'alpha',
+      rootId: 'alpha',
       entityType: 'system',
       data: { id: 'svc-conflict', type: 'system', name: 'main' },
       contentHash: computeHash({ id: 'svc-conflict', name: 'main' }),
@@ -253,11 +265,11 @@ describe('Data Ops integration', () => {
 
     dataOpsCtx.storage.insertEntity({
       entityId: 'svc-conflict',
-      sourceProject: 'alpha',
+      rootId: 'alpha',
       entityType: 'system',
       data: { id: 'svc-conflict', type: 'system', name: 'feat' },
       contentHash: computeHash({ id: 'svc-conflict', name: 'feat' }),
-      proposalId: 'feat-conflict',
+      requirementId: featUuid,
       status: 'draft',
       createdAt: now,
       updatedAt: now,
@@ -319,21 +331,23 @@ describe('Data Ops integration', () => {
 
     const db = store.getDatabase();
     const oldTime = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+    const orphanUuid = randomUUID();
     db.prepare(
       `
         INSERT INTO entities (
-          id, source_project, proposal_id, type, kind, scope, perspective, data, orphaned, orphaned_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          uuid, root_id, id, type, kind, scope, perspective, data, requirement_id, component_id, orphaned, orphaned_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
       `
     ).run(
-      'orphan-1',
+      orphanUuid,
       'alpha',
-      workflowId,
+      'orphan-1',
       'system',
       null,
       null,
       null,
       JSON.stringify({ id: 'orphan-1', type: 'system' }),
+      workflowId,
       1,
       oldTime
     );
@@ -341,14 +355,12 @@ describe('Data Ops integration', () => {
     db.prepare(
       `
         INSERT INTO metadata (
-          entity_id, source_project, proposal_id, source_repo, external_url,
+          entity_uuid, source_repo, external_url,
           status, content_hash, created_at, updated_at, created_by, updated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `
     ).run(
-      'orphan-1',
-      'alpha',
-      workflowId,
+      orphanUuid,
       null,
       null,
       'draft',
@@ -362,7 +374,7 @@ describe('Data Ops integration', () => {
     await cleanupOrphanedEntities(storage, workflowId);
 
     const orphan = db
-      .prepare(`SELECT id FROM entities WHERE id = ? AND proposal_id = ?`)
+      .prepare(`SELECT id FROM entities WHERE id = ? AND requirement_id = ?`)
       .get('orphan-1', workflowId) as { id: string } | undefined | null;
     expect(orphan).toBeFalsy();
   });

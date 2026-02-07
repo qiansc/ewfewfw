@@ -6,9 +6,9 @@ import type { ParsedReference } from './types.js';
  * 
  * Formats:
  * - Simple ID: "entity-id"
- * - Project: "project:my-project/entity-id"
+ * - Root: "root:my-project/entity-id"
  * - Repo: "repo:my-org/my-repo/entity-id" (Note: simple repo format)
- *   or "repo:my-org/my-repo/project:my-project/entity-id" (Complex - future support)
+ *   or "repo:my-org/my-repo/root:my-project/entity-id" (Complex - future support)
  * - Scope: "scope:domain/entity-id"
  */
 export function parseReference(ref: string): ParsedReference {
@@ -18,14 +18,14 @@ export function parseReference(ref: string): ParsedReference {
     throw new Error('Reference string cannot be empty');
   }
 
-  // Project reference: project:{project_id}/{id}
-  const projectMatch = value.match(/^project:([^\/]+)\/(.+)$/);
-  if (projectMatch) {
+  // Root reference: root:{root_id}/{id}
+  const rootMatch = value.match(/^root:([^\/]+)\/(.+)$/);
+  if (rootMatch) {
     return {
       original: ref,
-      format: 'project',
-      projectId: projectMatch[1],
-      id: projectMatch[2]
+      format: 'root',
+      rootId: rootMatch[1],
+      id: rootMatch[2]
     };
   }
 

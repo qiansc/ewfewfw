@@ -43,9 +43,9 @@ function resetDb(): void {
   const db = store.getDatabase();
   db.exec('DELETE FROM feat_history;');
   db.exec('DELETE FROM relations;');
+  db.exec('DELETE FROM entity_versions;');
   db.exec('DELETE FROM metadata;');
   db.exec('DELETE FROM entities;');
-  db.exec('DELETE FROM feats;');
 }
 
 function computeHash(data: Record<string, unknown>): string {
@@ -62,7 +62,7 @@ function insertMainEntity(params: {
   const type = params.data.type as 'system';
   params.ctx.storage.insertEntity({
     entityId: id,
-    sourceProject: params.ctx.config.defaultProject,
+    rootId: params.ctx.config.defaultProject,
     entityType: type,
     data: params.data,
     contentHash,
@@ -139,7 +139,7 @@ describe('Data Ops sync engine (new)', () => {
     const row = store
       .getDatabase()
       .prepare(
-        `SELECT data FROM entities WHERE id = ? AND (proposal_id IS NULL OR proposal_id = '')`
+        `SELECT data FROM entities WHERE id = ? AND (requirement_id IS NULL OR requirement_id = '')`
       )
       .get('sys-bidir') as { data: string } | undefined;
     const parsed = row ? (JSON.parse(row.data) as { name?: string }) : {};

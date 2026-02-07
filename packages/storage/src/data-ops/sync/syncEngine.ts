@@ -160,7 +160,7 @@ export async function planSync(
   ctx: DataOpsContext,
   params: PlanSyncParams
 ): Promise<PlanSyncResult> {
-  const proposalId = params.options?.proposal_id ?? null;
+  const requirementId = params.options?.requirement_id ?? null;
   const statusFilter = params.options?.status_filter || 'published';
 
   const plan: SyncPlan = {
@@ -179,7 +179,7 @@ export async function planSync(
   }
 
   // 构建快照映射
-  const snapshotEntities = new Map<string, { content_hash: string; proposal_id?: string }>();
+  const snapshotEntities = new Map<string, { content_hash: string; requirement_id?: string }>();
   if (params.snapshot?.entities) {
     for (const [entityId, info] of Object.entries(params.snapshot.entities)) {
       snapshotEntities.set(entityId, info);
@@ -188,7 +188,7 @@ export async function planSync(
 
   // 查询远程实体
   const remoteEntities = ctx.storage.listEntitiesForPlanSync({
-    proposalId,
+    requirementId,
     statusFilter,
   });
 
@@ -331,7 +331,7 @@ export async function planSync(
   for (const [entityId, local] of localFiles) {
     newSnapshot.entities[entityId] = {
       content_hash: local.content_hash,
-      proposal_id: local.proposal_id,
+      requirement_id: local.requirement_id,
     };
   }
   for (const [entityId, remote] of remoteMap) {

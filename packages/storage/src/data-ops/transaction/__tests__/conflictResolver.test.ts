@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
+import { randomUUID } from 'node:crypto';
 import { mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { InMemoryGraph } from '../../../in-memory-graph.js';
@@ -42,85 +43,58 @@ function resetDb(): void {
   const db = store.getDatabase();
   db.exec('DELETE FROM feat_history;');
   db.exec('DELETE FROM relations;');
+  db.exec('DELETE FROM entity_versions;');
   db.exec('DELETE FROM metadata;');
   db.exec('DELETE FROM entities;');
-  db.exec('DELETE FROM feats;');
 }
 
-function insertMainEntity(params: {
+function insertEntity(params: {
+  uuid?: string;
   id: string;
-  sourceProject?: string;
+  rootId?: string;
+  type?: string;
+  requirementId?: string | null;
+  status?: string;
   data?: Record<string, unknown>;
   contentHash?: string;
-}): void {
+}): string {
   const db = store.getDatabase();
   const now = new Date().toISOString();
-  const sourceProject = params.sourceProject ?? 'alpha';
-  const data = params.data ?? { id: params.id, name: 'main' };
-  const contentHash = params.contentHash ?? 'hash-main';
+  const uuid = params.uuid ?? randomUUID();
+  const rootId = params.rootId ?? 'alpha';
+  const type = params.type ?? 'system';
+  const requirementId = params.requirementId ?? null;
+  const status = params.status ?? 'published';
+  const data = params.data ?? { id: params.id, name: 'entity' };
+  const contentHash = params.contentHash ?? 'hash';
 
   db.prepare(`
-    INSERT INTO entities (id, source_project, proposal_id, type, kind, scope, perspective, data)
-    VALUES (?, ?, '', ?, ?, ?, ?, ?)
-  `).run(params.id, sourceProject, 'system', null, null, null, JSON.stringify(data));
+    INSERT INTO entities (
+      uuid, root_id, id, type, kind, scope, perspective, data, requirement_id, component_id, orphaned, orphaned_at
+    )
+    VALUES (?, ?, ?, ?, NULL, NULL, NULL, ?, ?, NULL, 0, NULL)
+  `).run(uuid, rootId, params.id, type, JSON.stringify(data), requirementId);
 
   db.prepare(`
     INSERT INTO metadata (
-      entity_id, source_project, proposal_id, source_repo, external_url,
+      entity_uuid, source_repo, external_url,
       status, content_hash, created_at, updated_at, created_by, updated_by
     )
-    VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, NULL, NULL, ?, ?, ?, ?, NULL, NULL)
   `).run(
-    params.id,
-    sourceProject,
-    null,
-    null,
-    'published',
+    uuid,
+    status,
     contentHash,
     now,
-    now,
-    null,
-    null
+    now
   );
-}
-
-function insertFeatEntity(params: {
-  id: string;
-  featId: string;
-  sourceProject?: string;
-  data?: Record<string, unknown>;
-  contentHash?: string;
-}): void {
-  const db = store.getDatabase();
-  const now = new Date().toISOString();
-  const sourceProject = params.sourceProject ?? 'alpha';
-  const data = params.data ?? { id: params.id, name: 'feat' };
-  const contentHash = params.contentHash ?? 'hash-feat';
 
   db.prepare(`
-    INSERT INTO entities (id, source_project, proposal_id, type, kind, scope, perspective, data)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(params.id, sourceProject, params.featId, 'system', null, null, null, JSON.stringify(data));
+    INSERT INTO entity_versions (entity_uuid, version)
+    VALUES (?, '0.0.0')
+  `).run(uuid);
 
-  db.prepare(`
-    INSERT INTO metadata (
-      entity_id, source_project, proposal_id, source_repo, external_url,
-      status, content_hash, created_at, updated_at, created_by, updated_by
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    params.id,
-    sourceProject,
-    params.featId,
-    null,
-    null,
-    'draft',
-    contentHash,
-    now,
-    now,
-    null,
-    null
-  );
+  return uuid;
 }
 
 describe('conflictResolver', () => {
@@ -145,8 +119,28 @@ describe('conflictResolver', () => {
     const ctx = createContext();
     const dataOpsCtx = createDataOpsContext(ctx);
 
-    insertMainEntity({ id: 'sys-1', contentHash: 'hash-main' });
-    insertFeatEntity({ id: 'sys-1', featId: 'feat-1', contentHash: 'hash-feat' });
+    const featUuid = insertEntity({
+      id: 'feat-1',
+      rootId: '',
+      type: 'feat',
+      status: 'draft',
+      contentHash: 'hash-feat-root',
+      data: { id: 'feat-1', title: 'feat-1' },
+    });
+    insertEntity({
+      id: 'sys-1',
+      rootId: 'alpha',
+      contentHash: 'hash-main',
+      data: { id: 'sys-1', name: 'main' },
+    });
+    insertEntity({
+      id: 'sys-1',
+      rootId: 'alpha',
+      requirementId: featUuid,
+      status: 'draft',
+      contentHash: 'hash-feat',
+      data: { id: 'sys-1', name: 'feat' },
+    });
 
     const conflicts = getFeatConflicts(dataOpsCtx, 'feat-1');
     expect(conflicts.length).toBe(1);

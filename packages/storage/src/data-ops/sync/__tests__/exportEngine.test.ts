@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
+import { randomUUID } from 'node:crypto';
 import { mkdirSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { SQLiteStore } from '../../../sqlite-store.js';
@@ -43,9 +44,9 @@ function resetDb(): void {
   const db = store.getDatabase();
   db.exec('DELETE FROM feat_history;');
   db.exec('DELETE FROM relations;');
+  db.exec('DELETE FROM entity_versions;');
   db.exec('DELETE FROM metadata;');
   db.exec('DELETE FROM entities;');
-  db.exec('DELETE FROM feats;');
 }
 
 function computeHash(data: Record<string, unknown>): string {
@@ -55,20 +56,40 @@ function computeHash(data: Record<string, unknown>): string {
 function insertEntity(params: {
   ctx: ReturnType<typeof createDataOpsContext>;
   data: Record<string, unknown>;
-  proposalId?: string | null;
+  requirementId?: string | null;
 }): void {
   const contentHash = computeHash(params.data);
   const now = new Date().toISOString();
   params.ctx.storage.insertEntity({
     entityId: params.data.id as string,
-    sourceProject: params.ctx.config.defaultProject,
+    rootId: params.ctx.config.defaultProject,
     entityType: params.data.type as 'system',
     data: params.data,
     contentHash,
-    proposalId: params.proposalId ?? null,
+    requirementId: params.requirementId ?? null,
     createdAt: now,
     updatedAt: now,
   });
+}
+
+function insertFeatEntity(featId: string): string {
+  const db = store.getDatabase();
+  const now = new Date().toISOString();
+  const featUuid = randomUUID();
+  db.prepare(`
+    INSERT INTO entities (
+      uuid, root_id, id, type, kind, scope, perspective, data, requirement_id, component_id, orphaned, orphaned_at
+    )
+    VALUES (?, '', ?, 'feat', NULL, NULL, NULL, ?, NULL, NULL, 0, NULL)
+  `).run(featUuid, featId, JSON.stringify({ id: featId, type: 'feat' }));
+  db.prepare(`
+    INSERT INTO metadata (
+      entity_uuid, source_repo, external_url, status, content_hash, created_at, updated_at, created_by, updated_by
+    )
+    VALUES (?, NULL, NULL, 'approved', NULL, ?, ?, NULL, NULL)
+  `).run(featUuid, now, now);
+  db.prepare(`INSERT INTO entity_versions (entity_uuid, version) VALUES (?, '0.0.0')`).run(featUuid);
+  return featUuid;
 }
 
 describe('export engine', () => {
@@ -124,10 +145,11 @@ describe('export engine', () => {
   test('exports json under feat directory', async () => {
     const ctx = createContext();
     const dataOpsCtx = createDataOpsContext(ctx);
+    const featUuid = insertFeatEntity('feat-a001');
     insertEntity({
       ctx: dataOpsCtx,
       data: { id: 'sys-feat', type: 'system', name: 'Feat Export' },
-      proposalId: 'feat-a001',
+      requirementId: featUuid,
     });
 
     const projectRoot = join(FILES_ROOT, 'feat');

@@ -89,7 +89,7 @@ function buildResolveContext(entity: Entity): ResolveContext {
   const override = parseContextOverride(data);
 
   return {
-    projectId: override.projectId ?? entity.metadata.source_project,
+    rootId: override.rootId ?? entity.root_id ?? '',
     repoId: override.repoId ?? entity.metadata.source_repo ?? null,
     scope: override.scope ?? null,
     candidates: hasCandidateField ? candidates : candidates.length > 0 ? candidates : undefined,
@@ -115,7 +115,7 @@ function parseCandidates(data: UnknownRecord): {
     if (typeof id !== 'string' || !id) continue;
     candidates.push({
       id,
-      sourceProject: (item.sourceProject ?? item.source_project) as string | null | undefined,
+      rootId: (item.rootId ?? item.root_id) as string | null | undefined,
       sourceRepo: (item.sourceRepo ?? item.source_repo) as string | null | undefined,
       scope: typeof item.scope === 'string' ? normalizeReferenceScope(item.scope) : null,
     });
@@ -126,14 +126,14 @@ function parseCandidates(data: UnknownRecord): {
 
 function parseContextOverride(
   data: UnknownRecord
-): { projectId?: string; repoId?: string; scope?: ResolveContext['scope'] } {
+): { rootId?: string; repoId?: string; scope?: ResolveContext['scope'] } {
   const raw = data.reference_context ?? data.referenceContext;
   if (!isPlainObject(raw)) return {};
-  const projectId = typeof raw.projectId === 'string' ? raw.projectId : undefined;
+  const rootId = typeof raw.rootId === 'string' ? raw.rootId : undefined;
   const repoId = typeof raw.repoId === 'string' ? raw.repoId : undefined;
   const scope =
     typeof raw.scope === 'string' ? normalizeReferenceScope(raw.scope) ?? undefined : undefined;
-  return { projectId, repoId, scope };
+  return { rootId, repoId, scope };
 }
 
 function extractReferences(data: UnknownRecord): ReferenceEntry[] {
@@ -192,7 +192,7 @@ function buildSuggestions(
   const suggestions: string[] = [`确认实体 "${resolved.id}" 已创建或同步到当前数据库`];
 
   if (resolved.format === 'simple') {
-    suggestions.push(`为引用 "${ref}" 添加 project:/repo:/scope: 前缀以明确目标`);
+    suggestions.push(`为引用 "${ref}" 添加 root:/repo:/scope: 前缀以明确目标`);
   }
 
   if (resolved.format === 'scope' && resolved.scope) {

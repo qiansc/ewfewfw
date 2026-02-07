@@ -42,60 +42,65 @@ function resetDb(): void {
   const db = store.getDatabase();
   db.exec('DELETE FROM feat_history;');
   db.exec('DELETE FROM relations;');
+  db.exec('DELETE FROM entity_versions;');
   db.exec('DELETE FROM metadata;');
   db.exec('DELETE FROM entities;');
-  db.exec('DELETE FROM feats;');
 }
 
-function insertFeat(featId: string): void {
+function insertFeat(featId: string): string {
   const now = new Date().toISOString();
+  const featUuid = randomUUID();
   const db = store.getDatabase();
   db.prepare(`
-    INSERT INTO feats (id, status, title, description, created_by, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(featId, 'approved', featId, '', 'tester', now, now);
+    INSERT INTO entities (
+      uuid, root_id, id, type, kind, scope, perspective, data, requirement_id, component_id, orphaned, orphaned_at
+    )
+    VALUES (?, '', ?, 'feat', NULL, NULL, NULL, ?, NULL, NULL, 0, NULL)
+  `).run(featUuid, featId, JSON.stringify({ id: featId, title: featId, description: '' }));
+  db.prepare(`
+    INSERT INTO metadata (
+      entity_uuid, source_repo, external_url, status, content_hash, created_at, updated_at, created_by, updated_by
+    )
+    VALUES (?, NULL, NULL, 'approved', NULL, ?, ?, 'tester', NULL)
+  `).run(featUuid, now, now);
+  db.prepare(`INSERT INTO entity_versions (entity_uuid, version) VALUES (?, '0.0.0')`).run(featUuid);
+  return featUuid;
 }
 
 function insertFeatEntity(params: {
   id: string;
-  featId: string;
-  sourceProject: string;
+  featUuid: string;
+  rootId: string;
 }): void {
   const db = store.getDatabase();
   const now = new Date().toISOString();
+  const uuid = randomUUID();
   db.prepare(`
-    INSERT INTO entities (id, source_project, proposal_id, type, kind, scope, perspective, data)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO entities (
+      uuid, root_id, id, type, kind, scope, perspective, data, requirement_id, component_id, orphaned, orphaned_at
+    )
+    VALUES (?, ?, ?, 'system', NULL, NULL, NULL, ?, ?, NULL, 0, NULL)
   `).run(
+    uuid,
+    params.rootId,
     params.id,
-    params.sourceProject,
-    params.featId,
-    'system',
-    null,
-    null,
-    null,
-    JSON.stringify({ id: params.id })
+    JSON.stringify({ id: params.id }),
+    params.featUuid
   );
 
   db.prepare(`
     INSERT INTO metadata (
-      entity_id, source_project, proposal_id, source_repo, external_url,
+      entity_uuid, source_repo, external_url,
       status, content_hash, created_at, updated_at, created_by, updated_by
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, NULL, NULL, 'draft', ?, ?, ?, NULL, NULL)
   `).run(
-    params.id,
-    params.sourceProject,
-    params.featId,
-    null,
-    null,
-    'draft',
+    uuid,
     `hash-${params.id}`,
     now,
-    now,
-    null,
-    null
+    now
   );
+  db.prepare(`INSERT INTO entity_versions (entity_uuid, version) VALUES (?, '0.0.0')`).run(uuid);
 }
 
 describe('cross project feat', () => {
@@ -120,30 +125,40 @@ describe('cross project feat', () => {
     const ctx = createContext();
     const dataOpsCtx = createDataOpsContext(ctx);
 
-    insertFeat('feat-cross');
-    insertFeatEntity({ id: 'svc-1', featId: 'feat-cross', sourceProject: 'alpha' });
-    insertFeatEntity({ id: 'svc-2', featId: 'feat-cross', sourceProject: 'beta' });
+    const featUuid = insertFeat('feat-cross');
+    insertFeatEntity({ id: 'svc-1', featUuid, rootId: 'alpha' });
+    insertFeatEntity({ id: 'svc-2', featUuid, rootId: 'beta' });
 
     const tx = beginFeatTransaction(dataOpsCtx, 'feat-cross');
     await commitFeatTransaction(dataOpsCtx, tx);
 
     const db = store.getDatabase();
     const alphaMain = db.prepare(`
-      SELECT proposal_id FROM entities
-      WHERE id = ? AND source_project = ? AND (proposal_id IS NULL OR proposal_id = '')
-    `).get('svc-1', 'alpha') as { proposal_id: string | null } | undefined;
+      SELECT requirement_id FROM entities
+      WHERE id = ? AND root_id = ? AND (requirement_id IS NULL OR requirement_id = '')
+    `).get('svc-1', 'alpha') as { requirement_id: string | null } | undefined;
 
     const betaMain = db.prepare(`
-      SELECT proposal_id FROM entities
-      WHERE id = ? AND source_project = ? AND (proposal_id IS NULL OR proposal_id = '')
-    `).get('svc-2', 'beta') as { proposal_id: string | null } | undefined;
+      SELECT requirement_id FROM entities
+      WHERE id = ? AND root_id = ? AND (requirement_id IS NULL OR requirement_id = '')
+    `).get('svc-2', 'beta') as { requirement_id: string | null } | undefined;
 
     expect(alphaMain).toBeTruthy();
     expect(betaMain).toBeTruthy();
 
     const remainingFeat = db.prepare(`
-      SELECT COUNT(1) as count FROM entities WHERE proposal_id = ?
-    `).get('feat-cross') as { count: number } | undefined;
+      SELECT COUNT(1) as count FROM entities WHERE requirement_id = ?
+    `).get(featUuid) as { count: number } | undefined;
     expect(remainingFeat?.count).toBe(0);
+
+    const featStatus = db.prepare(`
+      SELECT m.status
+      FROM entities e
+      JOIN metadata m ON m.entity_uuid = e.uuid
+      WHERE e.type = 'feat' AND e.id = ? AND e.root_id = ''
+      LIMIT 1
+    `).get('feat-cross') as { status: string } | undefined;
+    expect(featStatus?.status).toBe('published');
+    expect(tx.status).toBe('committed');
   });
 });

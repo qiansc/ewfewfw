@@ -83,21 +83,23 @@ export async function executeRollback(ctx: DataOpsContext, rollbackFeatId: strin
   const now = new Date().toISOString();
 
   ctx.storage.transaction((tx) => {
-    tx.deleteEntitiesByProposalId(rollbackFeatId);
-    tx.deleteMetadataByProposalId(rollbackFeatId);
-    tx.deleteRelationsByProposalId(rollbackFeatId);
+    const rollbackFeat = tx.getFeat(rollbackFeatId);
+    const requirementId = rollbackFeat?.uuid ?? rollbackFeatId;
+    tx.deleteEntitiesByRequirementId(requirementId);
+    tx.deleteMetadataByRequirementId(requirementId);
+    tx.deleteRelationsByRequirementId(requirementId);
 
     for (const entity of history.snapshot) {
       tx.insertEntity({
         entityId: entity.id,
-        sourceProject: entity.metadata.source_project,
+        rootId: entity.root_id ?? '',
         entityType: entity.type,
         entityKind: entity.kind ?? null,
         entityScope: entity.scope ?? null,
         entityPerspective: entity.perspective ?? null,
         data: entity.data,
-        contentHash: entity.metadata.content_hash,
-        proposalId: rollbackFeatId,
+        contentHash: entity.metadata.content_hash ?? '',
+        requirementId: requirementId,
         status: 'draft',
         createdAt: entity.metadata.created_at || now,
         updatedAt: now,

@@ -209,9 +209,11 @@ function deleteFeat(
   const vectorEntities = collectFeatEntitiesForVector(ctx.storage, featId);
 
   // 删除 feat 关联的实体
-  ctx.storage.deleteEntitiesByProposalId(featId);
-  ctx.storage.deleteMetadataByProposalId(featId);
-  ctx.storage.deleteRelationsByProposalId(featId);
+  const feat = ctx.storage.getFeat(featId);
+  const requirementId = feat?.uuid ?? featId;
+  ctx.storage.deleteEntitiesByRequirementId(requirementId);
+  ctx.storage.deleteMetadataByRequirementId(requirementId);
+  ctx.storage.deleteRelationsByRequirementId(requirementId);
 
   removeVectorIndexForEntities(ctx, featId, vectorEntities);
 

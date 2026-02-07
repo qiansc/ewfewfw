@@ -42,9 +42,9 @@ function resetDb(): void {
   const db = store.getDatabase();
   db.exec('DELETE FROM feat_history;');
   db.exec('DELETE FROM relations;');
+  db.exec('DELETE FROM entity_versions;');
   db.exec('DELETE FROM metadata;');
   db.exec('DELETE FROM entities;');
-  db.exec('DELETE FROM feats;');
 }
 
 describe('rollback', () => {
@@ -81,14 +81,19 @@ describe('rollback', () => {
     });
 
     const rollback = createRollbackFeat(dataOpsCtx, 'feat-1', 'rollback reason');
-    const row = store
-      .getDatabase()
-      .prepare(`SELECT id, status, description FROM feats WHERE id = ?`)
-      .get(rollback.id) as { id: string; status: string; description: string } | undefined;
+    const row = store.getDatabase().prepare(`
+      SELECT e.id, m.status, e.data
+      FROM entities e
+      JOIN metadata m ON m.entity_uuid = e.uuid
+      WHERE e.type = 'feat' AND e.id = ? AND e.root_id = ''
+      LIMIT 1
+    `).get(rollback.id) as { id: string; status: string; data: string } | undefined;
+
+    const data = row?.data ? (JSON.parse(row.data) as { description?: string }) : null;
 
     expect(row?.id).toBe(rollback.id);
     expect(row?.status).toBe('draft');
-    expect(row?.description).toContain('rollback reason');
+    expect(data?.description).toContain('rollback reason');
   });
 
   test('executeRollback restores latest snapshot into rollback feat', async () => {
@@ -108,12 +113,14 @@ describe('rollback', () => {
 
     const snapshot: Entity[] = [
       {
+        uuid: 'snapshot-sys-1',
+        root_id: 'alpha',
         id: 'sys-1',
         type: 'system',
         data: { id: 'sys-1', name: 'system' },
-        proposal_id: null,
+        requirement_id: undefined,
+        versions: ['0.0.0'],
         metadata: {
-          source_project: 'alpha',
           status: 'published',
           content_hash: 'hash-1',
           created_at: now,
@@ -131,12 +138,20 @@ describe('rollback', () => {
 
     const rollback = createRollbackFeat(dataOpsCtx, 'feat-2', 'rollback issue');
     await executeRollback(dataOpsCtx, rollback.id);
+    const rollbackFeat = dataOpsCtx.storage.getFeat(rollback.id);
+    const rollbackFeatUuid = rollbackFeat?.uuid;
+    expect(rollbackFeatUuid).toBeString();
+    if (!rollbackFeatUuid) {
+      throw new Error('rollback feat uuid not found');
+    }
 
-    const row = store
-      .getDatabase()
-      .prepare(`SELECT proposal_id FROM entities WHERE id = ? AND proposal_id = ?`)
-      .get('sys-1', rollback.id) as { proposal_id: string } | undefined;
+    const row = store.getDatabase().prepare(`
+      SELECT requirement_id
+      FROM entities
+      WHERE id = ? AND requirement_id = ?
+      LIMIT 1
+    `).get('sys-1', rollbackFeatUuid) as { requirement_id: string } | undefined;
 
-    expect(row?.proposal_id).toBe(rollback.id);
+    expect(row?.requirement_id).toBe(rollbackFeatUuid);
   });
 });

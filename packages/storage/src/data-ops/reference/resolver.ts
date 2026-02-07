@@ -3,18 +3,19 @@ import { normalizeReferenceScope } from './types.js';
 import type { ReferenceCandidate, ResolvedReference, ResolveContext } from './types.js';
 import type { Entity } from '../../adapter.js';
 import type { StorageOperations } from '../types.js';
+import { randomUUID } from 'node:crypto';
 
 type ResolutionBucket =
-  | 'current_project'
+  | 'current_root'
   | 'same_repo_infra'
-  | 'other_projects'
+  | 'other_roots'
   | 'enterprise'
   | 'domain';
 
 const RESOLUTION_ORDER: ResolutionBucket[] = [
-  'current_project',
+  'current_root',
   'same_repo_infra',
-  'other_projects',
+  'other_roots',
   'enterprise',
   'domain',
 ];
@@ -24,7 +25,7 @@ function normalizeRepoId(value?: string | null): string | null {
   return value.trim();
 }
 
-function normalizeProjectId(value?: string | null): string | null {
+function normalizeRootId(value?: string | null): string | null {
   if (!value) return null;
   return value.trim();
 }
@@ -54,11 +55,11 @@ function bucketizeCandidates(
     buckets.set(bucket, []);
   }
 
-  const currentProject = normalizeProjectId(context.projectId);
+  const currentRoot = normalizeRootId(context.rootId);
   const currentRepo = normalizeRepoId(context.repoId);
 
   for (const candidate of candidates) {
-    const candidateProject = normalizeProjectId(candidate.sourceProject);
+    const candidateRoot = normalizeRootId(candidate.rootId);
     const candidateRepo = normalizeRepoId(candidate.sourceRepo);
     const candidateScope = normalizeScope(candidate.scope);
 
@@ -72,19 +73,19 @@ function bucketizeCandidates(
     }
 
     if (candidateRepo && currentRepo && candidateRepo === currentRepo) {
-      if (candidateProject && currentProject && candidateProject === currentProject) {
-        buckets.get('current_project')?.push(candidate);
-      } else if (!candidateProject) {
+      if (candidateRoot && currentRoot && candidateRoot === currentRoot) {
+        buckets.get('current_root')?.push(candidate);
+      } else if (!candidateRoot) {
         buckets.get('same_repo_infra')?.push(candidate);
       } else {
-        buckets.get('other_projects')?.push(candidate);
+        buckets.get('other_roots')?.push(candidate);
       }
       continue;
     }
 
-    if (candidateProject && currentProject && candidateProject === currentProject) {
+    if (candidateRoot && currentRoot && candidateRoot === currentRoot) {
       if (!candidateRepo || !currentRepo || candidateRepo === currentRepo) {
-        buckets.get('current_project')?.push(candidate);
+        buckets.get('current_root')?.push(candidate);
       }
     }
   }
@@ -101,21 +102,21 @@ function buildExplicitRef(
   }
 
   const repoId = normalizeRepoId(candidate.sourceRepo);
-  const projectId = normalizeProjectId(candidate.sourceProject);
+  const rootId = normalizeRootId(candidate.rootId);
 
-  if (repoId && projectId) {
+  if (repoId && rootId) {
     if (repoId === normalizeRepoId(context.repoId)) {
-      return `project:${projectId}/${candidate.id}`;
+      return `root:${rootId}/${candidate.id}`;
     }
-    return `repo:${repoId}/project:${projectId}/${candidate.id}`;
+    return `repo:${repoId}/root:${rootId}/${candidate.id}`;
   }
 
   if (repoId) {
     return `repo:${repoId}/${candidate.id}`;
   }
 
-  if (projectId) {
-    return `project:${projectId}/${candidate.id}`;
+  if (rootId) {
+    return `root:${rootId}/${candidate.id}`;
   }
 
   return candidate.id;
@@ -144,7 +145,7 @@ function pickPrimaryCandidate(
 
 function candidateMatchesTarget(
   candidate: ReferenceCandidate,
-  target: { id: string; projectId?: string | null; repoId?: string | null; scope?: string | null }
+  target: { id: string; rootId?: string | null; repoId?: string | null; scope?: string | null }
 ): boolean {
   if (candidate.id !== target.id) return false;
   const targetScope = normalizeScope(target.scope);
@@ -153,13 +154,13 @@ function candidateMatchesTarget(
   }
 
   const targetRepo = normalizeRepoId(target.repoId);
-  const targetProject = normalizeProjectId(target.projectId);
+  const targetRootId = normalizeRootId(target.rootId);
 
   const candidateRepo = normalizeRepoId(candidate.sourceRepo);
-  const candidateProject = normalizeProjectId(candidate.sourceProject);
+  const candidateRoot = normalizeRootId(candidate.rootId);
 
   if (targetRepo && candidateRepo !== targetRepo) return false;
-  if (targetProject && candidateProject !== targetProject) return false;
+  if (targetRootId && candidateRoot !== targetRootId) return false;
 
   return true;
 }
@@ -167,16 +168,16 @@ function candidateMatchesTarget(
 function resolveExplicitReference(
   ref: string,
   context: ResolveContext,
-  target: { id: string; projectId?: string | null; repoId?: string | null; scope?: string | null }
+  target: { id: string; rootId?: string | null; repoId?: string | null; scope?: string | null }
 ): ResolvedReference {
   const candidates = resolveCandidates(target.id, context);
   const hasLookup = hasLookupContext(context);
   if (!hasLookup || candidates.length === 0) {
     return {
       original: ref,
-      format: ref.startsWith('scope:') ? 'scope' : ref.startsWith('repo:') ? 'repo' : 'project',
+      format: ref.startsWith('scope:') ? 'scope' : ref.startsWith('repo:') ? 'repo' : 'root',
       id: target.id,
-      targetProject: target.projectId ?? null,
+      targetRootId: target.rootId ?? null,
       targetRepo: target.repoId ?? null,
       scope: normalizeScope(target.scope),
       resolved: !hasLookup,
@@ -187,9 +188,9 @@ function resolveExplicitReference(
   const found = candidates.some((candidate) => candidateMatchesTarget(candidate, target));
   return {
     original: ref,
-    format: ref.startsWith('scope:') ? 'scope' : ref.startsWith('repo:') ? 'repo' : 'project',
+    format: ref.startsWith('scope:') ? 'scope' : ref.startsWith('repo:') ? 'repo' : 'root',
     id: target.id,
-    targetProject: target.projectId ?? null,
+    targetRootId: target.rootId ?? null,
     targetRepo: target.repoId ?? null,
     scope: normalizeScope(target.scope),
     resolved: found,
@@ -203,30 +204,30 @@ function resolveExplicitReference(
 export function resolveReference(ref: string, context: ResolveContext): ResolvedReference {
   const parsed = parseReference(ref);
 
-  if (parsed.format === 'project') {
+  if (parsed.format === 'root') {
     return resolveExplicitReference(ref, context, {
       id: parsed.id,
-      projectId: parsed.projectId ?? null,
+      rootId: parsed.rootId ?? null,
       repoId: context.repoId ?? null,
     });
   }
 
   if (parsed.format === 'repo') {
     let targetId = parsed.id;
-    let targetProject = null as string | null;
+    let targetRootId = null as string | null;
     const targetRepo = parsed.repoId ?? null;
 
-    if (parsed.id.startsWith('project:')) {
+    if (parsed.id.startsWith('root:')) {
       const nested = parseReference(parsed.id);
-      if (nested.format === 'project') {
-        targetProject = nested.projectId ?? null;
+      if (nested.format === 'root') {
+        targetRootId = nested.rootId ?? null;
         targetId = nested.id;
       }
     }
 
     return resolveExplicitReference(ref, context, {
       id: targetId,
-      projectId: targetProject,
+      rootId: targetRootId,
       repoId: targetRepo,
     });
   }
@@ -245,7 +246,7 @@ export function resolveReference(ref: string, context: ResolveContext): Resolved
       original: ref,
       format: parsed.format,
       id: parsed.id,
-      targetProject: context.projectId ?? null,
+      targetRootId: context.rootId ?? null,
       targetRepo: context.repoId ?? null,
       scope: context.scope ?? null,
       resolved: !hasLookup,
@@ -260,7 +261,7 @@ export function resolveReference(ref: string, context: ResolveContext): Resolved
       original: ref,
       format: parsed.format,
       id: parsed.id,
-      targetProject: context.projectId ?? null,
+      targetRootId: context.rootId ?? null,
       targetRepo: context.repoId ?? null,
       scope: context.scope ?? null,
       resolved: false,
@@ -275,7 +276,7 @@ export function resolveReference(ref: string, context: ResolveContext): Resolved
     original: ref,
     format: parsed.format,
     id: parsed.id,
-    targetProject: primary.sourceProject ?? null,
+    targetRootId: primary.rootId ?? null,
     targetRepo: primary.sourceRepo ?? null,
     scope: primary.scope ?? null,
     resolved: true,
@@ -291,7 +292,7 @@ export function copyOnWrite(
   storage: StorageOperations,
   entityId: string,
   targetFeatId: string,
-  sourceProject?: string | null
+  rootId?: string | null
 ): Entity {
   if (!entityId) {
     throw new Error('entityId is required');
@@ -306,27 +307,31 @@ export function copyOnWrite(
   }
 
   const mainRows = storage.listMainEntities(entityId);
-  const scopedProject = sourceProject ?? null;
-  const scopedRows = scopedProject === null
-    ? mainRows
-    : mainRows.filter((row) => row.metadata.source_project === scopedProject);
+  const scopedProject = rootId ?? null;
+  const scopedRows =
+    scopedProject === null
+      ? mainRows
+      : mainRows.filter((row) => (row.root_id ?? '') === scopedProject);
 
   if (scopedRows.length === 0) {
     if (scopedProject) {
-      throw new Error(`Entity '${entityId}' not found in main branch for project '${scopedProject}'`);
+      throw new Error(`Entity '${entityId}' not found in main branch for root '${scopedProject}'`);
     }
     throw new Error(`Entity '${entityId}' not found in main branch`);
   }
   if (scopedRows.length > 1) {
-    throw new Error(`Ambiguous entity '${entityId}' across multiple projects`);
+    throw new Error(`Ambiguous entity '${entityId}' across multiple roots`);
   }
 
   const main = scopedRows[0];
   const now = new Date().toISOString();
 
+  const feat = storage.getFeat(targetFeatId);
+  const requirementId = feat?.uuid ?? targetFeatId;
+  const newUuid = randomUUID();
   storage.insertEntityWithMetadata({
-    entity: main,
-    proposalId: targetFeatId,
+    entity: { ...main, uuid: newUuid },
+    requirementId: requirementId,
     status: 'draft',
     createdAt: now,
     updatedAt: now,
@@ -334,7 +339,8 @@ export function copyOnWrite(
 
   return {
     ...main,
-    proposal_id: targetFeatId,
+    uuid: newUuid,
+    requirement_id: requirementId,
     metadata: {
       ...main.metadata,
       status: 'draft',
