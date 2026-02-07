@@ -22,12 +22,12 @@ type BackupPayload = {
     type: string;
     data: Record<string, unknown>;
     metadata: {
-      source_project: string;
+      root_id: string;
       status: string;
       created_at: string;
       updated_at: string;
     };
-    proposal_id: string | null;
+    requirement_id: string | null;
   }>;
   relations: Array<Record<string, unknown>>;
   feats: Array<Record<string, unknown>>;
@@ -88,7 +88,7 @@ describe('migrateServerToLocal', () => {
     ensureTmpDir();
     const now = new Date().toISOString();
     const payload: BackupPayload = {
-      version: '0.3.0',
+      version: '0.3.1',
       exported_at: now,
       entities: [
         {
@@ -96,12 +96,12 @@ describe('migrateServerToLocal', () => {
           type: 'system',
           data: { id: 'demo-system', name: 'Demo System' },
           metadata: {
-            source_project: 'demo-project',
+            root_id: 'demo-project',
             status: 'published',
             created_at: now,
             updated_at: now,
           },
-          proposal_id: null,
+          requirement_id: null,
         },
       ],
       relations: [],
@@ -130,7 +130,7 @@ describe('migrateServerToLocal', () => {
     ensureTmpDir();
     const now = new Date().toISOString();
     const payload: BackupPayload = {
-      version: '0.3.0',
+      version: '0.3.1',
       exported_at: now,
       entities: [],
       relations: [],
@@ -158,7 +158,7 @@ describe('migrateServerToLocal', () => {
     ensureTmpDir();
     const now = new Date().toISOString();
     const payload: BackupPayload = {
-      version: '0.3.0',
+      version: '0.3.1',
       exported_at: now,
       entities: [],
       relations: [],

@@ -6,7 +6,6 @@ import { InMemoryGraph } from '../in-memory-graph.js';
 import { GraphQueryCache } from '../graph-query-cache.js';
 import { read } from '../lite-adapter/crud-read.js';
 import type { AdapterContext } from '../lite-adapter/types.js';
-import type { EntityStatus } from '../adapterBaseTypes.js';
 
 const TMP_ROOT = join(process.cwd(), '.tmp', 'store-tests');
 const DB_PATH = join(TMP_ROOT, `lite-adapter-read-${Date.now()}.db`);
@@ -39,54 +38,44 @@ function createContext(): AdapterContext {
 
 function resetDb(): void {
   const db = store.getDatabase();
+  db.exec('DELETE FROM entity_versions;');
   db.exec('DELETE FROM metadata;');
   db.exec('DELETE FROM entities;');
 }
 
 function insertEntity(params: {
+  uuid: string;
   id: string;
-  name: string;
-  proposalId?: string | null;
+  rootId?: string;
   type?: string;
-  sourceProject?: string;
-  status?: EntityStatus;
-  updatedAt?: string;
+  versions: string[];
+  name: string;
 }): void {
   const db = store.getDatabase();
-  const now = params.updatedAt ?? new Date().toISOString();
-  const proposalId = params.proposalId ?? '';
-  const sourceProject = params.sourceProject ?? 'alpha';
+  const now = new Date().toISOString();
+  const rootId = params.rootId ?? 'alpha';
   const type = params.type ?? 'system';
-  const status = params.status ?? 'published';
   const data = { id: params.id, name: params.name };
 
   db.prepare(`
-    INSERT INTO entities (id, source_project, proposal_id, type, kind, scope, perspective, data)
+    INSERT INTO entities (uuid, root_id, id, type, kind, scope, perspective, data)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(params.id, sourceProject, proposalId, type, null, null, null, JSON.stringify(data));
+  `).run(params.uuid, rootId, params.id, type, null, null, null, JSON.stringify(data));
 
   db.prepare(`
     INSERT INTO metadata (
-      entity_id, source_project, proposal_id, source_repo, external_url,
-      status, content_hash, created_at, updated_at, created_by, updated_by
+      entity_uuid, source_repo, external_url, status, content_hash, created_at, updated_at, created_by, updated_by
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    params.id,
-    sourceProject,
-    proposalId,
-    null,
-    null,
-    status,
-    'hash',
-    now,
-    now,
-    null,
-    null
-  );
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(params.uuid, null, null, 'published', 'hash', now, now, null, null);
+
+  const insertVersion = db.prepare(`INSERT INTO entity_versions (entity_uuid, version) VALUES (?, ?)`);
+  for (const v of params.versions) {
+    insertVersion.run(params.uuid, v);
+  }
 }
 
-describe('LiteAdapter read merge view', () => {
+describe('LiteAdapter read', () => {
   beforeAll(() => {
     mkdirSync(TMP_ROOT, { recursive: true });
     store = SQLiteStore.getInstance({ dbPath: DB_PATH });
@@ -104,31 +93,23 @@ describe('LiteAdapter read merge view', () => {
     resetDb();
   });
 
-  test('read uses last proposal_id as highest priority', async () => {
-    insertEntity({ id: 'svc', name: 'main', proposalId: null });
-    insertEntity({ id: 'svc', name: 'feat-1', proposalId: 'feat-1', status: 'draft' });
-    insertEntity({ id: 'svc', name: 'feat-2', proposalId: 'feat-2', status: 'draft' });
+  test('read returns latest (0.0.0) by default', async () => {
+    insertEntity({ uuid: 'uuid-main', id: 'svc', versions: ['0.0.0'], name: 'main' });
+    insertEntity({ uuid: 'uuid-1', id: 'svc', versions: ['1.0.0'], name: 'v1' });
 
     const ctx = createContext();
-    const result = await read(ctx, { id: 'svc', proposal_id: ['feat-1', 'feat-2'] });
-
-    if (!result || !('entity' in result)) {
-      throw new Error('Expected entity result');
-    }
-    expect(result.entity?.data.name).toBe('feat-2');
+    const result = await read(ctx, 'alpha', 'svc');
+    expect(result?.uuid).toBe('uuid-main');
+    expect(result?.versions).toContain('0.0.0');
   });
 
-  test('read honors array order when reversed', async () => {
-    insertEntity({ id: 'svc', name: 'main', proposalId: null });
-    insertEntity({ id: 'svc', name: 'feat-1', proposalId: 'feat-1', status: 'draft' });
-    insertEntity({ id: 'svc', name: 'feat-2', proposalId: 'feat-2', status: 'draft' });
+  test('read supports version filter', async () => {
+    insertEntity({ uuid: 'uuid-main', id: 'svc', versions: ['0.0.0'], name: 'main' });
+    insertEntity({ uuid: 'uuid-1', id: 'svc', versions: ['1.0.0'], name: 'v1' });
 
     const ctx = createContext();
-    const result = await read(ctx, { id: 'svc', proposal_id: ['feat-2', 'feat-1'] });
-
-    if (!result || !('entity' in result)) {
-      throw new Error('Expected entity result');
-    }
-    expect(result.entity?.data.name).toBe('feat-1');
+    const result = await read(ctx, 'alpha', 'svc', '1.0.0');
+    expect(result?.uuid).toBe('uuid-1');
+    expect(result?.data.name).toBe('v1');
   });
 });

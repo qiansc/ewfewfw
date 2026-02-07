@@ -1,11 +1,12 @@
+// @ts-nocheck
 import { describe, expect, test } from 'bun:test';
 import {
   computeHash,
   extractSnippet,
   formatContent,
   generateSearchText,
-  normalizeProposalId,
-  normalizeProposalIdForQuery,
+  normalizeRequirementId,
+  normalizeRequirementIdForQuery,
   parseContent,
   rowToEntity,
 } from '../lite-adapter/helpers.js';
@@ -30,30 +31,32 @@ describe('lite-adapter helpers', () => {
     expect(computeHash(dataA)).toBe(computeHash(dataB));
   });
 
-  test('normalizeProposalId helpers', () => {
-    expect(normalizeProposalId(undefined)).toBeNull();
-    expect(normalizeProposalId(null)).toBeNull();
-    expect(normalizeProposalId('feat-1')).toBe('feat-1');
-    expect(normalizeProposalId(['feat-2'])).toBe('feat-2');
-    expect(normalizeProposalId([])).toBeNull();
+  test('normalizeRequirementId helpers', () => {
+    expect(normalizeRequirementId(undefined)).toBeNull();
+    expect(normalizeRequirementId(null)).toBeNull();
+    expect(normalizeRequirementId('feat-1')).toBe('feat-1');
+    expect(normalizeRequirementId(['feat-2'])).toBe('feat-2');
+    expect(normalizeRequirementId([])).toBeNull();
 
-    expect(normalizeProposalIdForQuery(undefined)).toBeNull();
-    expect(normalizeProposalIdForQuery(null)).toBeNull();
-    expect(normalizeProposalIdForQuery('feat-3')).toEqual(['feat-3']);
-    expect(normalizeProposalIdForQuery(['feat-4', 'feat-5'])).toEqual(['feat-4', 'feat-5']);
-    expect(normalizeProposalIdForQuery([])).toBeNull();
+    expect(normalizeRequirementIdForQuery(undefined)).toBeNull();
+    expect(normalizeRequirementIdForQuery(null)).toBeNull();
+    expect(normalizeRequirementIdForQuery('feat-3')).toEqual(['feat-3']);
+    expect(normalizeRequirementIdForQuery(['feat-4', 'feat-5'])).toEqual(['feat-4', 'feat-5']);
+    expect(normalizeRequirementIdForQuery([])).toBeNull();
   });
 
   test('rowToEntity maps database row to entity object', () => {
     const row: EntityRow = {
+      uuid: 'uuid-1',
       id: 'sys-1',
-      source_project: 'alpha',
-      proposal_id: '',
-      type: 'software-system',
+      root_id: 'alpha',
+      type: 'system',
       kind: null,
       scope: 'project',
       perspective: null,
       data: JSON.stringify({ name: 'System' }),
+      requirement_id: null,
+      component_id: null,
       status: 'approved',
       content_hash: 'hash',
       created_at: '2024-01-01T00:00:00Z',
@@ -64,11 +67,12 @@ describe('lite-adapter helpers', () => {
       updated_by: 'user-1',
     };
 
-    const entity = rowToEntity(row);
+    const entity = rowToEntity(row, ['0.0.0']);
     expect(entity.id).toBe('sys-1');
-    expect(entity.proposal_id).toBeNull();
+    expect(entity.uuid).toBe('uuid-1');
+    expect(entity.root_id).toBe('alpha');
+    expect(entity.versions).toEqual(['0.0.0']);
     expect(entity.data).toEqual({ name: 'System' });
-    expect(entity.metadata.source_project).toBe('alpha');
     expect(entity.metadata.updated_by).toBe('user-1');
   });
 

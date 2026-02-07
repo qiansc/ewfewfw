@@ -5,6 +5,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { SQLiteStore } from '../sqlite-store.js';
 import { DataValidator } from '../validate.js';
 import { DataRepair } from '../repair.js';
@@ -13,11 +14,10 @@ type InsertParams = {
   id: string;
   type?: string;
   scope?: string | null;
-  sourceProject?: string;
+  rootId?: string;
   sourceRepo?: string | null;
   externalUrl?: string | null;
   data?: Record<string, unknown>;
-  proposalId?: string | null;
 };
 
 const TMP_ROOT = join(process.cwd(), '.tmp', 'store-tests');
@@ -34,6 +34,7 @@ function resetStoreInstance(): void {
 function resetDb() {
   const db = store.getDatabase();
   db.exec('DELETE FROM metadata;');
+  db.exec('DELETE FROM entity_versions;');
   db.exec('DELETE FROM entities;');
 }
 
@@ -43,34 +44,23 @@ function insertEntity(params: InsertParams) {
   const id = params.id;
   const type = params.type ?? 'system';
   const scope = params.scope ?? null;
-  const sourceProject = params.sourceProject ?? 'my-project';
-  const proposalId = params.proposalId ?? '';
+  const rootId = params.rootId ?? 'my-project';
   const data = params.data ?? {};
+  const uuid = randomUUID();
 
   db.prepare(`
-    INSERT INTO entities (id, source_project, proposal_id, type, kind, scope, perspective, data)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    id,
-    sourceProject,
-    proposalId,
-    type,
-    null,
-    scope,
-    null,
-    JSON.stringify(data)
-  );
+    INSERT INTO entities (uuid, root_id, id, type, kind, scope, perspective, data, requirement_id, component_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)
+  `).run(uuid, rootId, id, type, null, scope, null, JSON.stringify(data));
 
   db.prepare(`
     INSERT INTO metadata (
-      entity_id, source_project, proposal_id, source_repo, external_url,
+      entity_uuid, source_repo, external_url,
       status, content_hash, created_at, updated_at, created_by, updated_by
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    id,
-    sourceProject,
-    proposalId,
+    uuid,
     params.sourceRepo ?? null,
     params.externalUrl ?? null,
     'published',
@@ -80,6 +70,8 @@ function insertEntity(params: InsertParams) {
     null,
     null
   );
+
+  db.prepare(`INSERT INTO entity_versions (entity_uuid, version) VALUES (?, ?)`).run(uuid, '0.0.0');
 }
 
 describe('DataValidator', () => {
@@ -104,7 +96,7 @@ describe('DataValidator', () => {
     insertEntity({
       id: 'ext-1',
       type: 'system',
-      sourceProject: '',
+      rootId: '',
       sourceRepo: null,
       externalUrl: 'https://example.com',
       data: { external: true },
@@ -121,7 +113,7 @@ describe('DataValidator', () => {
     insertEntity({
       id: 'ext-2',
       type: 'system',
-      sourceProject: '',
+      rootId: '',
       sourceRepo: null,
       externalUrl: null,
       data: { external: true },
@@ -133,12 +125,12 @@ describe('DataValidator', () => {
     expect(result.warnings.map(item => item.code)).toContain('C4A-MIGRATE-008');
   });
 
-  test('warns on non-project scopes with source_project/source_repo', () => {
+  test('warns on non-project scopes with root_id/source_repo', () => {
     insertEntity({
       id: 'domain-1',
       type: 'system',
       scope: 'domain',
-      sourceProject: 'proj-x',
+      rootId: '@acme/project-x',
       sourceRepo: 'owner/repo',
       data: { name: 'domain' },
     });
@@ -151,11 +143,11 @@ describe('DataValidator', () => {
     expect(warningCodes).toContain('C4A-MIGRATE-006');
   });
 
-  test('errors on missing source_project/source_repo', () => {
+  test('errors on missing root_id/source_repo', () => {
     insertEntity({
       id: 'proj-1',
       type: 'system',
-      sourceProject: '',
+      rootId: '',
       sourceRepo: null,
       data: { name: 'project' },
     });
@@ -172,7 +164,7 @@ describe('DataValidator', () => {
     insertEntity({
       id: 'repo-1',
       type: 'system',
-      sourceProject: 'my-project',
+      rootId: '@acme/project',
       sourceRepo: 'invalid-format',
       data: { name: 'repo' },
     });
@@ -187,7 +179,7 @@ describe('DataValidator', () => {
     insertEntity({
       id: 'json-1',
       type: 'system',
-      sourceProject: '',
+      rootId: '',
       sourceRepo: null,
       externalUrl: null,
       data: { external: true },
@@ -231,21 +223,21 @@ describe('DataRepair', () => {
     mkdirSync(contextDir, { recursive: true });
     writeFileSync(
       join(contextDir, '.c4a.yaml'),
-      'project_id: test-project\nrepo_id: company/test\n',
+      'root_id: \"@acme/test-project\"\nrepo_id: company/test\n',
       'utf-8'
     );
 
-    const originalCwd = process.cwd;
-    (process as unknown as { cwd: () => string }).cwd = () => configRoot;
+    const originalCwd = process.cwd();
+    process.chdir(configRoot);
 
     let result: { success: boolean } | null = null;
-    let metadata: { source_project: string; source_repo: string | null } | null = null;
+    let entityRow: { root_id: string; source_repo: string | null } | null = null;
 
     try {
       insertEntity({
         id: 'proj-2',
         type: 'system',
-        sourceProject: '',
+        rootId: '',
         sourceRepo: null,
         data: { name: 'project' },
       });
@@ -254,16 +246,19 @@ describe('DataRepair', () => {
       result = repair.repair({ entityIds: ['proj-2'] });
 
       const db = store.getDatabase();
-      metadata = db.prepare(`
-        SELECT source_project, source_repo FROM metadata WHERE entity_id = ?
-      `).get('proj-2') as { source_project: string; source_repo: string | null };
+      entityRow = db.prepare(`
+        SELECT e.root_id, m.source_repo
+        FROM entities e
+        JOIN metadata m ON e.uuid = m.entity_uuid
+        WHERE e.id = ?
+      `).get('proj-2') as { root_id: string; source_repo: string | null };
     } finally {
-      (process as unknown as { cwd: () => string }).cwd = originalCwd;
+      process.chdir(originalCwd);
       rmSync(configRoot, { recursive: true, force: true });
     }
 
     expect(result?.success).toBe(true);
-    expect(metadata?.source_project).toBe('test-project');
-    expect(metadata?.source_repo).toBe('company/test');
+    expect(entityRow?.root_id).toBe('@acme/test-project');
+    expect(entityRow?.source_repo).toBe('company/test');
   });
 });

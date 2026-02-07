@@ -27,44 +27,33 @@ function makeEmbedding(seed: number): Float32Array {
 }
 
 function insertEntity(params: {
+  uuid: string;
   id: string;
+  rootId?: string;
   type?: string;
-  sourceProject?: string;
-  proposalId?: string | null;
+  versions?: string[];
   data?: Record<string, unknown>;
 }): void {
   const db = store.getDatabase();
   const now = new Date().toISOString();
   const id = params.id;
   const type = params.type ?? 'system';
-  const sourceProject = params.sourceProject ?? 'default';
-  const proposalId = params.proposalId ?? null;
+  const rootId = params.rootId ?? 'default';
   const data = params.data ?? {};
+  const versions = params.versions ?? ['0.0.0'];
 
   db.prepare(`
-    INSERT INTO entities (id, source_project, proposal_id, type, kind, scope, perspective, data)
+    INSERT INTO entities (uuid, root_id, id, type, kind, scope, perspective, data)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    id,
-    sourceProject,
-    proposalId ?? '',
-    type,
-    null,
-    null,
-    null,
-    JSON.stringify(data)
-  );
+  `).run(params.uuid, rootId, id, type, null, null, null, JSON.stringify(data));
 
   db.prepare(`
     INSERT INTO metadata (
-      entity_id, source_project, proposal_id, source_repo, external_url,
-      status, content_hash, created_at, updated_at, created_by, updated_by
+      entity_uuid, source_repo, external_url, status, content_hash, created_at, updated_at, created_by, updated_by
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    id,
-    sourceProject,
-    proposalId ?? '',
+    params.uuid,
     null,
     null,
     'published',
@@ -74,6 +63,11 @@ function insertEntity(params: {
     null,
     null
   );
+
+  const insertVersion = db.prepare(`INSERT INTO entity_versions (entity_uuid, version) VALUES (?, ?)`);
+  for (const v of versions) {
+    insertVersion.run(params.uuid, v);
+  }
 }
 
 beforeAll(() => {
@@ -101,6 +95,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   const db = store.getDatabase();
+  db.exec('DELETE FROM entity_versions;');
   db.exec('DELETE FROM metadata;');
   db.exec('DELETE FROM entities;');
   store.getVectorStore()?.rebuild([]);
@@ -118,56 +113,51 @@ describe('Search Integration', () => {
     const vectorStore = store.getVectorStore();
     expect(vectorStore).not.toBeNull();
 
-    insertEntity({ id: 'entity-a', sourceProject: 'default', data: { name: 'alpha' } });
-    insertEntity({ id: 'entity-b', sourceProject: 'default', data: { name: 'beta' } });
+    insertEntity({ uuid: 'u1', id: 'entity-a', data: { name: 'alpha' } });
+    insertEntity({ uuid: 'u2', id: 'entity-b', data: { name: 'beta' } });
 
-    vectorStore?.add(generateVectorKey('default', 'entity-a', ''), makeEmbedding(1));
-    vectorStore?.add(generateVectorKey('default', 'entity-b', ''), makeEmbedding(0));
+    vectorStore?.add(generateVectorKey('u1'), makeEmbedding(1));
+    vectorStore?.add(generateVectorKey('u2'), makeEmbedding(0));
     vectorStore?.save();
 
     const results = await semanticSearch(
       store.getDatabase(),
       vectorStore as NonNullable<typeof vectorStore>,
       'query',
-      null,
+      {},
       2
     );
 
     expect(results[0]?.id).toBe('entity-a');
   });
 
-  test('vector search prefers feat version over main branch', async () => {
+  test('vector search supports version filter', async () => {
     const vectorStore = store.getVectorStore();
     expect(vectorStore).not.toBeNull();
 
-    insertEntity({ id: 'entity-x', sourceProject: 'default', proposalId: null, data: { name: 'main' } });
-    insertEntity({
-      id: 'entity-x',
-      sourceProject: 'default',
-      proposalId: 'feat-1',
-      data: { name: 'feat' },
-    });
+    insertEntity({ uuid: 'u-main', id: 'entity-x', versions: ['0.0.0'], data: { name: 'main' } });
+    insertEntity({ uuid: 'u-v1', id: 'entity-x', versions: ['1.0.0'], data: { name: 'v1' } });
 
-    vectorStore?.add(generateVectorKey('default', 'entity-x', ''), makeEmbedding(1));
-    vectorStore?.add(generateVectorKey('default', 'entity-x', 'feat-1'), makeEmbedding(1));
+    vectorStore?.add(generateVectorKey('u-main'), makeEmbedding(1));
+    vectorStore?.add(generateVectorKey('u-v1'), makeEmbedding(1));
     vectorStore?.save();
 
     const results = await semanticSearch(
       store.getDatabase(),
       vectorStore as NonNullable<typeof vectorStore>,
       'query',
-      'feat-1',
+      { versions: ['1.0.0'] },
       5
     );
 
     expect(results.length).toBeGreaterThan(0);
-    expect(results[0]?.proposal_id).toBe('feat-1');
+    expect(results[0]?.uuid).toBe('u-v1');
   });
 
   test('fallback to LIKE when vector search has no results', async () => {
     insertEntity({
+      uuid: 'u-like',
       id: 'entity-like',
-      sourceProject: 'default',
       data: { name: 'hello world', description: 'match me' },
     });
 

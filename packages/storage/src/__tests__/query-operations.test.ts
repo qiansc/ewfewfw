@@ -32,13 +32,13 @@ function createContext(graph: InMemoryGraph, defaultProject = "alpha"): AdapterC
 describe("query operations", () => {
   test("queryDeps returns downstream nodes", async () => {
     const graph = new InMemoryGraph();
-    graph.addRelation("alpha", "svc", "alpha", "dep", "depends_on");
-    graph.addRelation("alpha", "dep", "alpha", "leaf", "depends_on");
+    graph.addRelation("alpha", "svc", "alpha", "dep", "DEPENDS_ON", "u1", "system", "u2", "system");
+    graph.addRelation("alpha", "dep", "alpha", "leaf", "DEPENDS_ON", "u2", "system", "u3", "system");
 
     const ctx = createContext(graph);
     const result = await queryDeps(ctx, {
       id: "svc",
-      source_project: "alpha",
+      root_id: "alpha",
       direction: "downstream",
       depth: 2,
     });
@@ -49,13 +49,13 @@ describe("query operations", () => {
 
   test("queryImpact assigns direct/indirect levels", async () => {
     const graph = new InMemoryGraph();
-    graph.addRelation("alpha", "svc", "alpha", "dep", "depends_on");
-    graph.addRelation("alpha", "dep", "alpha", "leaf", "depends_on");
+    graph.addRelation("alpha", "svc", "alpha", "dep", "DEPENDS_ON", "u1", "system", "u2", "system");
+    graph.addRelation("alpha", "dep", "alpha", "leaf", "DEPENDS_ON", "u2", "system", "u3", "system");
 
     const ctx = createContext(graph);
     const result = await queryImpact(ctx, {
       id: "svc",
-      source_project: "alpha",
+      root_id: "alpha",
       depth: 2,
       change_type: "remove",
     });

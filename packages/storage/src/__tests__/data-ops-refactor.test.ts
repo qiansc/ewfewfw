@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { SQLiteStore } from '../sqlite-store.js';
 import { InMemoryGraph } from '../in-memory-graph.js';
 import { GraphQueryCache } from '../graph-query-cache.js';
@@ -46,38 +47,41 @@ function resetDb(): void {
   db.exec('DELETE FROM feat_history;');
   db.exec('DELETE FROM relations;');
   db.exec('DELETE FROM metadata;');
+  db.exec('DELETE FROM entity_versions;');
   db.exec('DELETE FROM entities;');
-  db.exec('DELETE FROM feats;');
 }
 
 function insertFeatEntity(params: {
   id: string;
   featId: string;
-  sourceProject?: string;
+  rootId?: string;
   data?: Record<string, unknown>;
   contentHash?: string;
 }): void {
   const db = store.getDatabase();
   const now = new Date().toISOString();
-  const sourceProject = params.sourceProject ?? 'alpha';
+  const rootId = params.rootId ?? 'alpha';
   const data = params.data ?? { id: params.id };
   const contentHash = params.contentHash ?? 'hash';
+  const featRow = db.prepare(
+    `SELECT uuid FROM entities WHERE type = 'feat' AND id = ? AND root_id = '' LIMIT 1`
+  ).get(params.featId) as { uuid?: string } | undefined;
+  const requirementId = featRow?.uuid ?? params.featId;
+  const uuid = randomUUID();
 
   db.prepare(`
-    INSERT INTO entities (id, source_project, proposal_id, type, kind, scope, perspective, data)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(params.id, sourceProject, params.featId, 'system', null, null, null, JSON.stringify(data));
+    INSERT INTO entities (uuid, root_id, id, type, kind, scope, perspective, data, requirement_id, component_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+  `).run(uuid, rootId, params.id, 'system', null, null, null, JSON.stringify(data), requirementId);
 
   db.prepare(`
     INSERT INTO metadata (
-      entity_id, source_project, proposal_id, source_repo, external_url,
+      entity_uuid, source_repo, external_url,
       status, content_hash, created_at, updated_at, created_by, updated_by
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    params.id,
-    sourceProject,
-    params.featId,
+    uuid,
     null,
     null,
     'draft',
@@ -87,36 +91,38 @@ function insertFeatEntity(params: {
     null,
     null
   );
+
+  db.prepare(`INSERT INTO entity_versions (entity_uuid, version) VALUES (?, ?)`).run(uuid, '0.0.0');
 }
 
 function insertMainEntity(params: {
   id: string;
-  sourceProject?: string;
+  rootId?: string;
   type?: string;
   data?: Record<string, unknown>;
   contentHash?: string;
 }): void {
   const db = store.getDatabase();
   const now = new Date().toISOString();
-  const sourceProject = params.sourceProject ?? 'alpha';
+  const rootId = params.rootId ?? 'alpha';
   const type = params.type ?? 'system';
   const data = params.data ?? { id: params.id };
   const contentHash = params.contentHash ?? 'hash-main';
 
+  const uuid = randomUUID();
   db.prepare(`
-    INSERT INTO entities (id, source_project, proposal_id, type, kind, scope, perspective, data)
-    VALUES (?, ?, '', ?, ?, ?, ?, ?)
-  `).run(params.id, sourceProject, type, null, null, null, JSON.stringify(data));
+    INSERT INTO entities (uuid, root_id, id, type, kind, scope, perspective, data, requirement_id, component_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)
+  `).run(uuid, rootId, params.id, type, null, null, null, JSON.stringify(data));
 
   db.prepare(`
     INSERT INTO metadata (
-      entity_id, source_project, proposal_id, source_repo, external_url,
+      entity_uuid, source_repo, external_url,
       status, content_hash, created_at, updated_at, created_by, updated_by
     )
-    VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    params.id,
-    sourceProject,
+    uuid,
     null,
     null,
     'published',
@@ -126,6 +132,8 @@ function insertMainEntity(params: {
     null,
     null
   );
+
+  db.prepare(`INSERT INTO entity_versions (entity_uuid, version) VALUES (?, ?)`).run(uuid, '0.0.0');
 }
 
 describe('Data Ops refactor', () => {
@@ -184,14 +192,19 @@ describe('Data Ops refactor', () => {
     expect(published.success).toBe(true);
 
     const db = store.getDatabase();
-    const feat = db.prepare(`SELECT status FROM feats WHERE id = ?`).get('feat-1') as
-      | { status: string }
-      | undefined;
+    const feat = db.prepare(
+      `
+        SELECT m.status
+        FROM entities e
+        JOIN metadata m ON e.uuid = m.entity_uuid
+        WHERE e.type = 'feat' AND e.id = ? AND e.root_id = ''
+      `
+    ).get('feat-1') as { status?: string } | undefined;
     expect(feat?.status).toBe('published');
 
     const mainEntity = db.prepare(`
-      SELECT proposal_id FROM entities WHERE id = ? AND (proposal_id IS NULL OR proposal_id = '')
-    `).get('sys-1') as { proposal_id: string | null } | undefined;
+      SELECT requirement_id FROM entities WHERE id = ? AND (requirement_id IS NULL OR requirement_id = '')
+    `).get('sys-1') as { requirement_id: string | null } | undefined;
     expect(mainEntity).toBeTruthy();
 
     const history = db.prepare(`
@@ -200,9 +213,18 @@ describe('Data Ops refactor', () => {
     expect(history?.count).toBe(1);
   });
 
-  test('detectFeatConflicts reports modified entities', () => {
+  test('detectFeatConflicts reports modified entities', async () => {
     const ctx = createContext();
     const dataOpsCtx = createDataOpsContext(ctx);
+    await featLifecycle(dataOpsCtx, {
+      action: 'create',
+      feat_id: 'feat-2',
+      metadata: {
+        title: 'feat-2',
+        description: '',
+        created_by: 'tester',
+      },
+    });
 
     insertMainEntity({
       id: 'svc-1',
@@ -239,9 +261,22 @@ describe('Data Ops refactor', () => {
     const db = store.getDatabase();
     const originalUpdatedAt = '2026-01-01T00:00:00.000Z';
     const workflowSteps = [{ id: 'step-1', status: 'pending' }];
-    db.prepare(`
-      UPDATE feats SET workflow_steps = ?, updated_at = ? WHERE id = ?
-    `).run(JSON.stringify(workflowSteps), originalUpdatedAt, 'feat-wf');
+    const featRow = db.prepare(`
+      SELECT uuid, data FROM entities WHERE type = 'feat' AND id = ? AND root_id = '' LIMIT 1
+    `).get('feat-wf') as { uuid: string; data: string } | undefined;
+    if (!featRow) {
+      throw new Error('feat-wf not found');
+    }
+    const featData = JSON.parse(featRow.data) as Record<string, unknown>;
+    featData.workflow_steps = JSON.stringify(workflowSteps);
+    db.prepare(`UPDATE entities SET data = ? WHERE uuid = ?`).run(
+      JSON.stringify(featData),
+      featRow.uuid
+    );
+    db.prepare(`UPDATE metadata SET updated_at = ? WHERE entity_uuid = ?`).run(
+      originalUpdatedAt,
+      featRow.uuid
+    );
 
     const result = await updateWorkflowStep(dataOpsCtx, {
       feat_id: 'feat-wf',
@@ -254,10 +289,11 @@ describe('Data Ops refactor', () => {
     expect(result.status).toBe('completed');
     expect(result.updated_at).not.toBe(originalUpdatedAt);
 
-    const row = db.prepare(`SELECT workflow_steps FROM feats WHERE id = ?`).get('feat-wf') as
-      | { workflow_steps: string | null }
-      | undefined;
-    const parsed = row?.workflow_steps ? JSON.parse(row.workflow_steps) : [];
+    const row = db.prepare(`
+      SELECT e.data FROM entities e WHERE e.type = 'feat' AND e.id = ? AND e.root_id = ''
+    `).get('feat-wf') as { data: string } | undefined;
+    const data = row?.data ? (JSON.parse(row.data) as Record<string, unknown>) : {};
+    const parsed = data.workflow_steps ? JSON.parse(String(data.workflow_steps)) : [];
     expect(parsed[0]?.status).toBe('completed');
   });
 
@@ -277,9 +313,18 @@ describe('Data Ops refactor', () => {
 
     const db = store.getDatabase();
     const workflowSteps = [{ id: 'step-1', status: 'pending' }];
-    db.prepare(`
-      UPDATE feats SET workflow_steps = ? WHERE id = ?
-    `).run(JSON.stringify(workflowSteps), 'feat-miss');
+    const featRow = db.prepare(`
+      SELECT uuid, data FROM entities WHERE type = 'feat' AND id = ? AND root_id = '' LIMIT 1
+    `).get('feat-miss') as { uuid: string; data: string } | undefined;
+    if (!featRow) {
+      throw new Error('feat-miss not found');
+    }
+    const featData = JSON.parse(featRow.data) as Record<string, unknown>;
+    featData.workflow_steps = JSON.stringify(workflowSteps);
+    db.prepare(`UPDATE entities SET data = ? WHERE uuid = ?`).run(
+      JSON.stringify(featData),
+      featRow.uuid
+    );
 
     const result = await updateWorkflowStep(dataOpsCtx, {
       feat_id: 'feat-miss',
@@ -311,7 +356,7 @@ describe('Data Ops refactor', () => {
     const db = store.getDatabase();
     const row = db.prepare(`
       SELECT e.id FROM entities e
-      WHERE e.id = ? AND (e.proposal_id IS NULL OR e.proposal_id = '')
+      WHERE e.id = ? AND (e.requirement_id IS NULL OR e.requirement_id = '')
     `).get('sys-import') as { id: string } | undefined;
     expect(row?.id).toBe('sys-import');
   });

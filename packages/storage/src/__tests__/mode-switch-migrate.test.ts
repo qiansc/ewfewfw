@@ -21,9 +21,9 @@ type StoredEntity = {
   id: string;
   type: string;
   data: Record<string, unknown>;
-  proposal_id: string | null;
+  requirement_id: string | null;
   metadata: {
-    source_project: string;
+    root_id: string;
     status: string;
     content_hash: string;
     created_at: string;
@@ -35,7 +35,7 @@ class FakeServerAdapter {
   private entities = new Map<string, StoredEntity>();
   private feats = new Map<string, { status: string }>();
   private relations: Array<{ from_id: string; to_id: string; rel_type: string }> = [];
-  private deletions: Array<{ id: string; proposal_id: string | null }> = [];
+  private deletions: Array<{ id: string; requirement_id: string | null }> = [];
   private failOnSaveId?: string;
   public transitions: Array<{ feat_id: string; to_status?: string }> = [];
   public checklistActions: Array<{ action: string; feat_id: string }> = [];
@@ -44,22 +44,22 @@ class FakeServerAdapter {
   constructor(options?: { seed?: StoredEntity[]; failOnSaveId?: string }) {
     if (options?.seed) {
       for (const entity of options.seed) {
-        this.entities.set(this.buildKey(entity.id, entity.proposal_id), entity);
+        this.entities.set(this.buildKey(entity.id, entity.requirement_id), entity);
       }
     }
     this.failOnSaveId = options?.failOnSaveId;
   }
 
-  private buildKey(id: string, proposalId?: string | null): string {
-    return `${id}::${proposalId ?? ''}`;
+  private buildKey(id: string, requirementId?: string | null): string {
+    return `${id}::${requirementId ?? ''}`;
   }
 
   seedFeat(id: string): void {
     this.feats.set(id, { status: 'draft' });
   }
 
-  async read(params: { id: string; proposal_id?: string | null }): Promise<{ entity: StoredEntity } | null> {
-    const key = this.buildKey(params.id, params.proposal_id ?? null);
+  async read(params: { id: string; requirement_id?: string | null }): Promise<{ entity: StoredEntity } | null> {
+    const key = this.buildKey(params.id, params.requirement_id ?? null);
     const entity = this.entities.get(key);
     return entity ? { entity } : null;
   }
@@ -68,8 +68,8 @@ class FakeServerAdapter {
     id: string;
     type: string;
     data: Record<string, unknown>;
-    source_project?: string;
-    proposal_id?: string | null;
+    root_id?: string;
+    requirement_id?: string | null;
   }): Promise<{ success: boolean; id: string; status: string; content_hash: string }> {
     if (this.failOnSaveId && params.id === this.failOnSaveId) {
       throw new Error('save failed');
@@ -79,23 +79,23 @@ class FakeServerAdapter {
       id: params.id,
       type: params.type,
       data: params.data,
-      proposal_id: params.proposal_id ?? null,
+      requirement_id: params.requirement_id ?? null,
       metadata: {
-        source_project: params.source_project ?? 'default',
+        root_id: params.root_id ?? 'default',
         status: 'published',
         content_hash: 'hash',
         created_at: now,
         updated_at: now,
       },
     };
-    this.entities.set(this.buildKey(params.id, params.proposal_id ?? null), entity);
+    this.entities.set(this.buildKey(params.id, params.requirement_id ?? null), entity);
     this.lastSavedEntity = entity;
     return { success: true, id: params.id, status: 'published', content_hash: 'hash' };
   }
 
-  async delete(params: { id: string; proposal_id?: string | null }): Promise<{ success: boolean; id: string }> {
-    this.entities.delete(this.buildKey(params.id, params.proposal_id ?? null));
-    this.deletions.push({ id: params.id, proposal_id: params.proposal_id ?? null });
+  async delete(params: { id: string; requirement_id?: string | null }): Promise<{ success: boolean; id: string }> {
+    this.entities.delete(this.buildKey(params.id, params.requirement_id ?? null));
+    this.deletions.push({ id: params.id, requirement_id: params.requirement_id ?? null });
     return { success: true, id: params.id };
   }
 
@@ -158,7 +158,7 @@ describe('migrateLocalToServer', () => {
     const backupPath = createTempPath('migrate-local');
     const now = new Date().toISOString();
     const backup = {
-      version: '0.3.0',
+      version: '0.3.1',
       exported_at: now,
       entities: [
         {
@@ -166,12 +166,12 @@ describe('migrateLocalToServer', () => {
           type: 'system',
           data: { id: 'demo-system', name: 'Demo System' },
           metadata: {
-            source_project: 'demo-project',
+            root_id: 'demo-project',
             status: 'published',
             created_at: now,
             updated_at: now,
           },
-          proposal_id: null,
+          requirement_id: null,
         },
       ],
       relations: [],
@@ -196,7 +196,7 @@ describe('migrateLocalToServer', () => {
     const backupPath = createTempPath('migrate-meta');
     const now = new Date().toISOString();
     const backup = {
-      version: '0.3.0',
+      version: '0.3.1',
       exported_at: now,
       entities: [
         {
@@ -207,13 +207,13 @@ describe('migrateLocalToServer', () => {
           perspective: 'technical',
           data: { id: 'meta-system', name: 'Meta System' },
           metadata: {
-            source_project: 'demo-project',
+            root_id: 'demo-project',
             status: 'published',
             content_hash: 'hash-meta',
             created_at: now,
             updated_at: now,
           },
-          proposal_id: null,
+          requirement_id: null,
         },
       ],
       relations: [],
@@ -243,7 +243,7 @@ describe('migrateLocalToServer', () => {
     const backupPath = createTempPath('migrate-feat');
     const now = new Date().toISOString();
     const backup = {
-      version: '0.3.0',
+      version: '0.3.1',
       exported_at: now,
       entities: [],
       relations: [],
@@ -278,7 +278,7 @@ describe('migrateLocalToServer', () => {
     const backupPath = createTempPath('migrate-feat-skip');
     const now = new Date().toISOString();
     const backup = {
-      version: '0.3.0',
+      version: '0.3.1',
       exported_at: now,
       entities: [],
       relations: [],
@@ -314,7 +314,7 @@ describe('migrateLocalToServer', () => {
     const now = new Date().toISOString();
     const older = new Date(Date.now() - 1000).toISOString();
     const backup = {
-      version: '0.3.0',
+      version: '0.3.1',
       exported_at: now,
       entities: [
         {
@@ -322,13 +322,13 @@ describe('migrateLocalToServer', () => {
           type: 'system',
           data: { id: 'demo-system', name: 'Old' },
           metadata: {
-            source_project: 'demo-project',
+            root_id: 'demo-project',
             status: 'published',
             content_hash: 'hash-old',
             created_at: older,
             updated_at: older,
           },
-          proposal_id: null,
+          requirement_id: null,
         },
       ],
       relations: [],
@@ -342,9 +342,9 @@ describe('migrateLocalToServer', () => {
           id: 'demo-system',
           type: 'system',
           data: { id: 'demo-system', name: 'New' },
-          proposal_id: null,
+          requirement_id: null,
           metadata: {
-            source_project: 'demo-project',
+            root_id: 'demo-project',
             status: 'published',
             content_hash: 'hash-new',
             created_at: now,
@@ -369,7 +369,7 @@ describe('migrateLocalToServer', () => {
     const backupPath = createTempPath('migrate-permission');
     const now = new Date().toISOString();
     const backup = {
-      version: '0.3.0',
+      version: '0.3.1',
       exported_at: now,
       entities: [
         {
@@ -377,12 +377,12 @@ describe('migrateLocalToServer', () => {
           type: 'system',
           data: { id: 'demo-system', name: 'Demo System' },
           metadata: {
-            source_project: 'demo-project',
+            root_id: 'demo-project',
             status: 'published',
             created_at: now,
             updated_at: now,
           },
-          proposal_id: null,
+          requirement_id: null,
         },
       ],
       relations: [],
@@ -410,7 +410,7 @@ describe('migrateLocalToServer', () => {
     const backupPath = createTempPath('migrate-rollback');
     const now = new Date().toISOString();
     const backup = {
-      version: '0.3.0',
+      version: '0.3.1',
       exported_at: now,
       entities: [
         {
@@ -418,24 +418,24 @@ describe('migrateLocalToServer', () => {
           type: 'system',
           data: { id: 'entity-1', name: 'One' },
           metadata: {
-            source_project: 'demo-project',
+            root_id: 'demo-project',
             status: 'published',
             created_at: now,
             updated_at: now,
           },
-          proposal_id: null,
+          requirement_id: null,
         },
         {
           id: 'entity-2',
           type: 'system',
           data: { id: 'entity-2', name: 'Two' },
           metadata: {
-            source_project: 'demo-project',
+            root_id: 'demo-project',
             status: 'published',
             created_at: now,
             updated_at: now,
           },
-          proposal_id: null,
+          requirement_id: null,
         },
       ],
       relations: [],
@@ -466,7 +466,7 @@ describe('migrateLocalToServer', () => {
     const backupPath = createTempPath('migrate-relations');
     const now = new Date().toISOString();
     const backup = {
-      version: '0.3.0',
+      version: '0.3.1',
       exported_at: now,
       entities: [],
       relations: [

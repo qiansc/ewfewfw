@@ -6,7 +6,6 @@ import { InMemoryGraph } from '../in-memory-graph.js';
 import { GraphQueryCache } from '../graph-query-cache.js';
 import { list } from '../lite-adapter/crud-read.js';
 import type { AdapterContext } from '../lite-adapter/types.js';
-import type { EntityStatus } from '../adapterBaseTypes.js';
 
 const TMP_ROOT = join(process.cwd(), '.tmp', 'store-tests');
 const DB_PATH = join(TMP_ROOT, `lite-adapter-list-${Date.now()}.db`);
@@ -39,52 +38,43 @@ function createContext(): AdapterContext {
 
 function resetDb(): void {
   const db = store.getDatabase();
+  db.exec('DELETE FROM entity_versions;');
   db.exec('DELETE FROM metadata;');
   db.exec('DELETE FROM entities;');
 }
 
 function insertEntity(params: {
+  uuid: string;
   id: string;
-  proposalId?: string | null;
+  rootId?: string;
   type?: string;
-  sourceProject?: string;
-  status?: EntityStatus;
-  updatedAt?: string;
+  versions: string[];
 }): void {
   const db = store.getDatabase();
-  const now = params.updatedAt ?? new Date().toISOString();
-  const proposalId = params.proposalId ?? '';
-  const sourceProject = params.sourceProject ?? 'alpha';
+  const now = new Date().toISOString();
+  const rootId = params.rootId ?? 'alpha';
   const type = params.type ?? 'system';
-  const status = params.status ?? 'published';
+  const data = { id: params.id, name: params.id };
 
   db.prepare(`
-    INSERT INTO entities (id, source_project, proposal_id, type, kind, scope, perspective, data)
+    INSERT INTO entities (uuid, root_id, id, type, kind, scope, perspective, data)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(params.id, sourceProject, proposalId, type, null, null, null, JSON.stringify({ id: params.id }));
+  `).run(params.uuid, rootId, params.id, type, null, null, null, JSON.stringify(data));
 
   db.prepare(`
     INSERT INTO metadata (
-      entity_id, source_project, proposal_id, source_repo, external_url,
-      status, content_hash, created_at, updated_at, created_by, updated_by
+      entity_uuid, source_repo, external_url, status, content_hash, created_at, updated_at, created_by, updated_by
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    params.id,
-    sourceProject,
-    proposalId,
-    null,
-    null,
-    status,
-    'hash',
-    now,
-    now,
-    null,
-    null
-  );
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(params.uuid, null, null, 'published', 'hash', now, now, null, null);
+
+  const insertVersion = db.prepare(`INSERT INTO entity_versions (entity_uuid, version) VALUES (?, ?)`);
+  for (const v of params.versions) {
+    insertVersion.run(params.uuid, v);
+  }
 }
 
-describe('LiteAdapter list merge view', () => {
+describe('LiteAdapter list', () => {
   beforeAll(() => {
     mkdirSync(TMP_ROOT, { recursive: true });
     store = SQLiteStore.getInstance({ dbPath: DB_PATH });
@@ -102,24 +92,24 @@ describe('LiteAdapter list merge view', () => {
     resetDb();
   });
 
-  test('list uses feat version when proposal_id is provided', async () => {
-    insertEntity({ id: 'svc', proposalId: null, updatedAt: '2026-01-01T00:00:00.000Z' });
-    insertEntity({ id: 'svc', proposalId: 'feat-1', status: 'draft', updatedAt: '2026-01-02T00:00:00.000Z' });
+  test('list filters by root_id and type', async () => {
+    insertEntity({ uuid: 'u1', id: 'svc-a', rootId: 'alpha', type: 'system', versions: ['0.0.0'] });
+    insertEntity({ uuid: 'u2', id: 'svc-b', rootId: 'beta', type: 'system', versions: ['0.0.0'] });
+    insertEntity({ uuid: 'u3', id: 'comp-a', rootId: 'alpha', type: 'component', versions: ['0.0.0'] });
 
     const ctx = createContext();
-    const result = await list(ctx, { proposal_id: 'feat-1' });
-
-    expect(result.items?.length).toBe(1);
-    expect(result.items?.[0].proposal_id).toBe('feat-1');
+    const items = await list(ctx, { root_id: 'alpha', type: 'system' });
+    expect(items).toHaveLength(1);
+    expect(items[0].id).toBe('svc-a');
   });
 
-  test('count_only respects merge view', async () => {
-    insertEntity({ id: 'svc', proposalId: null, updatedAt: '2026-01-01T00:00:00.000Z' });
-    insertEntity({ id: 'svc', proposalId: 'feat-1', status: 'draft', updatedAt: '2026-01-02T00:00:00.000Z' });
+  test('list filters by version', async () => {
+    insertEntity({ uuid: 'u1', id: 'svc-a', versions: ['0.0.0'] });
+    insertEntity({ uuid: 'u2', id: 'svc-a', versions: ['1.0.0'] });
 
     const ctx = createContext();
-    const result = await list(ctx, { proposal_id: 'feat-1', count_only: true });
-
-    expect(result.total).toBe(1);
+    const items = await list(ctx, { root_id: 'alpha', id: 'svc-a', version: '1.0.0' });
+    expect(items).toHaveLength(1);
+    expect(items[0].uuid).toBe('u2');
   });
 });

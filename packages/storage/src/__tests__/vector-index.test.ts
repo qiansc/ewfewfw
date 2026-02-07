@@ -22,34 +22,32 @@ function makeEmbedding(seed: number): Float32Array {
 }
 
 function insertEntity(params: {
+  uuid: string;
   id: string;
-  sourceProject?: string;
-  proposalId?: string | null;
+  rootId?: string;
+  versions?: string[];
   data?: string;
   status?: 'published' | 'archived' | 'deprecated';
 }): void {
   const db = store.getDatabase();
   const now = new Date().toISOString();
-  const sourceProject = params.sourceProject ?? 'default';
-  const proposalId = params.proposalId ?? '';
+  const rootId = params.rootId ?? 'default';
   const data = params.data ?? JSON.stringify({ name: 'hello world' });
   const status = params.status ?? 'published';
 
   db.prepare(`
-    INSERT INTO entities (id, source_project, proposal_id, type, kind, scope, perspective, data)
+    INSERT INTO entities (uuid, root_id, id, type, kind, scope, perspective, data)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(params.id, sourceProject, proposalId, 'system', null, null, null, data);
+  `).run(params.uuid, rootId, params.id, 'system', null, null, null, data);
 
   db.prepare(`
     INSERT INTO metadata (
-      entity_id, source_project, proposal_id, source_repo, external_url,
+      entity_uuid, source_repo, external_url,
       status, content_hash, created_at, updated_at, created_by, updated_by
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    params.id,
-    sourceProject,
-    proposalId,
+    params.uuid,
     null,
     null,
     status,
@@ -59,6 +57,12 @@ function insertEntity(params: {
     null,
     null
   );
+
+  const versions = params.versions ?? ['0.0.0'];
+  const insertVersion = db.prepare(`INSERT INTO entity_versions (entity_uuid, version) VALUES (?, ?)`);
+  for (const v of versions) {
+    insertVersion.run(params.uuid, v);
+  }
 }
 
 beforeAll(() => {
@@ -79,13 +83,14 @@ afterAll(() => {
 describe('Vector Index Maintenance', () => {
   test('rebuildVectorIndex skips archived and invalid data', async () => {
     const db = store.getDatabase();
+    db.exec('DELETE FROM entity_versions;');
     db.exec('DELETE FROM metadata;');
     db.exec('DELETE FROM entities;');
     store.getVectorStore()?.rebuild([]);
 
-    insertEntity({ id: 'entity-ok', data: JSON.stringify({ name: 'alpha' }) });
-    insertEntity({ id: 'entity-archived', status: 'archived' });
-    insertEntity({ id: 'entity-empty', data: JSON.stringify({}) });
+    insertEntity({ uuid: 'u-ok', id: 'entity-ok', data: JSON.stringify({ name: 'alpha' }) });
+    insertEntity({ uuid: 'u-archived', id: 'entity-archived', status: 'archived' });
+    insertEntity({ uuid: 'u-empty', id: 'entity-empty', data: JSON.stringify({}) });
 
     const result = await store.rebuildVectorIndex();
     expect(result.total).toBe(2);
@@ -94,7 +99,7 @@ describe('Vector Index Maintenance', () => {
 
     const vectorStore = store.getVectorStore();
     expect(vectorStore).not.toBeNull();
-    const key = generateVectorKey('default', 'entity-ok', '');
+    const key = generateVectorKey('u-ok');
     expect(vectorStore?.has(key)).toBe(true);
   });
 });

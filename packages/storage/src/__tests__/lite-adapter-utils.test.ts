@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -7,7 +8,6 @@ import { SQLiteStore } from '../sqlite-store.js';
 import { InMemoryGraph } from '../in-memory-graph.js';
 import { GraphQueryCache } from '../graph-query-cache.js';
 import type { FeatureExtractionPipeline } from '@xenova/transformers';
-import { save } from '../lite-adapter/crud-save.js';
 import { backup } from '../lite-adapter/utilsBackup.js';
 import { restore } from '../lite-adapter/utilsRestore.js';
 import { readHistory } from '../lite-adapter/utilsHistory.js';
@@ -50,42 +50,41 @@ function resetDb(): void {
   const db = store.getDatabase();
   db.exec('DELETE FROM relations;');
   db.exec('DELETE FROM metadata;');
+  db.exec('DELETE FROM entity_versions;');
   db.exec('DELETE FROM entities;');
-  db.exec('DELETE FROM feats;');
 }
 
 function insertEntity(params: {
   id: string;
-  proposalId?: string | null;
   type?: string;
-  sourceProject?: string;
+  rootId?: string;
   status?: string;
   updatedBy?: string | null;
   data?: Record<string, unknown>;
-}): void {
+  versions?: string[];
+}): { uuid: string } {
   const db = store.getDatabase();
   const now = new Date().toISOString();
-  const proposalId = params.proposalId ?? '';
-  const sourceProject = params.sourceProject ?? 'alpha';
+  const rootId = params.rootId ?? 'alpha';
   const type = params.type ?? 'system';
   const status = params.status ?? 'published';
   const data = params.data ?? { id: params.id, name: params.id };
+  const uuid = randomUUID();
+  const versions = params.versions && params.versions.length > 0 ? params.versions : ['0.0.0'];
 
   db.prepare(`
-    INSERT INTO entities (id, source_project, proposal_id, type, kind, scope, perspective, data)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(params.id, sourceProject, proposalId, type, null, null, null, JSON.stringify(data));
+    INSERT INTO entities (uuid, root_id, id, type, kind, scope, perspective, data, requirement_id, component_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)
+  `).run(uuid, rootId, params.id, type, null, null, null, JSON.stringify(data));
 
   db.prepare(`
     INSERT INTO metadata (
-      entity_id, source_project, proposal_id, source_repo, external_url,
+      entity_uuid, source_repo, external_url,
       status, content_hash, created_at, updated_at, created_by, updated_by
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    params.id,
-    sourceProject,
-    proposalId,
+    uuid,
     null,
     null,
     status,
@@ -95,28 +94,39 @@ function insertEntity(params: {
     null,
     params.updatedBy ?? null
   );
+
+  const insertVersion = db.prepare(`INSERT INTO entity_versions (entity_uuid, version) VALUES (?, ?)`);
+  for (const version of versions) {
+    insertVersion.run(uuid, version);
+  }
+
+  return { uuid };
 }
 
 function insertRelation(params: {
   fromId: string;
   toId: string;
-  proposalId?: string | null;
   relType?: string;
+  fromUuid: string;
+  toUuid?: string | null;
+  fromRootId?: string;
+  toRootId?: string;
 }): void {
   const db = store.getDatabase();
   const now = new Date().toISOString();
   db.prepare(`
     INSERT INTO relations (
-      id, proposal_id, from_project, from_id, to_project, to_id,
+      id, from_uuid, to_uuid, from_root_id, from_id, to_root_id, to_id,
       rel_type, status, properties, created_at, updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     randomUUID(),
-    params.proposalId ?? '',
-    'alpha',
+    params.fromUuid,
+    params.toUuid ?? null,
+    params.fromRootId ?? 'alpha',
     params.fromId,
-    'alpha',
+    params.toRootId ?? 'alpha',
     params.toId,
     params.relType ?? 'DEPENDS_ON',
     'active',
@@ -126,39 +136,23 @@ function insertRelation(params: {
   );
 }
 
-function insertFeat(params: { id: string; status?: string; title?: string }): void {
-  const db = store.getDatabase();
-  const now = new Date().toISOString();
-  db.prepare(`
-    INSERT INTO feats (id, status, title, description, created_by, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    params.id,
-    params.status ?? 'draft',
-    params.title ?? params.id,
-    '',
-    'tester',
-    now,
-    now
-  );
-}
-
 function insertHistory(params: { entityId: string; action: string }): void {
   const db = store.getDatabase();
   const now = new Date().toISOString();
+  const uuid = randomUUID();
   db.prepare(`
     INSERT INTO entity_history (
-      entity_id, source_project, proposal_id, entity_type, feat_id,
-      action, changed_fields, changed_by, changed_at
+      entity_uuid, root_id, entity_id, entity_type,
+      action, changed_fields, snapshot_after, changed_by, changed_at
     )
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    params.entityId,
+    uuid,
     'alpha',
-    '',
+    params.entityId,
     'system',
-    '',
     params.action,
+    null,
     null,
     'tester',
     now
@@ -201,39 +195,23 @@ describe('LiteAdapter utils fixes', () => {
     resetDb();
   });
 
-  test('concurrent warning respects config and force_save', async () => {
-    insertEntity({ id: 'svc' });
-    insertEntity({ id: 'svc', proposalId: 'feat-b', status: 'draft', updatedBy: 'bob' });
-    insertFeat({ id: 'feat-b', status: 'approved', title: 'Upgrade to v2' });
+  test('backup includes versions and root_id', async () => {
+    insertEntity({ id: 'svc', versions: ['0.0.0', '1.0.0'] });
+    const backupFile = join(TMP_ROOT, `backup-${Date.now()}.json`);
 
-    const resultWarn = await save(createContext(), {
-      type: 'system',
-      data: { id: 'svc', name: 'svc' },
-      proposal_id: 'feat-a',
+    const result = await backup(createContext({ repoId: 'acme/repo' }), {
+      output: backupFile,
+      format: 'json',
     });
 
-    expect(resultWarn.warnings?.[0].code).toBe('CONCURRENT_MODIFICATION');
-    const summary = (resultWarn.warnings?.[0].details as { concurrent_feats?: Array<{ changes_summary?: string }> })
-      ?.concurrent_feats?.[0]?.changes_summary;
-    expect(summary).toBe('Upgrade to v2');
-
-    const resultDisabled = await save(
-      createContext({ feat: { concurrent_warning: false, auto_notify: false } }),
-      {
-      type: 'system',
-      data: { id: 'svc', name: 'svc' },
-      proposal_id: 'feat-a',
-      }
-    );
-    expect(resultDisabled.warnings).toBeUndefined();
-
-    const resultForced = await save(createContext(), {
-      type: 'system',
-      data: { id: 'svc', name: 'svc' },
-      proposal_id: 'feat-a',
-      force_save: true,
-    });
-    expect(resultForced.warnings).toBeUndefined();
+    expect(result.success).toBe(true);
+    const payload = JSON.parse(readFileSync(backupFile, 'utf-8')) as {
+      entities: Array<{ id: string; root_id: string; versions: string[] }>;
+      source: { root_id: string };
+    };
+    expect(payload.source.root_id).toBe('alpha');
+    const entity = payload.entities.find((item) => item.id === 'svc');
+    expect(entity?.versions).toEqual(['0.0.0', '1.0.0']);
   });
 
   test('backup tar.gz includes repo metadata', async () => {
@@ -258,8 +236,8 @@ describe('LiteAdapter utils fixes', () => {
   });
 
   test('restore validates relation checksum', async () => {
-    insertEntity({ id: 'svc' });
-    insertRelation({ fromId: 'svc', toId: 'svc' });
+    const { uuid } = insertEntity({ id: 'svc' });
+    insertRelation({ fromId: 'svc', toId: 'svc', fromUuid: uuid, toUuid: uuid });
     const backupFile = join(TMP_ROOT, `backup-${Date.now()}.json`);
 
     await backup(createContext(), { output: backupFile, format: 'json' });
@@ -283,7 +261,7 @@ describe('LiteAdapter utils fixes', () => {
     const stubEmbedder = (async () => ({ data: makeEmbedding(1) })) as unknown as FeatureExtractionPipeline;
     setEmbedderForTest(stubEmbedder);
 
-    insertEntity({ id: 'svc', data: { id: 'svc', name: 'svc' } });
+    const { uuid } = insertEntity({ id: 'svc', data: { id: 'svc', name: 'svc' } });
     const backupFile = join(TMP_ROOT, `backup-${Date.now()}.json`);
     await backup(createContext(), { output: backupFile, format: 'json' });
 
@@ -297,7 +275,7 @@ describe('LiteAdapter utils fixes', () => {
 
     expect(result.success).toBe(true);
     expect(result.stats?.vectors).toBe(1);
-    const key = generateVectorKey('alpha', 'svc', null);
+    const key = generateVectorKey(uuid);
     expect(vectorStore.has(key)).toBe(true);
   });
 

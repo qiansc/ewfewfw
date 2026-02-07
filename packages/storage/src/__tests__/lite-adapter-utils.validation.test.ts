@@ -43,41 +43,40 @@ function resetDb(): void {
   const db = store.getDatabase();
   db.exec('DELETE FROM relations;');
   db.exec('DELETE FROM metadata;');
+  db.exec('DELETE FROM entity_versions;');
   db.exec('DELETE FROM entities;');
-  db.exec('DELETE FROM feats;');
 }
 
 function insertEntity(params: {
   id: string;
-  proposalId?: string | null;
   type?: string;
-  sourceProject?: string;
+  rootId?: string;
+  requirementId?: string | null;
   status?: string;
   data?: Record<string, unknown>;
-}): void {
+}): { uuid: string } {
   const db = store.getDatabase();
   const now = new Date().toISOString();
-  const proposalId = params.proposalId ?? '';
-  const sourceProject = params.sourceProject ?? 'alpha';
+  const requirementId = params.requirementId ?? null;
+  const rootId = params.rootId ?? 'alpha';
   const type = params.type ?? 'system';
   const status = params.status ?? 'published';
   const data = params.data ?? { id: params.id, name: params.id };
+  const uuid = randomUUID();
 
   db.prepare(`
-    INSERT INTO entities (id, source_project, proposal_id, type, kind, scope, perspective, data)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(params.id, sourceProject, proposalId, type, null, null, null, JSON.stringify(data));
+    INSERT INTO entities (uuid, root_id, id, type, kind, scope, perspective, data, requirement_id, component_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+  `).run(uuid, rootId, params.id, type, null, null, null, JSON.stringify(data), requirementId);
 
   db.prepare(`
     INSERT INTO metadata (
-      entity_id, source_project, proposal_id, source_repo, external_url,
+      entity_uuid, source_repo, external_url,
       status, content_hash, created_at, updated_at, created_by, updated_by
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    params.id,
-    sourceProject,
-    proposalId,
+    uuid,
     null,
     null,
     status,
@@ -87,28 +86,36 @@ function insertEntity(params: {
     null,
     null
   );
+
+  db.prepare(`INSERT INTO entity_versions (entity_uuid, version) VALUES (?, ?)`).run(uuid, '0.0.0');
+
+  return { uuid };
 }
 
 function insertRelation(params: {
   fromId: string;
   toId: string;
-  proposalId?: string | null;
+  fromUuid: string;
+  toUuid?: string | null;
+  fromRootId?: string;
+  toRootId?: string;
   relType?: string;
 }): void {
   const db = store.getDatabase();
   const now = new Date().toISOString();
   db.prepare(`
     INSERT INTO relations (
-      id, proposal_id, from_project, from_id, to_project, to_id,
+      id, from_uuid, to_uuid, from_root_id, from_id, to_root_id, to_id,
       rel_type, status, properties, created_at, updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     randomUUID(),
-    params.proposalId ?? '',
-    'alpha',
+    params.fromUuid,
+    params.toUuid ?? null,
+    params.fromRootId ?? 'alpha',
     params.fromId,
-    'alpha',
+    params.toRootId ?? 'alpha',
     params.toId,
     params.relType ?? 'DEPENDS_ON',
     'active',
@@ -118,21 +125,24 @@ function insertRelation(params: {
   );
 }
 
-function insertFeat(params: { id: string; status?: string; title?: string }): void {
+function insertFeat(params: { id: string; status?: string; title?: string }): { uuid: string } {
   const db = store.getDatabase();
   const now = new Date().toISOString();
+  const uuid = randomUUID();
   db.prepare(`
-    INSERT INTO feats (id, status, title, description, created_by, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    params.id,
-    params.status ?? 'draft',
-    params.title ?? params.id,
-    '',
-    'tester',
-    now,
-    now
-  );
+    INSERT INTO entities (
+      uuid, root_id, id, type, kind, scope, perspective, data, requirement_id, component_id
+    )
+    VALUES (?, '', ?, 'feat', NULL, NULL, NULL, ?, NULL, NULL)
+  `).run(uuid, params.id, JSON.stringify({ id: params.id, title: params.title ?? params.id }));
+  db.prepare(`
+    INSERT INTO metadata (
+      entity_uuid, source_repo, external_url, status, content_hash, created_at, updated_at, created_by, updated_by
+    )
+    VALUES (?, NULL, NULL, ?, NULL, ?, ?, ?, NULL)
+  `).run(uuid, params.status ?? 'draft', now, now, 'tester');
+  db.prepare(`INSERT INTO entity_versions (entity_uuid, version) VALUES (?, ?)`).run(uuid, '0.0.0');
+  return { uuid };
 }
 
 describe('LiteAdapter utils validation', () => {
@@ -154,28 +164,28 @@ describe('LiteAdapter utils validation', () => {
   });
 
   test('adr completeness captures tech stack and depends_on changes', async () => {
-    insertFeat({ id: 'feat-arch-change', status: 'draft' });
+    const { uuid: featUuid } = insertFeat({ id: 'feat-arch-change', status: 'draft' });
     insertEntity({
       id: 'svc',
       type: 'container',
       data: { id: 'svc', name: 'svc', technology: 'mysql' },
     });
-    insertEntity({
+    const { uuid: svcUuid } = insertEntity({
       id: 'svc',
-      proposalId: 'feat-arch-change',
+      requirementId: featUuid,
       type: 'container',
       data: { id: 'svc', name: 'svc', technology: 'postgresql' },
     });
-    insertEntity({
+    const { uuid: depUuid } = insertEntity({
       id: 'dep',
-      proposalId: 'feat-arch-change',
+      requirementId: featUuid,
       type: 'container',
       data: { id: 'dep', name: 'dep' },
     });
-    insertRelation({ fromId: 'svc', toId: 'dep', proposalId: 'feat-arch-change' });
+    insertRelation({ fromId: 'svc', toId: 'dep', fromUuid: svcUuid, toUuid: depUuid });
 
     const result = await validate(createContext(), {
-      proposal_id: 'feat-arch-change',
+      requirement_id: 'feat-arch-change',
       checks: ['adr_completeness'],
     });
 
@@ -191,10 +201,16 @@ describe('LiteAdapter utils validation', () => {
 
   test('validate adr completeness reports architecture change without adr', async () => {
     insertEntity({ id: 'sys', data: { id: 'sys', name: 'v1' } });
-    insertEntity({ id: 'sys', proposalId: 'feat-a', status: 'draft', data: { id: 'sys', name: 'v2' } });
+    const { uuid: featUuid } = insertFeat({ id: 'feat-a', status: 'draft' });
+    insertEntity({
+      id: 'sys',
+      requirementId: featUuid,
+      status: 'draft',
+      data: { id: 'sys', name: 'v2' },
+    });
 
     const result = await validate(createContext(), {
-      proposal_id: 'feat-a',
+      requirement_id: 'feat-a',
       checks: ['adr_completeness'],
     });
 

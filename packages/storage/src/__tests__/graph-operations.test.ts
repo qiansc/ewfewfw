@@ -31,16 +31,16 @@ function createContext(graph: InMemoryGraph, defaultProject = 'alpha'): AdapterC
 }
 
 describe('graph-operations cache isolation', () => {
-  test('queryDeps caches per source_project', async () => {
+  test('queryDeps caches per root_id', async () => {
     const graph = new InMemoryGraph();
-    graph.addRelation('alpha', 'svc', 'alpha', 'dep', 'depends_on');
-    graph.addRelation('beta', 'svc', 'beta', 'other', 'depends_on');
+    graph.addRelation('alpha', 'svc', 'alpha', 'dep', 'DEPENDS_ON', 'u1', 'system', 'u2', 'system');
+    graph.addRelation('beta', 'svc', 'beta', 'other', 'DEPENDS_ON', 'u3', 'system', 'u4', 'system');
 
     const ctx = createContext(graph);
 
     const alpha = await queryDeps(ctx, {
       id: 'svc',
-      source_project: 'alpha',
+      root_id: 'alpha',
       direction: 'downstream',
       depth: 1,
     });
@@ -48,7 +48,7 @@ describe('graph-operations cache isolation', () => {
 
     const beta = await queryDeps(ctx, {
       id: 'svc',
-      source_project: 'beta',
+      root_id: 'beta',
       direction: 'downstream',
       depth: 1,
     });
@@ -57,17 +57,17 @@ describe('graph-operations cache isolation', () => {
 
   test('project-scoped invalidation clears cached entry', async () => {
     const graph = new InMemoryGraph();
-    graph.addRelation('alpha', 'svc', 'alpha', 'dep', 'depends_on');
+    graph.addRelation('alpha', 'svc', 'alpha', 'dep', 'DEPENDS_ON', 'u1', 'system', 'u2', 'system');
     const ctx = createContext(graph);
 
     await queryDeps(ctx, {
       id: 'svc',
-      source_project: 'alpha',
+      root_id: 'alpha',
       direction: 'downstream',
       depth: 1,
     });
 
-    const cacheKey = `deps:${toEntityCacheKey('alpha', 'svc')}:downstream:1:`;
+    const cacheKey = `deps:${toEntityCacheKey('alpha', 'svc')}:downstream:1`;
     expect(ctx.cache.get(cacheKey)).not.toBeNull();
 
     ctx.cache.invalidate(toEntityCacheKey('alpha', 'svc'));
