@@ -9,8 +9,8 @@ export interface CommandIO {
 }
 
 export interface BackupEntity {
-  source_project?: string;
-  metadata?: { source_project?: string };
+  root_id?: string;
+  metadata?: { root_id?: string };
 }
 
 export interface PermissionSummary {
@@ -25,7 +25,6 @@ export interface ServiceHealth {
   neo4j: boolean;
   milvus: boolean;
   ollama: boolean;
-  storage_backend: boolean;
 }
 
 export interface ServerDockerDeps {

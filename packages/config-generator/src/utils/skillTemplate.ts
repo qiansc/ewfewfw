@@ -5,16 +5,16 @@ import { fileExists, joinPath, readFileContent } from "./fileUtils.js";
 import { logger } from "./logger.js";
 
 export interface SkillTemplateContext {
-  current_proposal_id?: string | null;
-  current_proposal_status?: string | null;
-  current_proposal_title?: string | null;
+  current_feat_uuid?: string | null;
+  current_feat_status?: string | null;
+  current_feat_title?: string | null;
 }
 
 function readEnvContext(): SkillTemplateContext {
   return {
-    current_proposal_id: process.env.C4A_CURRENT_PROPOSAL_ID || null,
-    current_proposal_status: process.env.C4A_CURRENT_PROPOSAL_STATUS || null,
-    current_proposal_title: process.env.C4A_CURRENT_PROPOSAL_TITLE || null,
+    current_feat_uuid: process.env.C4A_CURRENT_FEAT_UUID || null,
+    current_feat_status: process.env.C4A_CURRENT_FEAT_STATUS || null,
+    current_feat_title: process.env.C4A_CURRENT_FEAT_TITLE || null,
   };
 }
 
@@ -31,9 +31,9 @@ async function readFileContext(baseDir: string): Promise<SkillTemplateContext> {
       title?: string;
     };
     return {
-      current_proposal_id: parsed.id ?? null,
-      current_proposal_status: parsed.status ?? null,
-      current_proposal_title: parsed.title ?? null,
+      current_feat_uuid: parsed.id ?? null,
+      current_feat_status: parsed.status ?? null,
+      current_feat_title: parsed.title ?? null,
     };
   } catch (error) {
     logger.warn(`读取当前 Feature 上下文失败: ${contextPath}`);
@@ -52,11 +52,11 @@ export async function loadSkillTemplateContext(baseDir: string): Promise<SkillTe
   };
 }
 
-function replaceIfBlock(template: string, hasProposal: boolean): string {
+function replaceIfBlock(template: string, hasFeat: boolean): string {
   const ifPattern =
-    /{{#if\s+current_proposal_id\s*}}([\s\S]*?)(?:{{else}}([\s\S]*?))?{{\/if}}/g;
+    /{{#if\s+current_feat_uuid\s*}}([\s\S]*?)(?:{{else}}([\s\S]*?))?{{\/if}}/g;
   return template.replace(ifPattern, (_match, ifBlock, elseBlock) =>
-    hasProposal ? ifBlock : elseBlock ?? ""
+    hasFeat ? ifBlock : elseBlock ?? ""
   );
 }
 
@@ -74,10 +74,10 @@ export function renderSkillTemplate(
   template: string,
   context: SkillTemplateContext
 ): string {
-  const hasProposal = Boolean(context.current_proposal_id);
-  let rendered = replaceIfBlock(template, hasProposal);
-  rendered = replaceVariable(rendered, "current_proposal_id", context.current_proposal_id);
-  rendered = replaceVariable(rendered, "current_proposal_status", context.current_proposal_status);
-  rendered = replaceVariable(rendered, "current_proposal_title", context.current_proposal_title);
+  const hasFeat = Boolean(context.current_feat_uuid);
+  let rendered = replaceIfBlock(template, hasFeat);
+  rendered = replaceVariable(rendered, "current_feat_uuid", context.current_feat_uuid);
+  rendered = replaceVariable(rendered, "current_feat_status", context.current_feat_status);
+  rendered = replaceVariable(rendered, "current_feat_title", context.current_feat_title);
   return rendered;
 }

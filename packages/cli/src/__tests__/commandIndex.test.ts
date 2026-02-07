@@ -46,7 +46,7 @@ describe("runCommand", () => {
       restore();
       process.exitCode = previousExit;
     }
-    expect(logs.join("\n")).toContain("0.3.0");
+    expect(logs.join("\n")).toContain("0.3.1");
   });
 
   test("unknown command sets exitCode and prints error", async () => {

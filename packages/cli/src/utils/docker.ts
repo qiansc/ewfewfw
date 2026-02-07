@@ -40,7 +40,6 @@ const DEFAULT_CONTAINER_NAMES = [
   "c4a-neo4j",
   "c4a-milvus",
   "c4a-ollama",
-  "c4a-storage-backend",
 ];
 
 function parseContainerStatusLine(line: string): ContainerStatus | null {

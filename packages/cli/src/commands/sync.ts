@@ -22,7 +22,6 @@ interface SyncOptionsInput {
 }
 
 interface SyncArgs {
-  proposalId?: string;
   options: SyncOptionsInput;
 }
 
@@ -32,7 +31,6 @@ interface SyncSnapshot {
     string,
     {
       content_hash: string;
-      proposal_id?: string;
     }
   >;
 }
@@ -43,7 +41,6 @@ interface LocalFileInfo {
   type: EntityType;
   content_hash: string;
   updated_at: string;
-  proposal_id?: string;
   content?: string;
 }
 
@@ -117,6 +114,11 @@ export async function syncCommand(
       process.exitCode = 3;
       return;
     }
+    if (!projectConfig.root_id) {
+      deps.error("未配置 root_id，请先在 .context/.c4a.yaml 设置 root_id");
+      process.exitCode = 3;
+      return;
+    }
 
     const mode = projectConfig.mode;
     deps.log("\n  同步架构知识 (双向)\n");
@@ -135,7 +137,6 @@ export async function syncCommand(
 
 export function parseSyncArgs(args: string[]): SyncArgs | Error {
   const options: SyncOptionsInput = {};
-  let proposalId: string | undefined;
 
   const takeValue = (index: number): string | undefined => {
     if (index >= args.length) return undefined;
@@ -193,12 +194,12 @@ export function parseSyncArgs(args: string[]): SyncArgs | Error {
         default:
           return new Error(`未知参数: --${key}`);
       }
-    } else if (!proposalId) {
-      proposalId = arg;
+    } else {
+      return new Error(`未知参数: ${arg}`);
     }
   }
 
-  return { proposalId, options };
+  return { options };
 }
 
 async function syncLocal(
@@ -211,10 +212,11 @@ async function syncLocal(
   const statusFilter = parsed.options.statusFilter ?? "published";
   const mode = parsed.options.mode ?? "incremental";
   const direction = parsed.options.direction;
+  const rootId = projectConfig.root_id;
 
   const lastSyncTime = await readLastSyncTime(contextDir);
   const fileChanges = await detectFileChanges(contextDir, lastSyncTime);
-  const dbChanges = await detectDbChanges(client, projectConfig.project_id, lastSyncTime);
+  const dbChanges = await detectDbChanges(client, rootId, lastSyncTime);
 
   if (direction) {
     await runStoreSync(client, direction, {
@@ -291,7 +293,6 @@ async function syncServerRemote(
     local_manifest: localManifest,
     snapshot,
     options: {
-      proposal_id: parsed.proposalId,
       status_filter: parsed.options.statusFilter ?? "all",
       conflict_policy: parsed.options.conflictPolicy ?? "prompt",
     },
@@ -314,8 +315,7 @@ async function syncServerRemote(
   await executeRemainingActions(
     response.actions,
     contextDir,
-    parsed.proposalId,
-    projectConfig.project_id,
+    projectConfig.root_id,
     deps,
     client,
   );
@@ -346,8 +346,7 @@ async function runStoreSync(
 async function executeRemainingActions(
   actions: SyncAction[],
   contextDir: string,
-  proposalId: string | undefined,
-  sourceProject: string | undefined,
+  rootId: string | undefined,
   deps: SyncCommandDeps,
   client: McpClientLike,
 ): Promise<void> {
@@ -364,18 +363,15 @@ async function executeRemainingActions(
         deps.log(`🗑️  删除本地: ${action.path}`);
         break;
       case "delete_remote":
-        await client.request("c4a_store_delete", {
-          id: action.entity_id,
-          proposal_id: proposalId ?? null,
-        });
+        await deleteRemoteEntity(client, rootId, action.entity_id);
         deps.log(`🗑️  删除远程: ${action.entity_id}`);
         break;
       case "upload":
-        await uploadLocalEntity(contextDir, action, proposalId, sourceProject, client);
+        await uploadLocalEntity(contextDir, action, rootId, client);
         deps.log(`⬆️  上传: ${action.path ?? action.entity_id}`);
         break;
       case "conflict":
-        await handleConflict(action, contextDir, proposalId, sourceProject, deps, client);
+        await handleConflict(action, contextDir, rootId, deps, client);
         break;
       case "skip":
       default:
@@ -387,8 +383,7 @@ async function executeRemainingActions(
 async function handleConflict(
   conflict: SyncAction,
   contextDir: string,
-  proposalId: string | undefined,
-  sourceProject: string | undefined,
+  rootId: string | undefined,
   deps: SyncCommandDeps,
   client: McpClientLike,
 ): Promise<void> {
@@ -399,7 +394,7 @@ async function handleConflict(
 
   if (conflictType === "both_modified") {
     if (choice === 0) {
-      await uploadLocalEntity(contextDir, conflict, proposalId, sourceProject, client);
+      await uploadLocalEntity(contextDir, conflict, rootId, client);
       deps.log("已选择使用本地版本");
     } else if (choice === 1) {
       if (conflict.remote_content) {
@@ -408,7 +403,7 @@ async function handleConflict(
       }
     } else if (choice === 2) {
       await showDiff(contextDir, conflict);
-      await handleConflict(conflict, contextDir, proposalId, sourceProject, deps, client);
+      await handleConflict(conflict, contextDir, rootId, deps, client);
     } else {
       deps.log("已跳过冲突");
     }
@@ -419,7 +414,7 @@ async function handleConflict(
     if (choice === 0) {
       await deleteLocalFile(contextDir, conflict.path);
     } else if (choice === 1) {
-      await uploadLocalEntity(contextDir, conflict, proposalId, sourceProject, client);
+      await uploadLocalEntity(contextDir, conflict, rootId, client);
     } else {
       deps.log("已跳过冲突");
     }
@@ -428,10 +423,7 @@ async function handleConflict(
 
   if (conflictType === "local_deleted") {
     if (choice === 0) {
-      await client.request("c4a_store_delete", {
-        id: conflict.entity_id,
-        proposal_id: proposalId ?? null,
-      });
+      await deleteRemoteEntity(client, rootId, conflict.entity_id);
     } else if (choice === 1 && conflict.remote_content) {
       await writeContent(contextDir, conflict.path, conflict.remote_content);
     } else {
@@ -464,8 +456,7 @@ async function showDiff(contextDir: string, conflict: SyncAction): Promise<void>
 async function uploadLocalEntity(
   contextDir: string,
   action: SyncAction,
-  proposalId: string | undefined,
-  sourceProject: string | undefined,
+  rootId: string | undefined,
   client: McpClientLike,
 ): Promise<void> {
   if (!action.path || !action.type) return;
@@ -476,9 +467,28 @@ async function uploadLocalEntity(
     content,
     format: "yaml",
     id: action.entity_id,
-    proposal_id: proposalId ?? null,
-    source_project: sourceProject,
+    root_id: rootId,
   });
+}
+
+async function deleteRemoteEntity(
+  client: McpClientLike,
+  rootId: string | undefined,
+  entityId: string,
+): Promise<void> {
+  if (!rootId) {
+    throw new Error("root_id 未配置，无法删除远程实体");
+  }
+  const result = await client.request<unknown>("c4a_store_read", {
+    root_id: rootId,
+    id: entityId,
+  });
+  const entity = Array.isArray(result) ? result[0] : result;
+  const uuid = (entity as { uuid?: string } | null)?.uuid;
+  if (!uuid) {
+    throw new Error(`未找到实体 UUID: ${entityId}`);
+  }
+  await client.request("c4a_store_delete", { uuid, cascade: true });
 }
 
 async function collectLocalManifestWithContent(contextDir: string): Promise<LocalManifest> {
@@ -501,7 +511,6 @@ async function collectLocalManifestWithContent(contextDir: string): Promise<Loca
       type: info.type,
       content_hash: calculateHash(content, "yaml"),
       updated_at: entry.mtime.toISOString(),
-      proposal_id: info.proposalId,
       content,
     });
   }
@@ -511,15 +520,14 @@ async function collectLocalManifestWithContent(contextDir: string): Promise<Loca
 function parseEntityInfo(
   parsed: Record<string, unknown>,
   relativePath: string,
-): { id: string; type: EntityType | "feat"; proposalId?: string } | null {
+): { id: string; type: EntityType | "feat" } | null {
   const rawType = parsed.type;
   if (typeof rawType !== "string") return null;
   const normalizedType = normalizeDslType(rawType);
   if (!normalizedType) return null;
   const id = extractEntityId(parsed, normalizedType, relativePath);
   if (!id) return null;
-  const proposalId = extractProposalId(relativePath);
-  return { id, type: normalizedType, proposalId };
+  return { id, type: normalizedType };
 }
 
 function normalizeDslType(rawType: string): EntityType | "feat" | null {
@@ -556,16 +564,6 @@ function extractEntityId(
 function deriveIdFromPath(relativePath: string): string {
   const file = relativePath.split(sep).pop() ?? "";
   return file.replace(/\.c4a\.yaml$/i, "").replace(/\.yaml$/i, "");
-}
-
-function extractProposalId(relativePath: string): string | undefined {
-  const segments = normalizePath(relativePath).split("/");
-  const featIndex = segments.indexOf("feat");
-  if (featIndex >= 0 && segments.length > featIndex + 1) {
-    const featId = segments[featIndex + 1];
-    if (featId.startsWith("feat-")) return featId;
-  }
-  return undefined;
 }
 
 function isYamlFile(relativePath: string): boolean {
@@ -621,12 +619,12 @@ async function detectFileChanges(contextDir: string, since: Date): Promise<numbe
 
 async function detectDbChanges(
   client: McpClientLike,
-  projectId: string | undefined,
+  rootId: string | undefined,
   since: Date,
 ): Promise<number> {
   const updatedAfter = since.toISOString();
   const result = await client.request<{ items?: Array<{ id: string }> }>("c4a_store_list", {
-    project_id: projectId,
+    root_id: rootId,
     updated_after: updatedAfter,
     limit: 1,
   });

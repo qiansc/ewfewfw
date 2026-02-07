@@ -8,6 +8,7 @@ import { templateCommand } from "./template.js";
 import { schemaCommand } from "./schema.js";
 import { serverCommand } from "./server.js";
 import { localCommand } from "./local.js";
+import { versionCommand } from "./version.js";
 
 export type CommandHandler = (args: string[]) => Promise<void>;
 
@@ -22,6 +23,7 @@ const COMMANDS: Record<string, CommandHandler> = {
   schema: schemaCommand,
   server: serverCommand,
   local: localCommand,
+  version: versionCommand,
 };
 
 export async function runCommand(args: string[]): Promise<void> {
@@ -33,7 +35,7 @@ export async function runCommand(args: string[]): Promise<void> {
   }
 
   if (command === "--version" || command === "-v") {
-    console.log("0.3.0");
+    console.log("0.3.1");
     return;
   }
 
@@ -62,5 +64,6 @@ function printHelp(): void {
   console.log("  schema <type|all>    输出 Schema");
   console.log("  server <subcommand>  服务管理");
   console.log("  local <subcommand>   本地管理");
+  console.log("  version <subcommand> 版本管理");
   console.log("  --version            查看版本");
 }

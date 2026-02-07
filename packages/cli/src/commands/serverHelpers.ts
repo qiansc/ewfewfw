@@ -8,7 +8,6 @@ export const SERVER_STATUS_SERVICES = [
   { label: "Neo4j", container: "c4a-neo4j", ports: "7474/7687" },
   { label: "Milvus", container: "c4a-milvus", ports: "19530" },
   { label: "Ollama", container: "c4a-ollama", ports: "11434" },
-  { label: "Storage Backend", container: "c4a-storage-backend", ports: "8055" },
 ];
 
 export const SERVER_CONTAINERS = SERVER_STATUS_SERVICES.map((item) => item.container);
@@ -18,9 +17,6 @@ const SERVER_CONTAINER_ALIASES: Record<string, string> = {
   neo4j: "c4a-neo4j",
   milvus: "c4a-milvus",
   ollama: "c4a-ollama",
-  backend: "c4a-storage-backend",
-  storage: "c4a-storage-backend",
-  "storage-backend": "c4a-storage-backend",
 };
 
 type HealthResponse = {
@@ -29,7 +25,6 @@ type HealthResponse = {
   neo4j?: boolean;
   milvus?: boolean;
   ollama?: boolean;
-  storage_backend?: boolean;
   service?: string;
 };
 
@@ -60,13 +55,9 @@ function normalizeHttpUrl(value?: string): string | undefined {
   return `http://${value}`;
 }
 
-export function resolveStorageBackendUrl(
-  config?: { server?: { url?: string; services?: { storage_backend?: string } } },
-): string {
-  const serviceUrl = normalizeHttpUrl(config?.server?.services?.storage_backend);
-  if (serviceUrl) return serviceUrl;
+export function resolveServerUrl(config?: { server?: { url?: string } }): string {
   const serverUrl = normalizeHttpUrl(config?.server?.url);
-  return serverUrl ?? "http://localhost:8055";
+  return serverUrl ?? "http://localhost:8051";
 }
 
 function isContainerHealthy(item?: ContainerStatus): boolean {
@@ -82,7 +73,6 @@ export function deriveContainerHealth(statusMap: Map<string, ContainerStatus>): 
     neo4j: isContainerHealthy(statusMap.get("c4a-neo4j")),
     milvus: isContainerHealthy(statusMap.get("c4a-milvus")),
     ollama: isContainerHealthy(statusMap.get("c4a-ollama")),
-    storage_backend: isContainerHealthy(statusMap.get("c4a-storage-backend")),
   };
 }
 
@@ -163,14 +153,14 @@ export async function readBackupEntities(backupFile: string): Promise<BackupEnti
     throw new Error("备份文件缺少 entities 字段");
   }
   return data.entities.map((entity) => ({
-    source_project: entity.source_project ?? entity.metadata?.source_project,
+    root_id: entity.root_id ?? entity.metadata?.root_id,
   }));
 }
 
 export function summarizePermissions(entities: BackupEntity[]): PermissionSummary {
   const projects: PermissionSummary["projects"] = {};
   for (const entity of entities) {
-    const project = entity.source_project || "unknown";
+    const project = entity.root_id || "unknown";
     if (!projects[project]) {
       projects[project] = { total: 0, allowed: 0, denied: 0 };
     }
@@ -187,7 +177,7 @@ export function summarizePermissions(entities: BackupEntity[]): PermissionSummar
 export async function checkProjectPermission(
   baseUrl: string,
   userId: string,
-  projectId: string,
+  rootId: string,
 ): Promise<boolean> {
   const trimmedBase = baseUrl.replace(/\/+$/, "");
   const response = await fetch(`${trimmedBase}/permissions/check`, {
@@ -196,9 +186,12 @@ export async function checkProjectPermission(
       "content-type": "application/json",
       "X-User-ID": userId,
     },
-    body: JSON.stringify({ user_id: userId, project_id: projectId, action: "write" }),
+    body: JSON.stringify({ user_id: userId, root_id: rootId, action: "write" }),
   });
   if (!response.ok) {
+    if (response.status === 404) {
+      return true;
+    }
     return false;
   }
   const data = (await response.json()) as { allowed?: boolean };

@@ -541,11 +541,6 @@ export function checkBun(): boolean {
   return result.status === 0;
 }
 
-export function checkUv(): boolean {
-  const result = spawnSync("uv", ["--version"], { stdio: "pipe" });
-  return result.status === 0;
-}
-
 export function checkOpencode(): boolean {
   // 优先检查项目内安装的 opencode
   if (existsSync(LOCAL_OPENCODE)) {

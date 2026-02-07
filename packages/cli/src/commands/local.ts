@@ -133,18 +133,26 @@ export async function localCommand(
       const adapter = await adapterFactory("local");
       await adapter.initialize();
       try {
-        const byType = await adapter.list({ group_by: "type" });
-        const byStatus = await adapter.list({ group_by: "status" });
-        if (byType.groups) {
+        const items = await adapter.list({});
+        const typeCounts = new Map<string, number>();
+        const statusCounts = new Map<string, number>();
+        for (const item of items) {
+          const type = item.type ?? "unknown";
+          const status = item.metadata?.status ?? "unknown";
+          typeCounts.set(type, (typeCounts.get(type) ?? 0) + 1);
+          statusCounts.set(status, (statusCounts.get(status) ?? 0) + 1);
+        }
+
+        if (typeCounts.size > 0) {
           io.log("实体类型统计:");
-          for (const [key, value] of Object.entries(byType.groups)) {
-            io.log(`- ${key}: ${value.count}`);
+          for (const [key, value] of typeCounts.entries()) {
+            io.log(`- ${key}: ${value}`);
           }
         }
-        if (byStatus.groups) {
+        if (statusCounts.size > 0) {
           io.log("状态统计:");
-          for (const [key, value] of Object.entries(byStatus.groups)) {
-            io.log(`- ${key}: ${value.count}`);
+          for (const [key, value] of statusCounts.entries()) {
+            io.log(`- ${key}: ${value}`);
           }
         }
         return;

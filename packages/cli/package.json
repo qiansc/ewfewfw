@@ -1,13 +1,13 @@
 {
   "name": "@c4a/cli",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "bin": {
     "c4a": "./dist/index.js"
   },
   "scripts": {
     "dev": "bun run src/index.tsx",
-    "build": "bun build src/index.tsx --outdir dist --target node",
+    "build": "bun build src/index.tsx --outdir dist --target node && bun run scripts/syncSkills.ts",
     "typecheck": "tsc --noEmit",
     "test": "bun test"
   },

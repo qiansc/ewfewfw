@@ -48,7 +48,7 @@ describe("installCommand", () => {
     });
 
     const config: CapturedConfig = capturedConfig ?? {};
-    expect(config.version).toBe("0.3.0");
+    expect(config.version).toBe("0.3.1");
     expect(config.local?.installed_at).toBe("2026-01-01T00:00:00.000Z");
     expect(config.local?.embedding_model).toBe("all-MiniLM-L6-v2");
     expect(capturedDbPath ?? "").toContain("/tmp/c4a-test-home/.c4a/store.db");

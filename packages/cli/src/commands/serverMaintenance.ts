@@ -1,7 +1,16 @@
 import type { GlobalConfig } from "../core/config.js";
+import { McpClient, type McpTransport } from "../core/mcp-client.js";
 import { buildErrorResponse } from "../utils/errorResponse.js";
 import type { CommandIO } from "./serverTypes.js";
-import { resolveStorageBackendUrl } from "./serverHelpers.js";
+
+function resolveServerUrl(config: GlobalConfig | null): string {
+  const serverUrl = config?.server?.url?.trim().replace(/\/+$/, "");
+  return serverUrl ? serverUrl : "http://localhost:8051";
+}
+
+function createMcpClient(config: GlobalConfig | null): McpClient {
+  return new McpClient({ baseUrl: resolveServerUrl(config), transport: "http" as McpTransport });
+}
 
 export async function handleCheckConsistency(params: {
   io: CommandIO;
@@ -11,34 +20,22 @@ export async function handleCheckConsistency(params: {
   userId: string;
 }): Promise<void> {
   const { io, config, options, emitError, userId } = params;
-  const projectId = typeof options.project === "string" ? options.project : undefined;
   const format = options.format === "json" ? "json" : "text";
-
-  const baseUrl = resolveStorageBackendUrl(config ?? undefined);
-  const response = await fetch(`${baseUrl}/utils/check-consistency`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-User-ID": userId,
-    },
-    body: JSON.stringify({ project_id: projectId }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    emitError(buildErrorResponse("C4A-SERVER-013", `一致性检查失败: ${errorText}`));
+  void userId;
+  const client = createMcpClient(config);
+  let result: {
+    scanned: number;
+    inconsistencies: Array<{ entity_id: string; issue: string; fixed: boolean }>;
+    stats?: { neo4j_fixed: number; milvus_fixed: number; failed: number };
+    message?: string;
+  };
+  try {
+    result = await client.request("c4a_store_repair", { scope: "all", dry_run: true });
+  } catch (error) {
+    emitError(buildErrorResponse("C4A-SERVER-013", `一致性检查失败: ${String(error)}`));
     process.exitCode = 1;
     return;
   }
-
-  const result = (await response.json()) as {
-    total: number;
-    synced: number;
-    pending: number;
-    failed: number;
-    no_status: number;
-    details: Array<{ id: string; neo4j: string; milvus: string }>;
-  };
 
   if (format === "json") {
     io.log(JSON.stringify(result, null, 2));
@@ -46,20 +43,17 @@ export async function handleCheckConsistency(params: {
   }
 
   io.log("数据一致性检查结果:");
-  io.log(`  总计: ${result.total} 个实体`);
-  io.log(`  ✅ 已同步: ${result.synced}`);
-  io.log(`  ⏳ 待同步: ${result.pending}`);
-  io.log(`  ❌ 失败: ${result.failed}`);
-  io.log(`  ⚠️  无状态: ${result.no_status}`);
+  io.log(`  扫描: ${result.scanned} 个实体`);
+  io.log(`  发现问题: ${result.inconsistencies.length}`);
 
-  if (result.details.length > 0) {
+  if (result.inconsistencies.length > 0) {
     io.log("");
     io.log("待同步实体:");
-    for (const item of result.details.slice(0, 10)) {
-      io.log(`  - ${item.id}: Neo4j=${item.neo4j}, Milvus=${item.milvus}`);
+    for (const item of result.inconsistencies.slice(0, 10)) {
+      io.log(`  - ${item.entity_id}: ${item.issue}`);
     }
-    if (result.details.length > 10) {
-      io.log(`  ... 还有 ${result.details.length - 10} 个`);
+    if (result.inconsistencies.length > 10) {
+      io.log(`  ... 还有 ${result.inconsistencies.length - 10} 个`);
     }
   }
 }
@@ -81,34 +75,25 @@ export async function handleRebuildNeo4j(params: {
   }
 
   const format = options.format === "json" ? "json" : "text";
-  const baseUrl = resolveStorageBackendUrl(config ?? undefined);
+  const client = createMcpClient(config);
 
   if (format === "text") {
     io.log("正在重建 Neo4j 数据...");
   }
 
-  const response = await fetch(`${baseUrl}/utils/repair`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-User-ID": userId,
-    },
-    body: JSON.stringify({ scope: "neo4j" }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    emitError(buildErrorResponse("C4A-SERVER-014", `Neo4j 重建失败: ${errorText}`));
+  void userId;
+  let result: {
+    scanned: number;
+    inconsistencies: Array<{ entity_id: string; issue: string; fixed: boolean }>;
+    stats?: { neo4j_fixed: number; milvus_fixed: number; failed: number };
+  };
+  try {
+    result = await client.request("c4a_store_repair", { scope: "neo4j", dry_run: false });
+  } catch (error) {
+    emitError(buildErrorResponse("C4A-SERVER-014", `Neo4j 重建失败: ${String(error)}`));
     process.exitCode = 1;
     return;
   }
-
-  const result = (await response.json()) as {
-    success: boolean;
-    scanned: number;
-    inconsistencies: Array<{ entity_id: string; issue: string; fixed: boolean }>;
-    stats: { neo4j_fixed: number; milvus_fixed: number; failed: number };
-  };
 
   if (format === "json") {
     io.log(JSON.stringify(result, null, 2));
@@ -117,8 +102,8 @@ export async function handleRebuildNeo4j(params: {
 
   io.log("✅ Neo4j 重建完成");
   io.log(`已同步 ${result.stats?.neo4j_fixed ?? 0} 个关系`);
-  if (result.stats?.failed > 0) {
-    io.log(`⚠️  失败 ${result.stats.failed} 个`);
+  if ((result.stats?.failed ?? 0) > 0) {
+    io.log(`⚠️  失败 ${result.stats?.failed ?? 0} 个`);
   }
 }
 
@@ -139,34 +124,25 @@ export async function handleRebuildMilvus(params: {
   }
 
   const format = options.format === "json" ? "json" : "text";
-  const baseUrl = resolveStorageBackendUrl(config ?? undefined);
+  const client = createMcpClient(config);
 
   if (format === "text") {
     io.log("正在重建 Milvus 数据...");
   }
 
-  const response = await fetch(`${baseUrl}/utils/repair`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-User-ID": userId,
-    },
-    body: JSON.stringify({ scope: "milvus" }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    emitError(buildErrorResponse("C4A-SERVER-015", `Milvus 重建失败: ${errorText}`));
+  void userId;
+  let result: {
+    scanned: number;
+    inconsistencies: Array<{ entity_id: string; issue: string; fixed: boolean }>;
+    stats?: { neo4j_fixed: number; milvus_fixed: number; failed: number };
+  };
+  try {
+    result = await client.request("c4a_store_repair", { scope: "milvus", dry_run: false });
+  } catch (error) {
+    emitError(buildErrorResponse("C4A-SERVER-015", `Milvus 重建失败: ${String(error)}`));
     process.exitCode = 1;
     return;
   }
-
-  const result = (await response.json()) as {
-    success: boolean;
-    scanned: number;
-    inconsistencies: Array<{ entity_id: string; issue: string; fixed: boolean }>;
-    stats: { neo4j_fixed: number; milvus_fixed: number; failed: number };
-  };
 
   if (format === "json") {
     io.log(JSON.stringify(result, null, 2));
@@ -175,7 +151,7 @@ export async function handleRebuildMilvus(params: {
 
   io.log("✅ Milvus 重建完成");
   io.log(`已同步 ${result.stats?.milvus_fixed ?? 0} 个向量`);
-  if (result.stats?.failed > 0) {
-    io.log(`⚠️  失败 ${result.stats.failed} 个`);
+  if ((result.stats?.failed ?? 0) > 0) {
+    io.log(`⚠️  失败 ${result.stats?.failed ?? 0} 个`);
   }
 }

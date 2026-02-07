@@ -57,12 +57,10 @@ describe("localCommand", () => {
       ({
         initialize: async () => {},
         close: async () => {},
-        list: async ({ group_by }: { group_by: string }) => {
-          if (group_by === "type") {
-            return { groups: { system: { count: 2 } } };
-          }
-          return { groups: { published: { count: 1 } } };
-        },
+        list: async () => [
+          { type: "system", metadata: { status: "published" } },
+          { type: "system", metadata: { status: "draft" } },
+        ],
       }) as any;
 
     await localCommand(["status"], {

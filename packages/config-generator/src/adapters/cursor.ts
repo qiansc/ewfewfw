@@ -154,7 +154,7 @@ export class CursorAdapter extends BaseAdapter {
    * - ./path -> ${workspaceFolder}/path
    * - 已包含 ${workspaceFolder} 的保持不变
    * - 绝对路径保持不变
-   * - 其他参数（如 run, python 等命令）保持不变
+   * - 其他参数（如 run 等命令）保持不变
    */
   private convertToWorkspaceFolder(arg: string): string {
     // 如果已经包含 ${workspaceFolder}，保持不变
@@ -172,7 +172,7 @@ export class CursorAdapter extends BaseAdapter {
       return arg;
     }
 
-    // 其他情况保持不变（如 run, python 等命令参数）
+    // 其他情况保持不变（如 run 等命令参数）
     return arg;
   }
 

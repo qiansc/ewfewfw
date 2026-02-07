@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline/promises";
@@ -57,6 +57,20 @@ const CONTEXT_DIRS = [
   ".context/technical/processes",
   ".context/technical/sors",
 ];
+
+async function loadPackageName(): Promise<string | null> {
+  try {
+    const packagePath = join(process.cwd(), "package.json");
+    if (!existsSync(packagePath)) {
+      return null;
+    }
+    const content = await readFile(packagePath, "utf-8");
+    const data = JSON.parse(content) as { name?: unknown };
+    return typeof data.name === "string" && data.name.trim() ? data.name.trim() : null;
+  } catch {
+    return null;
+  }
+}
 
 function normalizeMcpUrl(url: string): string {
   const trimmed = url.trim().replace(/\/+$/, "");
@@ -271,7 +285,11 @@ export async function initCommand(
   try {
     console.log("\nC4A 项目初始化\n");
 
-    const projectId = await prompter.input("项目标识 (project_id)", { required: true });
+    const packageName = await loadPackageName();
+    const rootId = await prompter.input("包标识 (root_id)", {
+      required: true,
+      defaultValue: packageName ?? undefined,
+    });
 
     const detectedRepo = await detectGitRemoteFn();
     let repoId = "";
@@ -377,7 +395,7 @@ export async function initCommand(
     await ensureContextDirsFn();
 
     const projectConfig: ProjectConfig = {
-      project_id: projectId,
+      root_id: rootId,
       repo_id: repoId,
       mode,
       skills,

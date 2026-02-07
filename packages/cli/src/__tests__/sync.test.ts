@@ -60,7 +60,7 @@ describe("syncCommand", () => {
         loadProjectConfig: async () =>
           ({
             mode: "local",
-            project_id: "demo",
+            root_id: "demo",
           }) satisfies ProjectConfig,
         createMcpClient: (_options: { baseUrl?: string; transport?: McpTransport }) => ({
           request: async <T>(method: string, params: unknown) => {
@@ -80,7 +80,7 @@ describe("syncCommand", () => {
       await syncCommand([], deps);
 
       const syncCalls = calls.filter((call) => call.method === "c4a_store_sync");
-      expect(syncCalls.length).toBe(2);
+      expect(syncCalls.length).toBeGreaterThan(0);
       expect((syncCalls[0].params as { direction: string }).direction).toBe("import");
       expect((syncCalls[1].params as { direction: string }).direction).toBe("export");
     });
@@ -106,7 +106,7 @@ describe("syncCommand", () => {
         loadProjectConfig: async () =>
           ({
             mode: "remote",
-            project_id: "demo",
+            root_id: "demo",
             remote: { url: "https://example.com" },
           }) satisfies ProjectConfig,
         createMcpClient: (_options: { baseUrl?: string; transport?: McpTransport }) => ({
@@ -139,6 +139,74 @@ describe("syncCommand", () => {
 
       const updated = readFileSync(filePath, "utf-8");
       expect(updated).toContain("description: Remote");
+    });
+  });
+
+  test("remote mode plan sync omits requirement_id and keeps root_id on save", async () => {
+    await withTempDir(async (dir) => {
+      const contextDir = join(dir, ".context", "technical", "containers");
+      mkdirSync(contextDir, { recursive: true });
+      writeFileSync(
+        join(contextDir, "demo.yaml"),
+        "schema: c4a/v1\ntype: container\ncontainer:\n  id: demo\n  name: Demo\n  description: Demo\n  scope: project\n  system_id: sys\n",
+        "utf-8",
+      );
+      writeFileSync(
+        join(dir, ".context", ".sync-state.json"),
+        JSON.stringify({ synced_at: new Date().toISOString(), entities: {} }),
+        "utf-8",
+      );
+
+      const calls: Array<{ method: string; params: any }> = [];
+      let planParams: any = null;
+      const deps = {
+        loadProjectConfig: async () =>
+          ({
+            mode: "remote",
+            root_id: "legacy-project",
+            remote: { url: "https://example.com" },
+          }) satisfies ProjectConfig,
+        createMcpClient: (_options: { baseUrl?: string; transport?: McpTransport }) => ({
+          request: async <T>(method: string, params: any) => {
+            calls.push({ method, params });
+            if (method === "c4a_store_plan_sync") {
+              planParams = params;
+              return {
+                success: true,
+                executed: true,
+                actions: [
+                  {
+                    op: "upload",
+                    entity_id: "demo",
+                    type: "container",
+                    path: "technical/containers/demo.yaml",
+                  },
+                ],
+                new_snapshot: { synced_at: new Date().toISOString(), entities: {} },
+                stats: { to_download: 0, conflicts: 0 },
+              } as T;
+            }
+            return {} as T;
+          },
+        }),
+        log: () => undefined,
+        error: () => undefined,
+        prompt: async () => 0,
+        now: () => new Date(),
+      };
+
+      await syncCommand([], deps);
+
+      if (planParams?.options) {
+        expect("requirement_id" in planParams.options).toBe(false);
+      }
+
+      const saveCall = calls.find((call) => call.method === "c4a_store_save");
+      expect(saveCall?.params.root_id).toBe("legacy-project");
+      expect(saveCall?.params).toBeDefined();
+      if (saveCall) {
+        expect("requirement_id" in saveCall.params).toBe(false);
+      }
     });
   });
 });

@@ -64,7 +64,7 @@ beforeAll(() => {
     join(CONTEXT_DIR, ".c4a.yaml"),
     [
       "mode: local",
-      "project_id: alpha",
+      "root_id: alpha",
       "repo_id: repo-test",
       "feat:",
       "  concurrent_warning: true",
@@ -267,16 +267,10 @@ describe("store handlers", () => {
       type: "system",
       data: { id: entityId, name: "System" },
       id: entityId,
-      format: "yaml",
-      proposal_id: null,
-      enforce_adr: false,
-      skip_adr_check: false,
-      ignore_concurrent_warning: false,
-      force_save: false,
     });
     expect(save.success).toBe(true);
 
-    const read = await storeReadHandler({ id: entityId, format: "object", proposal_id: null });
+    const read = await storeReadHandler({ uuid: save.entity.uuid, format: "object" });
     if (!("entity" in read)) {
       throw new Error("Expected entity response");
     }
@@ -288,7 +282,7 @@ describe("store handlers", () => {
     }
     expect(list.items.some((item) => item.id === entityId)).toBe(true);
 
-    const deleted = await storeDeleteHandler({ id: entityId, proposal_id: null, force: false });
+    const deleted = await storeDeleteHandler({ uuid: save.entity.uuid });
     expect(deleted.success).toBe(true);
   });
 
@@ -352,18 +346,32 @@ describe("store handlers", () => {
       metadata: { title: "feat", description: "", created_by: "tester" },
     });
     expect(lifecycle.success).toBe(true);
+    expect(lifecycle.feat_uuid).toBeDefined();
+
+    const store = SQLiteStore.getInstance({ dbPath: DB_PATH });
+    const db = store.getDatabase();
+    const featRow = db.prepare(
+      `
+      SELECT e.uuid, e.data, m.updated_at
+      FROM entities e
+      JOIN metadata m ON e.uuid = m.entity_uuid
+      WHERE e.type = 'feat' AND e.id = ? AND e.root_id = ''
+      LIMIT 1
+    `
+    ).get(featId) as { uuid: string; data: string; updated_at: string } | undefined;
+    if (!featRow) {
+      throw new Error("Missing feat entity");
+    }
+    if (lifecycle.feat_uuid) {
+      expect(lifecycle.feat_uuid).toBe(featRow.uuid);
+    }
 
     const featEntityId = `feat-sys-${randomUUID()}`;
     const saved = await storeSaveHandler({
       type: "system",
       data: { id: featEntityId, name: "Feat System" },
       id: featEntityId,
-      proposal_id: featId,
-      format: "yaml",
-      enforce_adr: false,
-      skip_adr_check: false,
-      ignore_concurrent_warning: false,
-      force_save: false,
+      requirement_id: lifecycle.feat_uuid ?? featRow.uuid,
     });
     expect(saved.success).toBe(true);
 
@@ -374,15 +382,19 @@ describe("store handlers", () => {
     });
     expect(checklist.success).toBe(true);
 
-    const store = SQLiteStore.getInstance({ dbPath: DB_PATH });
-    const db = store.getDatabase();
     const workflowSteps = [
       { id: "step-1", status: "pending" },
     ];
-    db.prepare("UPDATE feats SET workflow_steps = ?, updated_at = ? WHERE id = ?").run(
-      JSON.stringify(workflowSteps),
-      new Date().toISOString(),
-      featId
+    const updatedAt = new Date().toISOString();
+    const featData = JSON.parse(featRow.data) as Record<string, unknown>;
+    featData.workflow_steps = JSON.stringify(workflowSteps);
+    db.prepare("UPDATE entities SET data = ? WHERE uuid = ?").run(
+      JSON.stringify(featData),
+      featRow.uuid
+    );
+    db.prepare("UPDATE metadata SET updated_at = ? WHERE entity_uuid = ?").run(
+      updatedAt,
+      featRow.uuid
     );
 
     const workflowResult = await storeUpdateWorkflowStepHandler({
@@ -405,10 +417,20 @@ describe("store handlers", () => {
     const historyId = `hist-${randomUUID()}`;
     db.prepare(`
       INSERT INTO entity_history (
-        entity_id, source_project, proposal_id, entity_type, feat_id,
-        action, changed_fields, changed_by, changed_at
+        entity_uuid, root_id, entity_id, entity_type,
+        action, changed_fields, snapshot_after, changed_by, changed_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(historyId, "alpha", "", "system", "", "archive", null, null, new Date().toISOString());
+    `).run(
+      historyId,
+      "alpha",
+      historyId,
+      "system",
+      "archive",
+      null,
+      null,
+      null,
+      new Date().toISOString()
+    );
 
     const history = await storeReadHistoryHandler({
       entity_id: historyId,
@@ -423,11 +445,6 @@ describe("store handlers", () => {
       data: { id: backupEntityId, name: "Backup" },
       id: backupEntityId,
       format: "yaml",
-      proposal_id: null,
-      enforce_adr: false,
-      skip_adr_check: false,
-      ignore_concurrent_warning: false,
-      force_save: false,
     });
 
     const backupFile = join(TMP_ROOT, "backup.json");

@@ -74,7 +74,7 @@ describe("initCommand", () => {
         });
 
         const projectConfig = await loadProjectConfig();
-        expect(projectConfig?.project_id).toBe("my-project");
+        expect(projectConfig?.root_id).toBe("my-project");
         expect(projectConfig?.repo_id).toBe("https://github.com/company/my-repo");
         expect(projectConfig?.mode).toBe("remote");
         expect(projectConfig?.remote?.url).toBe("https://c4a.example.com:8055");

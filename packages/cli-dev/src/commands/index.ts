@@ -6,7 +6,6 @@ import {
   checkDocker,
   startDockerDesktop,
   startStorageServices,
-  startStorageBackend,
   startAllServices,
   stopServices,
   showStatus,
@@ -14,11 +13,9 @@ import {
   cleanData,
   waitForServicesHealthy,
   areStorageServicesRunning,
-  isStorageBackendRunning,
 } from "../utils/docker.js";
 import {
   checkBun,
-  checkUv,
   checkOpencode,
   checkTtyd,
   checkHttpHealth,
@@ -97,20 +94,6 @@ async function checkDependencies(required: string[], optional: string[] = []): P
       } else {
         warn("Bun 未安装，可选依赖缺失");
       }
-    }
-  }
-
-  const requiresUv = required.includes("uv");
-  const wantsUv = requiresUv || optional.includes("uv");
-  if (wantsUv) {
-    if (checkUv()) {
-      success("uv 已安装");
-    } else if (requiresUv) {
-      error("uv 未安装，请安装: curl -LsSf https://astral.sh/uv/install.sh | sh");
-      allOk = false;
-    } else {
-      warn("uv 未安装，Python 功能不可用");
-      warn("安装: curl -LsSf https://astral.sh/uv/install.sh | sh");
     }
   }
 
@@ -218,7 +201,7 @@ async function cmdDev(forceRestart = false) {
 
   // 1. 检查依赖
   info("检查依赖...");
-  if (!(await checkDependencies(["docker", "bun"], ["uv"]))) {
+  if (!(await checkDependencies(["docker", "bun"]))) {
     process.exit(1);
   }
 
@@ -268,40 +251,7 @@ async function cmdDev(forceRestart = false) {
     success("所有存储服务已就绪");
   }
 
-  const projectConfig = await loadConfig(PROJECT_ROOT);
-  const shouldStartBackend = projectConfig.mode === "server";
-  if (shouldStartBackend) {
-    const backendRunning = isStorageBackendRunning();
-    if (backendRunning) {
-      info("storage-backend 已在运行，检查健康状态...");
-      const backendHealthy = await checkHttpHealth("localhost", 8055, "/health");
-      if (backendHealthy) {
-        success("storage-backend 健康，复用已有服务");
-      } else {
-        warn("storage-backend 不健康，建议运行 ./start.sh restart 重启");
-      }
-    } else {
-      info("启动 storage-backend...");
-      await startStorageBackend();
-      success("storage-backend 已启动");
-
-      info("等待 storage-backend 健康...");
-      const startTime = Date.now();
-      let backendHealthy = false;
-      while (Date.now() - startTime < 60000) {
-        backendHealthy = await checkHttpHealth("localhost", 8055, "/health");
-        if (backendHealthy) {
-          break;
-        }
-        await new Promise((r) => setTimeout(r, 2000));
-      }
-      if (!backendHealthy) {
-        error("storage-backend 启动失败或健康检查超时");
-        process.exit(1);
-      }
-      success("storage-backend 已就绪");
-    }
-  }
+  void (await loadConfig(PROJECT_ROOT));
 
   // 5. 启动 mcp-store（带健康检查和重试）
   info("启动 mcp-store...");
@@ -358,9 +308,6 @@ async function cmdDev(forceRestart = false) {
   console.log("    - MongoDB:  localhost:27017");
   console.log("    - Neo4j:    localhost:7474 (HTTP), localhost:7687 (Bolt)");
   console.log("    - Milvus:   localhost:19530");
-  if (shouldStartBackend) {
-    console.log("    - storage-backend: localhost:8055");
-  }
   console.log("    - mcp-store: localhost:8051");
   console.log("    - mcp-query: localhost:8054");
 
@@ -711,7 +658,7 @@ async function cmdCleanAll() {
 }
 
 async function cmdInstall() {
-  if (!(await checkDependencies(["bun"], ["uv"]))) {
+  if (!(await checkDependencies(["bun"]))) {
     process.exit(1);
   }
 

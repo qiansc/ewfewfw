@@ -63,7 +63,6 @@ const SERVER_CONTAINERS = [
   "c4a-neo4j",
   "c4a-milvus",
   "c4a-ollama",
-  "c4a-storage-backend",
 ];
 
 function resolveHomeDir(): string {
@@ -187,7 +186,7 @@ async function installLocal(
 
   const nextConfig: GlobalConfig = {
     ...globalConfig,
-    version: "0.3.0",
+    version: "0.3.1",
     local: {
       db_path: dbPath,
       embedding_model: "all-MiniLM-L6-v2",
@@ -239,7 +238,7 @@ async function installServer(
 
   const nextConfig: GlobalConfig = {
     ...globalConfig,
-    version: "0.3.0",
+    version: "0.3.1",
     server: {
       url: "http://localhost:8055",
       installed_at: deps.now().toISOString(),
@@ -248,7 +247,6 @@ async function installServer(
         neo4j: "localhost:7474",
         milvus: "localhost:19530",
         ollama: "localhost:11434",
-        storage_backend: "localhost:8055",
       },
     },
   };
@@ -321,7 +319,7 @@ export async function installCommand(
     if (mode === "remote") {
       const nextConfig: GlobalConfig = {
         ...globalConfig,
-        version: "0.3.0",
+        version: "0.3.1",
         remote: {
           ...globalConfig.remote,
           selected_at: now().toISOString(),

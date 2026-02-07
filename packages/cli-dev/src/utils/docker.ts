@@ -73,7 +73,6 @@ function cleanupOldContainers(): void {
     "c4a-milvus",
     "c4a-ollama",
     "c4a-ollama-init",
-    "c4a-storage-backend",
   ];
   for (const container of containers) {
     // 尝试停止并删除旧容器（忽略错误）
@@ -121,16 +120,6 @@ export function startAllServices(
   });
 }
 
-export function startStorageBackend(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const [cmd, ...args] = dockerCompose("up", "-d", "storage-backend");
-    const proc = spawn(cmd, args, { stdio: "inherit" });
-    proc.on("close", (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`Docker compose failed with code ${code}`));
-    });
-  });
-}
 
 export function stopServices(): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -192,14 +181,6 @@ export function areStorageServicesRunning(): boolean {
     }
   }
   return true;
-}
-
-export function isStorageBackendRunning(): boolean {
-  const result = spawnSync("docker", ["ps", "-q", "-f", "name=c4a-storage-backend"], {
-    encoding: "utf-8",
-    stdio: ["pipe", "pipe", "pipe"],
-  });
-  return Boolean(result.stdout.trim());
 }
 
 /**

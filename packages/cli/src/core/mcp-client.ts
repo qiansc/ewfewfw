@@ -122,7 +122,7 @@ class HttpMcpClient {
       id: this.nextId++,
       method: "initialize",
       params: {
-        clientInfo: { name: "c4a-cli", version: "0.3.0" },
+        clientInfo: { name: "c4a-cli", version: "0.3.1" },
         capabilities: {},
       },
     });
@@ -203,7 +203,7 @@ class StdioMcpClient {
       id: this.nextId++,
       method: "initialize",
       params: {
-        clientInfo: { name: "c4a-cli", version: "0.3.0" },
+        clientInfo: { name: "c4a-cli", version: "0.3.1" },
         capabilities: {},
       },
     });

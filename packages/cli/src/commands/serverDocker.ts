@@ -12,7 +12,7 @@ import {
   fetchServerHealth,
   formatContainerSummary,
   resolveContainerName,
-  resolveStorageBackendUrl,
+  resolveServerUrl,
 } from "./serverHelpers.js";
 
 export async function runComposeDown(composeFile: string): Promise<CommandResult> {
@@ -53,7 +53,7 @@ export async function handleStatus(params: {
     io.log(formatContainerSummary(service, item));
   }
 
-  const baseUrl = resolveStorageBackendUrl(config ?? undefined);
+  const baseUrl = resolveServerUrl(config ?? undefined);
   const containerHealth = deriveContainerHealth(statusMap);
   let serviceHealth: ServiceHealth | null = null;
 
@@ -62,18 +62,11 @@ export async function handleStatus(params: {
   } else {
     const remote = await fetchServerHealth(baseUrl);
     if (remote) {
-      const storageBackend =
-        typeof remote.storage_backend === "boolean"
-          ? remote.storage_backend
-          : remote.status === "ok"
-            ? true
-            : containerHealth.storage_backend;
       serviceHealth = {
         mongodb: typeof remote.mongodb === "boolean" ? remote.mongodb : containerHealth.mongodb,
         neo4j: typeof remote.neo4j === "boolean" ? remote.neo4j : containerHealth.neo4j,
         milvus: typeof remote.milvus === "boolean" ? remote.milvus : containerHealth.milvus,
         ollama: typeof remote.ollama === "boolean" ? remote.ollama : containerHealth.ollama,
-        storage_backend: storageBackend,
       };
     }
   }
@@ -84,7 +77,6 @@ export async function handleStatus(params: {
 
   io.log("");
   io.log("服务健康状态:");
-  io.log(`  storage-backend: ${serviceHealth.storage_backend ? "✅" : "❌"}`);
   io.log(`  MongoDB: ${serviceHealth.mongodb ? "✅" : "❌"}`);
   io.log(`  Neo4j: ${serviceHealth.neo4j ? "✅" : "❌"}`);
   io.log(`  Milvus: ${serviceHealth.milvus ? "✅" : "❌"}`);
@@ -92,14 +84,12 @@ export async function handleStatus(params: {
 
   io.log("");
   io.log("连接信息:");
-  io.log(`  storage-backend: ${baseUrl}`);
   const services = config?.server?.services;
   if (services) {
     if (services.mongodb) io.log(`  MongoDB: ${services.mongodb}`);
     if (services.neo4j) io.log(`  Neo4j: ${services.neo4j}`);
     if (services.milvus) io.log(`  Milvus: ${services.milvus}`);
     if (services.ollama) io.log(`  Ollama: ${services.ollama}`);
-    if (services.storage_backend) io.log(`  Storage Backend: ${services.storage_backend}`);
   }
 }
 

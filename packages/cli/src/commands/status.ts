@@ -88,7 +88,8 @@ export async function statusCommand(
   if (!projectConfig) {
     deps.log("  未检测到 .context/.c4a.yaml");
   } else {
-    deps.log(`  项目 ID: ${projectConfig.project_id ?? "未设置"}`);
+    const rootId = projectConfig.root_id;
+    deps.log(`  Root ID: ${rootId ?? "未设置"}`);
     deps.log(`  仓库 ID: ${projectConfig.repo_id ?? "未设置"}`);
     deps.log(`  使用模式: ${projectConfig.mode ?? "未设置"}`);
     deps.log("  配置文件: .context/.c4a.yaml");
@@ -106,17 +107,22 @@ export async function statusCommand(
   let listLatencyMs: number | null = null;
 
   if (projectConfig) {
-    const client = deps.createMcpClient({ baseUrl, transport });
-    const start = deps.now();
-    try {
-      listResult = await client.request<ListResult>("c4a_store_list", {
-        group_by: "type",
-        project_id: projectConfig.project_id,
-      });
-      listLatencyMs = deps.now() - start;
-    } catch (error) {
-      listLatencyMs = deps.now() - start;
-      listError = error;
+    const rootId = projectConfig.root_id;
+    if (rootId) {
+      const client = deps.createMcpClient({ baseUrl, transport });
+      const start = deps.now();
+      try {
+        listResult = await client.request<ListResult>("c4a_store_list", {
+          group_by: "type",
+          root_id: rootId,
+        });
+        listLatencyMs = deps.now() - start;
+      } catch (error) {
+        listLatencyMs = deps.now() - start;
+        listError = error;
+      }
+    } else {
+      listError = new Error("未配置 root_id");
     }
   }
 

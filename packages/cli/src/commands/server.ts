@@ -14,7 +14,7 @@ import type { CommandIO, ServerCommandDeps } from "./serverTypes.js";
 import {
   checkProjectPermission,
   readBackupEntities,
-  resolveStorageBackendUrl,
+  resolveServerUrl,
   summarizePermissions,
   summarizePermissionsWithCheck,
 } from "./serverHelpers.js";
@@ -105,7 +105,7 @@ export async function serverCommand(
     (async (backupFile: string, user?: string) => {
       const entities = await readBackupEntities(backupFile);
       const summary = summarizePermissions(entities);
-      const baseUrl = resolveStorageBackendUrl(config ?? undefined);
+      const baseUrl = resolveServerUrl(config ?? undefined);
       const userId = user ?? "cli-user";
       return await summarizePermissionsWithCheck(summary, (projectId) =>
         checkProjectPermission(baseUrl, userId, projectId),

@@ -89,8 +89,6 @@ function resolveCommandPath(command: string): string {
     node: [`${homedir()}/.nvm/current/bin/node`, "/usr/local/bin/node"],
     npm: [`${homedir()}/.nvm/current/bin/npm`, "/usr/local/bin/npm"],
     npx: [`${homedir()}/.nvm/current/bin/npx`, "/usr/local/bin/npx"],
-    uv: [`${homedir()}/.local/bin/uv`],
-    python: [`${homedir()}/.local/bin/python`, "/usr/bin/python3"],
   };
 
   const paths = toolPaths[command];

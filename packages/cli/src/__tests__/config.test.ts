@@ -44,13 +44,13 @@ describe("config", () => {
       process.chdir(dir);
       try {
         await saveProjectConfig({
-          project_id: "my-project",
+          root_id: "my-project",
           repo_id: "company/my-repo",
           mode: "local",
           skills: { cursor: true },
         });
         const loaded = await loadProjectConfig();
-        expect(loaded?.project_id).toBe("my-project");
+        expect(loaded?.root_id).toBe("my-project");
         expect(loaded?.repo_id).toBe("company/my-repo");
         expect(loaded?.skills?.cursor).toBe(true);
       } finally {

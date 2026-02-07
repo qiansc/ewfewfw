@@ -17,7 +17,6 @@ export interface GlobalConfig {
       neo4j?: string;
       milvus?: string;
       ollama?: string;
-      storage_backend?: string;
     };
   };
   remote?: { url?: string; selected_at?: string };
@@ -36,9 +35,10 @@ export interface AdrPolicyConfig {
 }
 
 export interface ProjectConfig {
-  project_id?: string;
+  root_id?: string;
   repo_id?: string;
   mode?: CliMode;
+  version?: string;
   skills?: SkillsConfig;
   adr_policy?: AdrPolicyConfig;
   sync?: { auto_export?: boolean };

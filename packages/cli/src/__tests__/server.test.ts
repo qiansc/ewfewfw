@@ -16,6 +16,42 @@ describe("serverCommand", () => {
 
   const originalFetch = globalThis.fetch;
 
+  function createMockMcpFetch(result: unknown) {
+    return mock(async (_url: string, init?: RequestInit) => {
+      const payload = JSON.parse(String(init?.body ?? "{}")) as { id?: number; method?: string };
+      const id = payload.id ?? 1;
+      if (payload.method === "initialize") {
+        return {
+          ok: true,
+          headers: new Headers(),
+          json: async () => ({ jsonrpc: "2.0", id, result: {} }),
+        } as Response;
+      }
+      if (payload.method === "tools/call") {
+        return {
+          ok: true,
+          headers: new Headers(),
+          json: async () => ({
+            jsonrpc: "2.0",
+            id,
+            result: { content: [{ type: "text", text: JSON.stringify(result) }] },
+          }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        headers: new Headers(),
+        json: async () => ({ jsonrpc: "2.0", id, result: {} }),
+      } as Response;
+    });
+  }
+
+  function findToolCall(mockFetchFn: ReturnType<typeof mock>) {
+    const calls = mockFetchFn.mock.calls;
+    const bodies = calls.map(([, init]) => JSON.parse(String(init?.body ?? "{}")));
+    return bodies.find((payload) => payload.method === "tools/call");
+  }
+
   beforeEach(() => {
     globalThis.fetch = originalFetch;
   });
@@ -100,7 +136,6 @@ describe("serverCommand", () => {
         neo4j: false,
         milvus: false,
         ollama: false,
-        storage_backend: false,
       }),
       loadConfig: async () => ({
         server: { installed_at: "2026-01-01T00:00:00Z", url: "http://localhost:8051" },
@@ -116,7 +151,7 @@ describe("serverCommand", () => {
     expect(logs.join("\n")).toContain("运行中");
   });
 
-  test("status uses storage_backend service url when provided", async () => {
+  test("status prints service url when provided", async () => {
     const logs: string[] = [];
     await serverCommand(["status"], {
       docker,
@@ -125,13 +160,12 @@ describe("serverCommand", () => {
         neo4j: true,
         milvus: true,
         ollama: true,
-        storage_backend: true,
       }),
       loadConfig: async () => ({
         server: {
           installed_at: "2026-01-01T00:00:00Z",
           url: "http://localhost:8051",
-          services: { storage_backend: "localhost:9999" },
+          services: { mongodb: "localhost:27017" },
         },
       }),
       io: {
@@ -141,7 +175,7 @@ describe("serverCommand", () => {
       emitError: () => {},
     });
 
-    expect(logs.join("\n")).toContain("storage-backend: http://localhost:9999");
+    expect(logs.join("\n")).toContain("MongoDB: localhost:27017");
   });
 
   test("check-permissions outputs json when requested", async () => {
@@ -171,20 +205,11 @@ describe("serverCommand", () => {
   });
 
   test("check-consistency with --user", async () => {
-    const mockFetch = mock(
-      async () =>
-        ({
-          ok: true,
-          json: async () => ({
-            total: 10,
-            synced: 8,
-            pending: 2,
-            failed: 0,
-            no_status: 0,
-            details: [],
-          }),
-        }) as Response,
-    );
+    const mockFetch = createMockMcpFetch({
+      scanned: 10,
+      inconsistencies: [],
+      stats: { neo4j_fixed: 0, milvus_fixed: 0, failed: 0 },
+    });
     globalThis.fetch = mockFetch as unknown as typeof fetch;
 
     await serverCommand(["check-consistency", "--user", "test-user"], {
@@ -194,27 +219,21 @@ describe("serverCommand", () => {
     });
 
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/utils/check-consistency"),
-      expect.objectContaining({
-        headers: expect.objectContaining({ "X-User-ID": "test-user" }),
-      }),
+      expect.stringContaining("/mcp"),
+      expect.objectContaining({ method: "POST" }),
     );
+    const toolCall = findToolCall(mockFetch);
+    expect(toolCall?.params?.name).toBe("c4a_store_repair");
+    expect(toolCall?.params?.arguments).toEqual({ scope: "all", dry_run: true });
   });
 
   test("rebuild-neo4j with --yes and --format=json", async () => {
     const logs: string[] = [];
-    const mockFetch = mock(
-      async () =>
-        ({
-          ok: true,
-          json: async () => ({
-            success: true,
-            scanned: 100,
-            stats: { neo4j_fixed: 100, milvus_fixed: 0, failed: 0 },
-            inconsistencies: [],
-          }),
-        }) as Response,
-    );
+    const mockFetch = createMockMcpFetch({
+      scanned: 100,
+      inconsistencies: [],
+      stats: { neo4j_fixed: 100, milvus_fixed: 0, failed: 0 },
+    });
     globalThis.fetch = mockFetch as unknown as typeof fetch;
 
     await serverCommand(["rebuild-neo4j", "--yes", "--format", "json"], {
@@ -227,24 +246,17 @@ describe("serverCommand", () => {
       },
     });
 
-    expect(logs.join("\n")).toContain("\"success\": true");
+    expect(logs.join("\n")).toContain("\"neo4j_fixed\": 100");
   });
 
   test("rebuild-milvus prompts and calls repair", async () => {
     const logs: string[] = [];
     const confirm = mock(async () => true);
-    const mockFetch = mock(
-      async () =>
-        ({
-          ok: true,
-          json: async () => ({
-            success: true,
-            scanned: 50,
-            stats: { neo4j_fixed: 0, milvus_fixed: 50, failed: 0 },
-            inconsistencies: [],
-          }),
-        }) as Response,
-    );
+    const mockFetch = createMockMcpFetch({
+      scanned: 50,
+      inconsistencies: [],
+      stats: { neo4j_fixed: 0, milvus_fixed: 50, failed: 0 },
+    });
     globalThis.fetch = mockFetch as unknown as typeof fetch;
 
     await serverCommand(["rebuild-milvus"], {
@@ -258,10 +270,9 @@ describe("serverCommand", () => {
     });
 
     expect(confirm).toHaveBeenCalled();
-    expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/utils/repair"),
-      expect.objectContaining({ body: JSON.stringify({ scope: "milvus" }) }),
-    );
+    const toolCall = findToolCall(mockFetch);
+    expect(toolCall?.params?.name).toBe("c4a_store_repair");
+    expect(toolCall?.params?.arguments).toEqual({ scope: "milvus", dry_run: false });
     expect(logs.join("\n")).toContain("✅ Milvus 重建完成");
   });
 });

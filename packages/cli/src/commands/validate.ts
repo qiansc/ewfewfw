@@ -61,7 +61,7 @@ export async function validateCommand(
   }
 
   const projectConfig = await deps.loadProjectConfig();
-  const projectId = projectConfig?.project_id;
+  const rootId = projectConfig?.root_id;
   const repoId = projectConfig?.repo_id;
 
   const files = await collectDslFiles(targetPath);
@@ -71,7 +71,7 @@ export async function validateCommand(
   }
 
   const context = {
-    projectId,
+    rootId: rootId,
     repoId,
   };
 
@@ -178,7 +178,7 @@ function shouldIgnorePath(filePath: string): boolean {
 
 async function validateFiles(
   files: string[],
-  context: { projectId?: string; repoId?: string },
+  context: { rootId?: string; repoId?: string },
   scope?: "published",
 ): Promise<FileValidationResult[]> {
   const parsedEntries: Array<{
@@ -458,12 +458,12 @@ function visitRelationships(
 
 function shouldSkipReference(
   reference: { id: string; field: string },
-  context: { projectId?: string; repoId?: string },
+  context: { rootId?: string; repoId?: string },
 ): boolean {
   try {
     const parsed = parseReference(reference.id);
-    if (parsed.format === "project" && parsed.projectId && context.projectId) {
-      return parsed.projectId !== context.projectId;
+    if (parsed.format === "root" && parsed.rootId && context.rootId) {
+      return parsed.rootId !== context.rootId;
     }
     if (parsed.format === "repo" && parsed.repoId && context.repoId) {
       return parsed.repoId !== context.repoId;

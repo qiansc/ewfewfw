@@ -105,7 +105,7 @@ describe("cli integration flow", () => {
         loadProjectConfig: async () =>
           ({
             mode: "local",
-            project_id: "demo",
+            root_id: "demo",
           }) satisfies ProjectConfig,
         createMcpClient: (_options: { baseUrl?: string; transport?: McpTransport }) =>
           createMockClient((method) => {
@@ -129,7 +129,7 @@ describe("cli integration flow", () => {
         loadProjectConfig: async () =>
           ({
             mode: "local",
-            project_id: "demo",
+            root_id: "demo",
           }) satisfies ProjectConfig,
         createMcpClient: (_options: { baseUrl?: string; transport?: McpTransport }) =>
           createMockClient(() => ({ groups: { system: { count: 1 } } })),
@@ -165,7 +165,7 @@ describe("cli integration flow", () => {
       loadProjectConfig: async () =>
         ({
           mode: "remote",
-          project_id: "demo",
+          root_id: "demo",
           remote: { url: "https://example.com" },
         }) satisfies ProjectConfig,
       createMcpClient: (options: { baseUrl?: string; transport?: McpTransport }) => {
@@ -185,5 +185,66 @@ describe("cli integration flow", () => {
     });
 
     expect(transports[0]).toBe("http");
+  });
+
+  test("sync remote actions apply root_id for save/delete", async () => {
+    await withTempDir(async (dir) => {
+      const contextDir = join(dir, ".context", "technical", "systems");
+      mkdirSync(contextDir, { recursive: true });
+      writeFileSync(
+        join(contextDir, "demo.c4a.yaml"),
+        "schema: c4a/v1\ntype: system\nsystem:\n  id: demo\n  name: Demo\n",
+        "utf-8",
+      );
+
+      const calls: Array<{ method: string; params: any }> = [];
+      await syncCommand([], {
+        loadProjectConfig: async () =>
+          ({
+            mode: "remote",
+            root_id: "demo-root",
+            remote: { url: "https://example.com" },
+          }) satisfies ProjectConfig,
+        createMcpClient: (_options: { baseUrl?: string; transport?: McpTransport }) =>
+          createMockClient((method, params) => {
+            calls.push({ method, params });
+            if (method === "c4a_store_plan_sync") {
+              return {
+                success: true,
+                executed: true,
+                actions: [
+                  {
+                    op: "upload",
+                    entity_id: "demo",
+                    type: "system",
+                    path: "technical/systems/demo.c4a.yaml",
+                  },
+                  {
+                    op: "delete_remote",
+                    entity_id: "legacy",
+                  },
+                ],
+                new_snapshot: { synced_at: new Date().toISOString(), entities: {} },
+                stats: { to_download: 0, conflicts: 0 },
+                results: { uploaded: [] },
+              };
+            }
+            if (method === "c4a_store_read") {
+              return { uuid: "legacy-uuid" };
+            }
+            return {};
+          }),
+        log: () => undefined,
+        error: () => undefined,
+        prompt: async () => 0,
+        now: () => new Date(),
+      });
+
+      const saveCall = calls.find((call) => call.method === "c4a_store_save");
+      expect(saveCall?.params?.root_id).toBe("demo-root");
+
+      const deleteCall = calls.find((call) => call.method === "c4a_store_delete");
+      expect(deleteCall?.params?.uuid).toBe("legacy-uuid");
+    });
   });
 });

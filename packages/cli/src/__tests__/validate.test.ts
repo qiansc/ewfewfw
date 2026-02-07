@@ -48,7 +48,7 @@ describe("validateCommand", () => {
 
       const logs: string[] = [];
       const deps = {
-        loadProjectConfig: async () => ({ project_id: "demo", repo_id: "acme/demo" }),
+        loadProjectConfig: async () => ({ root_id: "demo", repo_id: "acme/demo" }),
         log: (message: string) => logs.push(message),
         error: (message: string) => logs.push(message),
       };
@@ -69,12 +69,15 @@ describe("validateCommand", () => {
       writeFileSync(
         join(featDir, "feat.yaml"),
         [
-          "id: feat-a001-test",
           "type: feat",
+          "uuid: 11111111-1111-4111-8111-111111111111",
+          "root_id: \"\"",
+          "versions:",
+          "  - 0.0.0",
+          "id: feat-a001-test",
           "name: Test",
           "status: draft",
-          "source_project: demo",
-          `created_at: ${new Date().toISOString()}`,
+          "scope: project",
           "related_adrs:",
           "  - adr-a001-missing",
           "",
@@ -84,7 +87,7 @@ describe("validateCommand", () => {
 
       const logs: string[] = [];
       const deps = {
-        loadProjectConfig: async () => ({ project_id: "demo" }),
+        loadProjectConfig: async () => ({ root_id: "demo" }),
         log: (message: string) => logs.push(message),
         error: (message: string) => logs.push(message),
       };
@@ -95,4 +98,6 @@ describe("validateCommand", () => {
       process.exitCode = 0;
     });
   });
+
+  
 });
