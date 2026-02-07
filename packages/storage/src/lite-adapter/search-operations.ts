@@ -1,9 +1,8 @@
 /**
- * LiteAdapter 搜索操作
+ * LiteAdapter 搜索操作 (v0.3.1)
  */
 
 import type { SQLQueryBindings } from 'bun:sqlite';
-import type { SQLiteStore } from '../sqlite-store.js';
 import { semanticSearch } from '../vector-search.js';
 import type {
   EntityType,
@@ -15,29 +14,19 @@ import type {
 import type { AdapterContext } from './types.js';
 import { extractSnippet } from './helpers.js';
 
-// ============================================================
-// Search 操作
-// ============================================================
-
-/**
- * 搜索实体
- */
 export async function search(ctx: AdapterContext, params: SearchParams): Promise<SearchResult> {
   const db = ctx.store.getDatabase();
-  const proposalId = params.proposal_id ?? null;
   const limit = params.limit || 10;
   const offset = params.offset ?? 0;
   const vectorStore = ctx.store.getVectorStore();
   const ftsEnabled = ctx.store.isFtsEnabled();
 
-  // 检查向量搜索是否可用
   const vectorEnabled =
     ctx.config.enableVectorSearch && ctx.store.isVectorSearchEnabled() && vectorStore !== null;
 
-  // 尝试使用向量搜索
   if (vectorEnabled && vectorStore) {
     try {
-      const vectorResults = await vectorSearch(db, vectorStore, params, proposalId, limit, offset);
+      const vectorResults = await vectorSearch(ctx, params, limit, offset);
       if (vectorResults.items.length > 0) {
         return {
           items: vectorResults.items,
@@ -47,582 +36,250 @@ export async function search(ctx: AdapterContext, params: SearchParams): Promise
           has_more: vectorResults.has_more,
         };
       }
-      // 向量搜索无结果，降级到文本搜索
-      if (ftsEnabled) {
-        const ftsResults = safeFtsSearch(db, params, proposalId, limit, offset);
-        if (!ftsResults) {
-          const likeResults = likeSearch(db, params, proposalId, limit, offset);
-          return {
-            items: likeResults.items,
-            degraded: true,
-            degraded_reason: 'FULLTEXT_SEARCH_UNAVAILABLE',
-            degraded_message: '向量搜索无结果且 FTS5 不可用，已降级到 LIKE 模糊匹配',
-            search_mode: 'like',
-            total: likeResults.total,
-            has_more: likeResults.has_more,
-          };
-        }
-        return {
-          items: ftsResults.items,
-          degraded: true,
-          degraded_reason: 'NO_VECTOR_RESULTS',
-          degraded_message: '向量搜索无结果，已降级到全文搜索',
-          search_mode: 'fulltext',
-          total: ftsResults.total,
-          has_more: ftsResults.has_more,
-        };
-      }
-      const likeResults = likeSearch(db, params, proposalId, limit, offset);
-      return {
-        items: likeResults.items,
-        degraded: true,
-        degraded_reason: 'FULLTEXT_SEARCH_UNAVAILABLE',
-        degraded_message: '向量搜索无结果且 FTS5 不可用，已降级到 LIKE 模糊匹配',
-        search_mode: 'like',
-        total: likeResults.total,
-        has_more: likeResults.has_more,
-      };
     } catch {
-      // 向量搜索失败，降级到全文搜索/LIKE
-      if (ftsEnabled) {
-        const ftsResults = safeFtsSearch(db, params, proposalId, limit, offset);
-        if (!ftsResults) {
-          const likeResults = likeSearch(db, params, proposalId, limit, offset);
-          return {
-            items: likeResults.items,
-            degraded: true,
-            degraded_reason: 'FULLTEXT_SEARCH_UNAVAILABLE',
-            degraded_message: 'USearch 和 FTS5 均不可用，已降级到 LIKE 模糊匹配',
-            search_mode: 'like',
-            total: likeResults.total,
-            has_more: likeResults.has_more,
-          };
-        }
-        return {
-          items: ftsResults.items,
-          degraded: true,
-          degraded_reason: 'VECTOR_SEARCH_FAILED',
-          degraded_message: '向量搜索执行失败，已降级到全文搜索',
-          search_mode: 'fulltext',
-          total: ftsResults.total,
-          has_more: ftsResults.has_more,
-        };
-      }
-      const likeResults = likeSearch(db, params, proposalId, limit, offset);
+      // fallthrough to text search
+    }
+  }
+
+  if (ftsEnabled) {
+    const ftsResults = safeFtsSearch(db, params, limit, offset);
+    if (ftsResults) {
       return {
-        items: likeResults.items,
-        degraded: true,
-        degraded_reason: 'FULLTEXT_SEARCH_UNAVAILABLE',
-        degraded_message: 'USearch 和 FTS5 均不可用，已降级到 LIKE 模糊匹配',
-        search_mode: 'like',
-        total: likeResults.total,
-        has_more: likeResults.has_more,
+        items: ftsResults.items,
+        degraded: vectorEnabled,
+        degraded_reason: vectorEnabled ? 'NO_VECTOR_RESULTS' : undefined,
+        degraded_message: vectorEnabled ? '向量搜索无结果，已降级到全文搜索' : undefined,
+        search_mode: 'fulltext',
+        total: ftsResults.total,
+        has_more: ftsResults.has_more,
       };
     }
   }
 
-  // USearch 不可用，使用全文搜索/LIKE
-  const shouldHaveVector = ctx.config.enableVectorSearch;
-  if (ftsEnabled) {
-    const ftsResults = safeFtsSearch(db, params, proposalId, limit, offset);
-    if (!ftsResults) {
-      const likeResults = likeSearch(db, params, proposalId, limit, offset);
-      return {
-        items: likeResults.items,
-        degraded: true,
-        degraded_reason: 'FULLTEXT_SEARCH_UNAVAILABLE',
-        degraded_message: 'USearch 和 FTS5 均不可用，已降级到 LIKE 模糊匹配',
-        search_mode: 'like',
-        total: likeResults.total,
-        has_more: likeResults.has_more,
-      };
-    }
-    return {
-      items: ftsResults.items,
-      degraded: shouldHaveVector,
-      degraded_reason: shouldHaveVector ? 'VECTOR_SEARCH_UNAVAILABLE' : undefined,
-      degraded_message: shouldHaveVector ? 'USearch 不可用，使用全文搜索替代' : undefined,
-      search_mode: 'fulltext',
-      total: ftsResults.total,
-      has_more: ftsResults.has_more,
-    };
-  }
-  const likeResults = likeSearch(db, params, proposalId, limit, offset);
+  const likeResults = likeSearch(db, params, limit, offset);
   return {
     items: likeResults.items,
     degraded: true,
     degraded_reason: 'FULLTEXT_SEARCH_UNAVAILABLE',
-    degraded_message: 'USearch 和 FTS5 均不可用，已降级到 LIKE 模糊匹配',
+    degraded_message: '向量搜索不可用或无结果，已降级到 LIKE 模糊匹配',
     search_mode: 'like',
     total: likeResults.total,
     has_more: likeResults.has_more,
   };
 }
 
-// ============================================================
-// 内部辅助函数
-// ============================================================
-
-type TextSearchResult = {
-  items: SearchResultItem[];
-  total: number;
-  has_more: boolean;
-};
-
-/**
- * 向量语义搜索
- */
 async function vectorSearch(
-  db: ReturnType<SQLiteStore['getDatabase']>,
-  vectorStore: NonNullable<ReturnType<SQLiteStore['getVectorStore']>>,
+  ctx: AdapterContext,
   params: SearchParams,
-  proposalId: string | null,
   limit: number,
   offset: number
-): Promise<TextSearchResult> {
-  const searchLimit = limit + offset + 1;
-  const results = await semanticSearch(db, vectorStore, params.query, proposalId, searchLimit);
-  const hasMore = results.length > offset + limit;
-  const sliced = results.slice(offset, offset + limit);
-
-  const items = sliced.map((row) => {
-    const data = JSON.parse(row.data) as Record<string, unknown>;
-    return {
-      id: row.id,
-      type: row.type as EntityType,
-      score: 1 - row.distance, // 距离转换为相似度分数
-      snippet: extractSnippet(data, params.query),
-      metadata: {
-        source_project: row.source_project,
-      },
-    };
-  });
-
-  const total = offset + items.length + (hasMore ? 1 : 0);
-
-  return {
-    items,
-    total,
-    has_more: hasMore,
-  };
-}
-
-/**
- * 全文搜索（FTS5 降级方案）
- */
-function ftsSearch(
-  db: ReturnType<SQLiteStore['getDatabase']>,
-  params: SearchParams,
-  proposalId: string | null,
-  limit: number,
-  offset: number
-): TextSearchResult {
-  const dbProposalId = proposalId ?? '';
-  const conditions: string[] = [];
-  const values: SQLQueryBindings[] = [];
-
-  conditions.push("(e.proposal_id = ? OR e.proposal_id IS NULL OR e.proposal_id = '')");
-  values.push(dbProposalId);
-  conditions.push("m.status NOT IN ('archived', 'deprecated')");
-  conditions.push('entities_fts MATCH ?');
-  values.push(params.query);
-
-  if (params.scope && params.scope !== 'all') {
-    conditions.push('e.type = ?');
-    values.push(params.scope);
+): Promise<{ items: SearchResultItem[]; total: number; has_more: boolean }> {
+  const db = ctx.store.getDatabase();
+  const vectorStore = ctx.store.getVectorStore();
+  if (!vectorStore) {
+    return { items: [], total: 0, has_more: false };
   }
 
-  const whereClause = conditions.join(' AND ');
+  const rootId = params.root_id ?? (params as { root_id?: string | null }).root_id;
+  const results = await semanticSearch(
+    db,
+    vectorStore,
+    params.query,
+    { rootId: rootId ?? undefined, versions: params.versions },
+    limit + offset
+  );
 
-  const results = db.prepare(`
-    WITH ranked AS (
-      SELECT
-        e.id,
-        e.source_project,
-        e.proposal_id,
-        e.type,
-        e.data,
-        m.status,
-        m.updated_at,
-        m.content_hash,
-        bm25(entities_fts) AS fts_rank,
-        ROW_NUMBER() OVER (
-          PARTITION BY e.source_project, e.id
-          ORDER BY
-            CASE
-              WHEN e.proposal_id = ? THEN 1
-              WHEN e.proposal_id IS NULL OR e.proposal_id = '' THEN 2
-              ELSE 3
-            END
-        ) AS rn
-      FROM entities e
-      JOIN metadata m ON e.source_project = m.source_project
-        AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
-      JOIN entities_fts ON e.id = entities_fts.entity_id
-        AND e.source_project = entities_fts.source_project
-        AND e.proposal_id = entities_fts.proposal_id
-      WHERE ${whereClause}
-    )
-    SELECT id, source_project, proposal_id, type, data, status, updated_at, content_hash, fts_rank
-    FROM ranked
-    WHERE rn = 1
-    ORDER BY fts_rank
-    LIMIT ? OFFSET ?
-  `).all(dbProposalId, ...values, limit, offset) as Array<{
-    id: string;
-    type: EntityType;
-    data: string;
-    status: EntityStatus;
-    updated_at: string;
-    content_hash: string;
-    source_project: string;
-    fts_rank: number;
-  }>;
-
-  const total = countFtsMatches(db, params, proposalId);
-  const items = results.map((row) => {
-    const data = JSON.parse(row.data) as Record<string, unknown>;
-    const rank = Number(row.fts_rank ?? 0);
-    const score = rank <= 0 ? 1 : 1 / (1 + rank);
+  const sliced = results.slice(offset, offset + limit);
+  const items = sliced.map((item) => {
+    const meta = db
+      .prepare(
+        `SELECT status, updated_at, created_at, source_repo, external_url FROM metadata WHERE entity_uuid = ?`
+      )
+      .get(item.uuid) as
+      | {
+          status: string;
+          updated_at: string;
+          created_at: string;
+          source_repo: string | null;
+          external_url: string | null;
+        }
+      | undefined;
     return {
-      id: row.id,
-      type: row.type,
-      score,
-      snippet: extractSnippet(data, params.query),
+      id: item.id,
+      type: item.type as EntityType,
+      score: 1 - item.distance,
+      snippet: extractSnippet(JSON.parse(item.data), params.query),
       metadata: {
-        status: row.status,
-        updated_at: row.updated_at,
-        content_hash: row.content_hash,
-        source_project: row.source_project,
+        status: (meta?.status ?? 'published') as EntityStatus,
+        updated_at: meta?.updated_at,
+        created_at: meta?.created_at,
+        source_repo: meta?.source_repo ?? undefined,
+        external_url: meta?.external_url ?? undefined,
       },
     };
   });
 
   return {
     items,
-    total,
-    has_more: offset + items.length < total,
+    total: results.length,
+    has_more: results.length > offset + limit,
   };
 }
 
 function safeFtsSearch(
-  db: ReturnType<SQLiteStore['getDatabase']>,
+  db: ReturnType<typeof import('../sqlite-store.js').SQLiteStore.prototype.getDatabase>,
   params: SearchParams,
-  proposalId: string | null,
   limit: number,
   offset: number
-): TextSearchResult | null {
+): { items: SearchResultItem[]; total: number; has_more: boolean } | null {
   try {
-    return ftsSearch(db, params, proposalId, limit, offset);
+    return ftsSearch(db, params, limit, offset);
   } catch {
-    try {
-      return ftsSearchFallback(db, params, proposalId, limit, offset);
-    } catch {
-      return null;
-    }
+    return null;
   }
 }
 
-function ftsSearchFallback(
-  db: ReturnType<SQLiteStore['getDatabase']>,
+function ftsSearch(
+  db: ReturnType<typeof import('../sqlite-store.js').SQLiteStore.prototype.getDatabase>,
   params: SearchParams,
-  proposalId: string | null,
   limit: number,
   offset: number
-): TextSearchResult {
-  const dbProposalId = proposalId ?? '';
-  const conditions: string[] = [];
-  const values: SQLQueryBindings[] = [];
+): { items: SearchResultItem[]; total: number; has_more: boolean } {
+  const { whereClause, joinClause, joinBindings, whereBindings } = buildFilter(params);
 
-  conditions.push("(e.proposal_id = ? OR e.proposal_id IS NULL OR e.proposal_id = '')");
-  values.push(dbProposalId);
-  conditions.push("m.status NOT IN ('archived', 'deprecated')");
-  conditions.push('entities_fts MATCH ?');
-  values.push(params.query);
-
-  if (params.scope && params.scope !== 'all') {
-    conditions.push('e.type = ?');
-    values.push(params.scope);
-  }
-
-  const whereClause = conditions.join(' AND ');
-
-  const results = db.prepare(`
-    WITH ranked AS (
-      SELECT
-        e.id,
-        e.source_project,
-        e.proposal_id,
-        e.type,
-        e.data,
-        m.status,
-        m.updated_at,
-        m.content_hash,
-        0.0 AS fts_rank,
-        ROW_NUMBER() OVER (
-          PARTITION BY e.source_project, e.id
-          ORDER BY
-            CASE
-              WHEN e.proposal_id = ? THEN 1
-              WHEN e.proposal_id IS NULL OR e.proposal_id = '' THEN 2
-              ELSE 3
-            END
-        ) AS rn
-      FROM entities e
-      JOIN metadata m ON e.source_project = m.source_project
-        AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
-      JOIN entities_fts ON e.id = entities_fts.entity_id
-        AND e.source_project = entities_fts.source_project
-        AND e.proposal_id = entities_fts.proposal_id
-      WHERE ${whereClause}
-    )
-    SELECT id, source_project, proposal_id, type, data, status, updated_at, content_hash, fts_rank
-    FROM ranked
-    WHERE rn = 1
-    ORDER BY id
+  const query = `
+    SELECT e.uuid, e.id, e.root_id, e.type, e.data,
+           m.status, m.updated_at, m.created_at, m.source_repo, m.external_url,
+           bm25(entities_fts) as score
+    FROM entities_fts
+    JOIN entities e ON e.uuid = entities_fts.entity_uuid
+    JOIN metadata m ON m.entity_uuid = e.uuid
+    ${joinClause}
+    WHERE entities_fts.search_text MATCH ?
+    ${whereClause}
+    ORDER BY score ASC
     LIMIT ? OFFSET ?
-  `).all(dbProposalId, ...values, limit, offset) as Array<{
+  `;
+
+  const rows = db
+    .prepare(query)
+    .all(...joinBindings, params.query, ...whereBindings, limit, offset) as Array<{
+    uuid: string;
     id: string;
-    type: EntityType;
+    root_id: string;
+    type: string;
     data: string;
-    status: EntityStatus;
+    status: string;
     updated_at: string;
-    content_hash: string;
-    source_project: string;
-    fts_rank: number;
+    created_at: string;
+    source_repo: string | null;
+    external_url: string | null;
+    score: number;
   }>;
 
-  const total = countFtsMatches(db, params, proposalId);
-  const items = results.map((row) => {
-    const data = JSON.parse(row.data) as Record<string, unknown>;
-    return {
-      id: row.id,
-      type: row.type,
-      score: 1,
-      snippet: extractSnippet(data, params.query),
-      metadata: {
-        status: row.status,
-        updated_at: row.updated_at,
-        content_hash: row.content_hash,
-        source_project: row.source_project,
-      },
-    };
-  });
+  const items = rows.map((row) => ({
+    id: row.id,
+    type: row.type as EntityType,
+    score: row.score,
+    snippet: extractSnippet(JSON.parse(row.data), params.query),
+    metadata: {
+      status: row.status as EntityStatus,
+      updated_at: row.updated_at,
+      created_at: row.created_at,
+      source_repo: row.source_repo ?? undefined,
+      external_url: row.external_url ?? undefined,
+    },
+  }));
 
   return {
     items,
-    total,
-    has_more: offset + items.length < total,
+    total: rows.length,
+    has_more: rows.length >= limit,
   };
 }
 
-/**
- * 文本搜索（LIKE 降级方案）
- */
 function likeSearch(
-  db: ReturnType<SQLiteStore['getDatabase']>,
+  db: ReturnType<typeof import('../sqlite-store.js').SQLiteStore.prototype.getDatabase>,
   params: SearchParams,
-  proposalId: string | null,
   limit: number,
   offset: number
-): TextSearchResult {
-  const conditions: string[] = [];
-  const values: SQLQueryBindings[] = [];
-
-  // 基于 LIKE 的简单搜索
-  conditions.push("(e.data LIKE ? OR e.id LIKE ?)");
-  values.push(`%${params.query}%`, `%${params.query}%`);
-
-  // proposal_id 过滤
-  if (proposalId) {
-    conditions.push('(e.proposal_id = ? OR e.proposal_id IS NULL OR e.proposal_id = \'\')');
-    values.push(proposalId);
-  } else {
-    conditions.push('(e.proposal_id IS NULL OR e.proposal_id = \'\')');
-  }
-
-  // scope 过滤
-  if (params.scope && params.scope !== 'all') {
-    conditions.push('e.type = ?');
-    values.push(params.scope);
-  }
-
-  conditions.push("m.status NOT IN ('archived', 'deprecated')");
-
-  const whereClause = conditions.join(' AND ');
-
-  const results = db.prepare(`
-    WITH ranked AS (
-      SELECT
-        e.id,
-        e.source_project,
-        e.proposal_id,
-        e.type,
-        e.data,
-        m.status,
-        m.updated_at,
-        m.content_hash,
-        ROW_NUMBER() OVER (
-          PARTITION BY e.source_project, e.id
-          ORDER BY
-            CASE
-              WHEN e.proposal_id = ? THEN 1
-              WHEN e.proposal_id IS NULL OR e.proposal_id = '' THEN 2
-              ELSE 3
-            END
-        ) AS rn
-      FROM entities e
-      JOIN metadata m ON e.source_project = m.source_project
-        AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
-      WHERE ${whereClause}
-    )
-    SELECT id, source_project, proposal_id, type, data, status, updated_at, content_hash
-    FROM ranked
-    WHERE rn = 1
-    ORDER BY id
+): { items: SearchResultItem[]; total: number; has_more: boolean } {
+  const { whereClause, joinClause, joinBindings, whereBindings } = buildFilter(params);
+  const query = `
+    SELECT e.uuid, e.id, e.root_id, e.type, e.data,
+           m.status, m.updated_at, m.created_at, m.source_repo, m.external_url
+    FROM entities e
+    JOIN metadata m ON m.entity_uuid = e.uuid
+    ${joinClause}
+    WHERE e.data LIKE ?
+    ${whereClause}
     LIMIT ? OFFSET ?
-  `).all(...values, proposalId ?? '', limit, offset) as Array<{
+  `;
+
+  const rows = db
+    .prepare(query)
+    .all(...joinBindings, `%${params.query}%`, ...whereBindings, limit, offset) as Array<{
+    uuid: string;
     id: string;
-    type: EntityType;
+    root_id: string;
+    type: string;
     data: string;
-    status: EntityStatus;
+    status: string;
     updated_at: string;
-    content_hash: string;
-    source_project: string;
+    created_at: string;
+    source_repo: string | null;
+    external_url: string | null;
   }>;
 
-  const total = countLikeMatches(db, params, proposalId);
-  const items = results.map((row, index) => {
-    const data = JSON.parse(row.data) as Record<string, unknown>;
-    return {
-      id: row.id,
-      type: row.type,
-      score: 1 - index * 0.1, // 简单的排名分数
-      snippet: extractSnippet(data, params.query),
-      metadata: {
-        status: row.status,
-        updated_at: row.updated_at,
-        content_hash: row.content_hash,
-        source_project: row.source_project,
-      },
-    };
-  });
+  const items = rows.map((row) => ({
+    id: row.id,
+    type: row.type as EntityType,
+    score: 0,
+    snippet: extractSnippet(JSON.parse(row.data), params.query),
+    metadata: {
+      status: row.status as EntityStatus,
+      updated_at: row.updated_at,
+      created_at: row.created_at,
+      source_repo: row.source_repo ?? undefined,
+      external_url: row.external_url ?? undefined,
+    },
+  }));
 
   return {
     items,
-    total,
-    has_more: offset + items.length < total,
+    total: rows.length,
+    has_more: rows.length >= limit,
   };
 }
 
-function countFtsMatches(
-  db: ReturnType<SQLiteStore['getDatabase']>,
-  params: SearchParams,
-  proposalId: string | null
-): number {
-  const dbProposalId = proposalId ?? '';
-  const conditions: string[] = [];
-  const values: SQLQueryBindings[] = [];
+function buildFilter(params: SearchParams): {
+  whereClause: string;
+  joinClause: string;
+  joinBindings: SQLQueryBindings[];
+  whereBindings: SQLQueryBindings[];
+} {
+  const where: string[] = [];
+  const whereBindings: SQLQueryBindings[] = [];
+  const joinBindings: SQLQueryBindings[] = [];
+  let joinClause = '';
 
-  conditions.push("(e.proposal_id = ? OR e.proposal_id IS NULL OR e.proposal_id = '')");
-  values.push(dbProposalId);
-  conditions.push("m.status NOT IN ('archived', 'deprecated')");
-  conditions.push('entities_fts MATCH ?');
-  values.push(params.query);
-
-  if (params.scope && params.scope !== 'all') {
-    conditions.push('e.type = ?');
-    values.push(params.scope);
-  }
-
-  const whereClause = conditions.join(' AND ');
-
-  const row = db
-    .prepare(
-      `
-      WITH ranked AS (
-        SELECT
-          e.id,
-          e.source_project,
-          e.proposal_id,
-          ROW_NUMBER() OVER (
-            PARTITION BY e.source_project, e.id
-            ORDER BY
-              CASE
-                WHEN e.proposal_id = ? THEN 1
-                WHEN e.proposal_id IS NULL OR e.proposal_id = '' THEN 2
-                ELSE 3
-              END
-          ) AS rn
-        FROM entities e
-        JOIN metadata m ON e.source_project = m.source_project
-          AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
-        JOIN entities_fts ON e.id = entities_fts.entity_id
-          AND e.source_project = entities_fts.source_project
-          AND e.proposal_id = entities_fts.proposal_id
-        WHERE ${whereClause}
-      )
-      SELECT COUNT(*) AS total FROM ranked WHERE rn = 1
-    `
-    )
-    .get(dbProposalId, ...values) as { total?: number } | undefined;
-
-  return Number(row?.total ?? 0);
-}
-
-function countLikeMatches(
-  db: ReturnType<SQLiteStore['getDatabase']>,
-  params: SearchParams,
-  proposalId: string | null
-): number {
-  const conditions: string[] = [];
-  const values: SQLQueryBindings[] = [];
-
-  conditions.push("(e.data LIKE ? OR e.id LIKE ?)");
-  values.push(`%${params.query}%`, `%${params.query}%`);
-
-  if (proposalId) {
-    conditions.push('(e.proposal_id = ? OR e.proposal_id IS NULL OR e.proposal_id = \'\')');
-    values.push(proposalId);
-  } else {
-    conditions.push('(e.proposal_id IS NULL OR e.proposal_id = \'\')');
+  const rootId = params.root_id ?? (params as { root_id?: string | null }).root_id;
+  if (rootId !== undefined) {
+    where.push('e.root_id = ?');
+    whereBindings.push(rootId);
   }
 
   if (params.scope && params.scope !== 'all') {
-    conditions.push('e.type = ?');
-    values.push(params.scope);
+    where.push('e.type = ?');
+    whereBindings.push(params.scope);
   }
 
-  conditions.push("m.status NOT IN ('archived', 'deprecated')");
+  if (params.versions && params.versions.length > 0) {
+    const placeholders = params.versions.map(() => '?').join(', ');
+    joinClause = `JOIN entity_versions v ON v.entity_uuid = e.uuid AND v.version IN (${placeholders})`;
+    joinBindings.push(...params.versions);
+  }
 
-  const whereClause = conditions.join(' AND ');
-
-  const row = db
-    .prepare(
-      `
-      WITH ranked AS (
-        SELECT
-          e.id,
-          e.source_project,
-          e.proposal_id,
-          ROW_NUMBER() OVER (
-            PARTITION BY e.source_project, e.id
-            ORDER BY
-              CASE
-                WHEN e.proposal_id = ? THEN 1
-                WHEN e.proposal_id IS NULL OR e.proposal_id = '' THEN 2
-                ELSE 3
-              END
-          ) AS rn
-        FROM entities e
-        JOIN metadata m ON e.source_project = m.source_project
-          AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
-        WHERE ${whereClause}
-      )
-      SELECT COUNT(*) AS total FROM ranked WHERE rn = 1
-    `
-    )
-    .get(proposalId ?? '', ...values) as { total?: number } | undefined;
-
-  return Number(row?.total ?? 0);
+  const whereClause = where.length > 0 ? `AND ${where.join(' AND ')}` : '';
+  return { whereClause, joinClause, joinBindings, whereBindings };
 }

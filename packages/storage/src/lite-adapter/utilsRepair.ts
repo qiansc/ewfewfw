@@ -45,12 +45,13 @@ export async function repair(
 
     // 查询实体
     const entities = db.prepare(`
-      SELECT e.id, e.source_project, e.data
+      SELECT e.uuid, e.id, e.root_id, e.data
       FROM entities e
       ${entityCondition}
     `).all(...entityValues) as Array<{
+      uuid: string;
       id: string;
-      source_project: string;
+      root_id: string;
       data: string;
     }>;
 
@@ -61,7 +62,7 @@ export async function repair(
       const vectorStore = ctx.store.getVectorStore();
       if (vectorStore) {
         for (const entity of entities) {
-          const vectorKey = generateVectorKey(entity.source_project ?? '', entity.id, '');
+          const vectorKey = generateVectorKey(entity.uuid);
           const vector = vectorStore.has(vectorKey);
 
           if (!vector) {

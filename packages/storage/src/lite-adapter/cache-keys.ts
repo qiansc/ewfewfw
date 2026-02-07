@@ -1,13 +1,13 @@
-export function normalizeProject(project: string | null | undefined): string | null {
-  if (project === '' || project === undefined || project === null) return null;
-  return project;
+export function normalizeRootId(rootId: string | null | undefined): string | null {
+  if (rootId === '' || rootId === undefined || rootId === null) return null;
+  return rootId;
 }
 
-export function toEntityCacheKey(project: string | null | undefined, id: string): string {
-  const normalizedProject = normalizeProject(project);
-  return `${normalizedProject ?? 'null'}:${id}`;
+export function toEntityCacheKey(rootId: string | null | undefined, id: string): string {
+  const normalizedRootId = normalizeRootId(rootId);
+  return `${normalizedRootId ?? 'null'}:${id}`;
 }
 
-export function expandEntityCacheKeys(project: string | null | undefined, id: string): string[] {
-  return [toEntityCacheKey(project, id), id];
+export function expandEntityCacheKeys(rootId: string | null | undefined, id: string): string[] {
+  return [toEntityCacheKey(rootId, id), id];
 }

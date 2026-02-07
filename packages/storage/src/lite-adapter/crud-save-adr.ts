@@ -17,10 +17,10 @@ export function runAdrCheck(options: {
   status: EntityStatus;
   id: string;
   contentHash: string;
-  dbSourceProject: string;
-  dbProposalId: string;
+  dbRootId: string;
+  dbRequirementId: string;
 }): AdrCheckOutcome {
-  const { db, params, status, id, contentHash, dbSourceProject, dbProposalId } = options;
+  const { db, params, status, id, contentHash, dbRootId, dbRequirementId } = options;
   let adrCheck: SaveResult['adr_check'];
   const adrScope = params.adr_policy?.scope?.length
     ? params.adr_policy.scope
@@ -39,26 +39,16 @@ export function runAdrCheck(options: {
     return {};
   }
 
-  const adrQuery = dbProposalId === ''
-    ? `
+  void dbRequirementId;
+  const adrQuery = `
       SELECT 1 FROM relations r
-      JOIN entities e ON r.to_project = e.source_project AND r.to_id = e.id
-      WHERE r.from_id = ? AND r.from_project = ?
+      JOIN entities e ON r.to_uuid = e.uuid
+      WHERE r.from_id = ? AND r.from_root_id = ?
         AND r.rel_type = 'REFERENCES'
         AND e.type = 'adr'
         AND (r.status IS NULL OR r.status != 'deleted')
-        AND (r.proposal_id IS NULL OR r.proposal_id = '')
-    `
-    : `
-      SELECT 1 FROM relations r
-      JOIN entities e ON r.to_project = e.source_project AND r.to_id = e.id
-      WHERE r.from_id = ? AND r.from_project = ?
-        AND r.rel_type = 'REFERENCES'
-        AND e.type = 'adr'
-        AND (r.status IS NULL OR r.status != 'deleted')
-        AND r.proposal_id = ?
     `;
-  const adrParams = dbProposalId === '' ? [id, dbSourceProject] : [id, dbSourceProject, dbProposalId];
+  const adrParams = [id, dbRootId];
   const hasAdr = db.prepare(adrQuery).get(...adrParams);
 
   if (!hasAdr) {
@@ -97,4 +87,3 @@ export function runAdrCheck(options: {
 
   return { adrCheck };
 }
-

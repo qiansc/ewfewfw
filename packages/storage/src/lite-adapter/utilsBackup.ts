@@ -83,43 +83,60 @@ export async function backup(
 
     // 查询实体
     const entities = db.prepare(`
-      SELECT e.id, e.type, e.source_project, e.data,
+      SELECT e.uuid, e.root_id, e.id, e.type, e.data, e.requirement_id, e.component_id,
              m.status, m.content_hash, m.created_at, m.updated_at
       FROM entities e
-      JOIN metadata m ON e.source_project = m.source_project
-        AND e.id = m.entity_id AND e.proposal_id = m.proposal_id
+      JOIN metadata m ON e.uuid = m.entity_uuid
       ${statusCondition}
     `).all() as Array<{
+      uuid: string;
+      root_id: string;
       id: string;
       type: string;
-      source_project: string;
       data: string;
+      requirement_id: string | null;
+      component_id: string | null;
       status: string;
       content_hash: string;
       created_at: string;
       updated_at: string;
     }>;
 
+    const versionRows = db.prepare(`
+      SELECT entity_uuid, version FROM entity_versions
+    `).all() as Array<{ entity_uuid: string; version: string }>;
+    const versionsByUuid = new Map<string, string[]>();
+    for (const row of versionRows) {
+      const list = versionsByUuid.get(row.entity_uuid) ?? [];
+      list.push(row.version);
+      versionsByUuid.set(row.entity_uuid, list);
+    }
+
     // 查询关系
     const relations = db.prepare(`
-      SELECT * FROM relations WHERE proposal_id IS NULL OR proposal_id = ''
-    `).all();
+      SELECT id, from_uuid, to_uuid, from_root_id, from_id, to_root_id, to_id, rel_type, status, properties
+      FROM relations
+    `).all() as Array<Record<string, unknown>>;
 
     const vectorCount = ctx.store.getVectorStore()?.size() ?? 0;
 
     // 构建备份数据
     const source: Record<string, string> = {
       mode: 'local',
-      project_id: ctx.config.defaultProject,
+      root_id: ctx.config.defaultProject,
     };
     if (ctx.config.repoId) {
       source.repo_id = ctx.config.repoId;
     }
 
     const backupEntities = entities.map(e => ({
+      uuid: e.uuid,
+      root_id: e.root_id,
       id: e.id,
       type: e.type,
-      source_project: e.source_project,
+      requirement_id: e.requirement_id ?? undefined,
+      component_id: e.component_id ?? undefined,
+      versions: versionsByUuid.get(e.uuid) ?? [],
       status: e.status,
       data: JSON.parse(e.data),
       metadata: params.include_metadata !== false ? {
@@ -133,7 +150,7 @@ export async function backup(
     const relationsChecksum = computeChecksum(JSON.stringify(relations));
 
     const backupData = {
-      version: '0.3.0',
+      version: '0.3.1',
       format_version: BACKUP_FORMAT_VERSION,
       exported_at: new Date().toISOString(),
       exported_by: 'unknown',

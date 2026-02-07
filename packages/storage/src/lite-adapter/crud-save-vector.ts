@@ -11,13 +11,15 @@ import { generateSearchText } from './helpers.js';
  */
 export async function updateVectorIndex(
   ctx: AdapterContext,
-  sourceProject: string,
-  entityId: string,
-  proposalId: string | null,
+  uuid: string,
+  entityType: string,
   data: Record<string, unknown>
 ): Promise<void> {
   // 检查向量搜索是否可用
   if (!ctx.store.isVectorSearchEnabled()) {
+    return;
+  }
+  if (entityType === 'feat' || entityType === 'checklist') {
     return;
   }
   const vectorStore = ctx.store.getVectorStore();
@@ -34,9 +36,7 @@ export async function updateVectorIndex(
 
   // 写入 USearch 索引
   try {
-    const dbProposalId = proposalId ?? '';
-    const dbSourceProject = sourceProject ?? '';
-    const vectorKey = generateVectorKey(dbSourceProject, entityId, dbProposalId);
+    const vectorKey = generateVectorKey(uuid);
     vectorStore.add(vectorKey, embedding);
     // 显式保存（因为 usearch-store.ts 中 add 不会自动保存，依赖外部调用 flush 或 save）
     // 实际上 usearch-store.ts 有 markDirty 实现 debounce 自动保存，
@@ -47,4 +47,3 @@ export async function updateVectorIndex(
     // 向量写入失败，忽略
   }
 }
-

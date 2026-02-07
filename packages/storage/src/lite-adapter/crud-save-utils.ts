@@ -52,17 +52,17 @@ export function diffFields(
 
 export function resolveDanglingRelations(
   db: Database,
-  sourceProject: string,
+  rootId: string,
   entityId: string
 ): boolean {
   const rows = db.prepare(`
-    SELECT id, to_project, properties
+    SELECT id, to_root_id, properties
     FROM relations
     WHERE to_id = ?
       AND (status IS NULL OR status != 'deleted')
   `).all(entityId) as Array<{
     id: string;
-    to_project: string | null;
+    to_root_id: string | null;
     properties: string | null;
   }>;
 
@@ -71,7 +71,7 @@ export function resolveDanglingRelations(
   const now = new Date().toISOString();
   const updateStmt = db.prepare(`
     UPDATE relations
-    SET to_project = ?, properties = ?, updated_at = ?
+    SET to_root_id = ?, properties = ?, updated_at = ?
     WHERE id = ?
   `);
 
@@ -90,11 +90,11 @@ export function resolveDanglingRelations(
       props.resolved === false || props.resolve_status === 'pending';
     if (!isDangling) continue;
 
-    const toProject = row.to_project ?? '';
-    const targetProject =
-      typeof props.target_project === 'string' ? props.target_project : null;
+    const toRootId = row.to_root_id ?? '';
+    const targetRootId =
+      typeof props.target_root_id === 'string' ? props.target_root_id : null;
     const shouldResolve =
-      toProject === sourceProject || toProject === '' || targetProject === sourceProject;
+      toRootId === rootId || toRootId === '' || targetRootId === rootId;
 
     if (!shouldResolve) continue;
 
@@ -103,9 +103,9 @@ export function resolveDanglingRelations(
       delete props.resolve_status;
     }
 
-    const nextProject = toProject === '' ? sourceProject : toProject;
+    const nextRootId = toRootId === '' ? rootId : toRootId;
     const nextProps = Object.keys(props).length > 0 ? JSON.stringify(props) : null;
-    updateStmt.run(nextProject, nextProps, now, row.id);
+    updateStmt.run(nextRootId, nextProps, now, row.id);
     updated = true;
   }
 
@@ -229,12 +229,12 @@ function compareSequence(a: string, b: string): number {
 
 function getNextSequence(
   db: ReturnType<AdapterContext['store']['getDatabase']>,
-  sourceProject: string,
+  rootId: string,
   prefix: string
 ): string {
   const rows = db
-    .prepare('SELECT id FROM entities WHERE source_project = ? AND id LIKE ?')
-    .all(sourceProject, `${prefix}-%`) as Array<{ id: string }>;
+    .prepare('SELECT id FROM entities WHERE root_id = ? AND id LIKE ?')
+    .all(rootId, `${prefix}-%`) as Array<{ id: string }>;
   let maxSequence: string | null = null;
   for (const row of rows) {
     const sequence = extractSequenceFromId(row.id, prefix);
@@ -258,7 +258,7 @@ export function applyGeneratedId(type: string, rawData: Record<string, unknown>,
 
 export function generateAutoId(
   db: ReturnType<AdapterContext['store']['getDatabase']>,
-  sourceProject: string,
+  rootId: string,
   type: string,
   rawData: Record<string, unknown>
 ): string | null {
@@ -272,25 +272,24 @@ export function generateAutoId(
     case 'contract':
       return generateEntityId(type, name);
     case 'adr': {
-      const sequence = getNextSequence(db, sourceProject, 'adr');
+      const sequence = getNextSequence(db, rootId, 'adr');
       return generateEntityId('adr', name, sequence);
     }
     case 'process': {
       const perspective = getPerspectiveForAutoId('process', rawData);
       if (!perspective) return null;
       const prefix = perspective === 'business' ? 'prc-b' : 'prc-t';
-      const sequence = getNextSequence(db, sourceProject, prefix);
+      const sequence = getNextSequence(db, rootId, prefix);
       return generateEntityId('process', name, sequence, perspective);
     }
     case 'sor': {
       const perspective = getPerspectiveForAutoId('sor', rawData);
       if (!perspective) return null;
       const prefix = perspective === 'business' ? 'sor-b' : 'sor-t';
-      const sequence = getNextSequence(db, sourceProject, prefix);
+      const sequence = getNextSequence(db, rootId, prefix);
       return generateEntityId('sor', name, sequence, perspective);
     }
     default:
       return null;
   }
 }
-

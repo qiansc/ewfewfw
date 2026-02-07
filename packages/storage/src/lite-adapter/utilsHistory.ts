@@ -31,15 +31,14 @@ export async function readHistory(
   }
 
   if (params.feat_id) {
-    conditions.push('feat_id = ?');
-    values.push(params.feat_id);
+    // 兼容旧参数：当前 entity_history 不记录 feat_id
   }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
   const orderClause = `ORDER BY changed_at ${order.toUpperCase()}`;
 
   const rows = db.prepare(`
-    SELECT entity_id, feat_id, action, changed_fields, changed_by, changed_at
+    SELECT entity_id, action, changed_fields, changed_by, changed_at
     FROM entity_history
     ${whereClause}
     ${orderClause}
@@ -55,7 +54,7 @@ export async function readHistory(
 
   const items: HistoryItem[] = rows.map(row => ({
     entity_id: row.entity_id,
-    feat_id: row.feat_id,
+    feat_id: null,
     action: normalizeAction(row.action),
     changed_fields: row.changed_fields ? JSON.parse(row.changed_fields) : undefined,
     changed_by: row.changed_by ?? undefined,

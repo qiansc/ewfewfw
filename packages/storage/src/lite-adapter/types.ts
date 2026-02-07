@@ -18,7 +18,7 @@ export interface LiteAdapterConfig {
   dbPath?: string;
 
   /**
-   * 默认项目 ID
+   * 默认 root_id（兼容旧命名）
    */
   defaultProject?: string;
 
@@ -63,16 +63,18 @@ export interface RequiredConfig extends Required<LiteAdapterConfig> {
 // ============================================================
 
 export interface EntityRow {
+  uuid: string;
   id: string;
-  source_project: string;
-  proposal_id: string | null;
+  root_id: string;
   type: string;
   kind: string | null;
   scope: string | null;
   perspective: string | null;
   data: string;
+  requirement_id: string | null;
+  component_id: string | null;
   status: string;
-  content_hash: string;
+  content_hash: string | null;
   created_at: string;
   updated_at: string;
   source_repo: string | null;
@@ -97,9 +99,9 @@ export interface AdapterContext {
 // ============================================================
 
 export interface ParsedRelation {
-  fromProject?: string;
+  fromRootId?: string;
   fromId?: string;
-  toProject: string;
+  toRootId: string;
   toId: string;
   relType: string;
   properties?: Record<string, unknown>;

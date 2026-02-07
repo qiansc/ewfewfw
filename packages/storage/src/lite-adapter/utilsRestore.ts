@@ -11,9 +11,9 @@ import { checkCompatibility, computeChecksum } from './utilsCommon.js';
 
 type BackupRelation = {
   id?: string | null;
-  from_project?: string | null;
+  from_root_id?: string | null;
   from_id: string;
-  to_project?: string | null;
+  to_root_id?: string | null;
   to_id: string;
   rel_type: string;
 };
@@ -68,18 +68,29 @@ export async function restore(
       version: string;
       format_version: string;
       entities: Array<{
+        uuid?: string;
+        root_id?: string;
         id: string;
         type: string;
-        source_project: string;
-        status: string;
+        requirement_id?: string | null;
+        component_id?: string | null;
+        versions?: string[];
+        status?: string;
         data: Record<string, unknown>;
         metadata?: {
-          content_hash: string;
-          created_at: string;
-          updated_at: string;
+          content_hash?: string;
+          created_at?: string;
+          updated_at?: string;
         };
       }>;
-      relations: BackupRelation[];
+      relations: Array<BackupRelation & {
+        from_uuid?: string | null;
+        to_uuid?: string | null;
+        from_root_id?: string | null;
+        to_root_id?: string | null;
+        status?: string;
+        properties?: Record<string, unknown> | null;
+      }>;
       checksums?: {
         entities: string;
         relations: string;
@@ -87,13 +98,13 @@ export async function restore(
     };
 
     // 版本兼容性检查
-    const compatible = checkCompatibility(backupData.version, '0.3.0');
+    const compatible = checkCompatibility(backupData.version, '0.3.1');
     if (!compatible) {
       return {
         success: false,
         format_version: backupData.format_version,
         compatible: false,
-        error: `备份版本 ${backupData.version} 与当前版本 0.3.0 不兼容`,
+        error: `备份版本 ${backupData.version} 与当前版本 0.3.1 不兼容`,
       };
     }
 
@@ -129,13 +140,27 @@ export async function restore(
     // 恢复实体
     for (const entity of backupData.entities) {
       // 检查是否存在
-      const existing = db.prepare(`
-        SELECT content_hash, updated_at FROM metadata
-        WHERE source_project = ? AND entity_id = ? AND (proposal_id IS NULL OR proposal_id = '')
-      `).get(entity.source_project, entity.id) as {
-        content_hash: string;
-        updated_at: string;
-      } | undefined;
+      const rootId = entity.root_id ?? entity.root_id ?? ctx.config.defaultProject;
+      const requirementId = entity.requirement_id ?? null;
+      const existing = entity.uuid
+        ? (db.prepare(`
+            SELECT m.content_hash, m.updated_at, e.uuid
+            FROM entities e
+            JOIN metadata m ON e.uuid = m.entity_uuid
+            WHERE e.uuid = ?
+            LIMIT 1
+          `).get(entity.uuid) as { content_hash: string; updated_at: string; uuid: string } | undefined)
+        : (db.prepare(`
+            SELECT m.content_hash, m.updated_at, e.uuid
+            FROM entities e
+            JOIN metadata m ON e.uuid = m.entity_uuid
+            WHERE e.root_id = ? AND e.id = ? AND ${
+              requirementId ? 'e.requirement_id = ?' : "(e.requirement_id IS NULL OR e.requirement_id = '')"
+            }
+            LIMIT 1
+          `).get(
+            ...(requirementId ? [rootId, entity.id, requirementId] : [rootId, entity.id])
+          ) as { content_hash: string; updated_at: string; uuid: string } | undefined);
 
       if (existing) {
         // 处理冲突
@@ -174,32 +199,54 @@ export async function restore(
 
       // 计算 content_hash
       const contentHash = entity.metadata?.content_hash || computeChecksum(JSON.stringify(entity.data));
+      const createdAt = entity.metadata?.created_at || now;
+      const updatedAt = entity.metadata?.updated_at || now;
+      const uuid = entity.uuid ?? existing?.uuid ?? randomUUID();
+      const versions = entity.versions && entity.versions.length > 0 ? entity.versions : ['0.0.0'];
 
       // 插入/更新实体
       db.prepare(`
-        INSERT INTO entities (id, source_project, proposal_id, type, data)
-        VALUES (?, ?, '', ?, ?)
-        ON CONFLICT (source_project, id, proposal_id) DO UPDATE SET
+        INSERT INTO entities (
+          uuid, root_id, id, type, kind, scope, perspective, data, requirement_id, component_id, orphaned, orphaned_at
+        )
+        VALUES (?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, 0, NULL)
+        ON CONFLICT(uuid) DO UPDATE SET
+          root_id = excluded.root_id,
+          id = excluded.id,
           type = excluded.type,
-          data = excluded.data
-      `).run(entity.id, entity.source_project, entity.type, JSON.stringify(entity.data));
+          data = excluded.data,
+          requirement_id = excluded.requirement_id,
+          component_id = excluded.component_id
+      `).run(
+        uuid,
+        rootId,
+        entity.id,
+        entity.type,
+        JSON.stringify(entity.data),
+        requirementId,
+        entity.component_id ?? null
+      );
 
-      // 插入/更新元数据
       db.prepare(`
-        INSERT INTO metadata (entity_id, source_project, proposal_id, status, content_hash, created_at, updated_at)
-        VALUES (?, ?, '', ?, ?, ?, ?)
-        ON CONFLICT (source_project, entity_id, proposal_id) DO UPDATE SET
+        INSERT INTO metadata (entity_uuid, status, content_hash, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(entity_uuid) DO UPDATE SET
           status = excluded.status,
           content_hash = excluded.content_hash,
           updated_at = excluded.updated_at
       `).run(
-        entity.id,
-        entity.source_project,
-        entity.status,
+        uuid,
+        entity.status ?? 'published',
         contentHash,
-        entity.metadata?.created_at || now,
-        now
+        createdAt,
+        updatedAt
       );
+
+      db.prepare(`DELETE FROM entity_versions WHERE entity_uuid = ?`).run(uuid);
+      const insertVersion = db.prepare(`INSERT INTO entity_versions (entity_uuid, version) VALUES (?, ?)`);
+      for (const version of versions) {
+        insertVersion.run(uuid, version);
+      }
 
       entitiesRestored++;
     }
@@ -207,19 +254,40 @@ export async function restore(
     // 恢复关系（简化处理）
     for (const relation of backupData.relations) {
       const relationId = relation.id ?? randomUUID();
-      const fromProject = relation.from_project ?? '';
-      const toProject = relation.to_project ?? '';
+      const fromRootId = relation.from_root_id ?? '';
+      const toRootId = relation.to_root_id ?? '';
+      const fromUuid =
+        relation.from_uuid ??
+        (db.prepare(`SELECT uuid FROM entities WHERE root_id = ? AND id = ? LIMIT 1`).get(
+          fromRootId,
+          relation.from_id
+        ) as { uuid: string } | undefined)?.uuid;
+      if (!fromUuid) {
+        continue;
+      }
+      const toUuid =
+        relation.to_uuid ??
+        (db.prepare(`SELECT uuid FROM entities WHERE root_id = ? AND id = ? LIMIT 1`).get(
+          toRootId,
+          relation.to_id
+        ) as { uuid: string } | undefined)?.uuid ??
+        null;
       try {
         const result = db.prepare(`
-          INSERT OR IGNORE INTO relations (id, proposal_id, from_project, from_id, to_project, to_id, rel_type, created_at, updated_at)
-          VALUES (?, '', ?, ?, ?, ?, ?, ?, ?)
+          INSERT OR IGNORE INTO relations
+            (id, from_uuid, to_uuid, from_root_id, from_id, to_root_id, to_id, rel_type, status, properties, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           relationId,
-          fromProject,
+          fromUuid,
+          toUuid,
+          fromRootId,
           relation.from_id,
-          toProject,
+          toRootId,
           relation.to_id,
           relation.rel_type,
+          relation.status ?? 'active',
+          relation.properties ? JSON.stringify(relation.properties) : null,
           now,
           now
         );

@@ -6,8 +6,8 @@ import { randomUUID } from 'node:crypto';
 import YAML from 'yaml';
 import type { SQLiteStore } from '../sqlite-store.js';
 import type { InMemoryGraph } from '../in-memory-graph.js';
-import type { EntityType, EntityStatus, Entity, Relation } from '../adapter.js';
-import type { EntityRow, ParsedRelation } from './types.js';
+import type { EntityType, EntityStatus, Entity } from '../adapter.js';
+import type { EntityRow } from './types.js';
 import { computeContentHash } from '../utils/contentHash.js';
 
 // ============================================================
@@ -48,61 +48,57 @@ export function computeHash(data: Record<string, unknown>): string {
 }
 
 // ============================================================
-// 参数规范化
+// requirement_id 参数规范化
 // ============================================================
 
 /**
- * 规范化 proposal_id 参数（单值）
+ * 规范化 requirement_id 参数（单值）
  */
-export function normalizeProposalId(
-  proposalId: string | string[] | null | undefined
+export function normalizeRequirementId(
+  requirementId: string | string[] | null | undefined
 ): string | null {
-  if (Array.isArray(proposalId)) {
-    return proposalId[0] || null;
+  if (Array.isArray(requirementId)) {
+    return requirementId[0] || null;
   }
-  return proposalId ?? null;
+  return requirementId ?? null;
 }
 
 /**
- * 规范化 proposal_id 参数（保留数组形式，用于多 feat 查询）
- *
- * 设计文档: store-crud.md §3.2
- * > proposal_id?: string | string[] | null：支持多 Feat 合并视图
+ * 规范化 requirement_id 参数（保留数组形式）
  */
-export function normalizeProposalIdForQuery(
-  proposalId: string | string[] | null | undefined
+export function normalizeRequirementIdForQuery(
+  requirementId: string | string[] | null | undefined
 ): string[] | null {
-  if (proposalId === null || proposalId === undefined) {
+  if (requirementId === null || requirementId === undefined) {
     return null;
   }
-  if (Array.isArray(proposalId)) {
-    return proposalId.length > 0 ? proposalId : null;
+  if (Array.isArray(requirementId)) {
+    return requirementId.length > 0 ? requirementId : null;
   }
-  return [proposalId];
+  return [requirementId];
 }
-
-// ============================================================
-// 实体转换
-// ============================================================
 
 /**
  * 将数据库行转换为 Entity 对象
  */
-export function rowToEntity(row: EntityRow): Entity {
+export function rowToEntity(row: EntityRow, versions: string[] = []): Entity {
   return {
+    uuid: row.uuid,
     id: row.id,
+    root_id: row.root_id,
     type: row.type as EntityType,
     kind: row.kind || undefined,
     scope: row.scope || undefined,
     perspective: row.perspective || undefined,
     data: JSON.parse(row.data),
-    proposal_id: row.proposal_id === '' ? null : row.proposal_id,
+    requirement_id: row.requirement_id || undefined,
+    component_id: row.component_id || undefined,
+    versions,
     metadata: {
-      source_project: row.source_project,
       source_repo: row.source_repo || undefined,
-      external_url: row.external_url || undefined,
+      external_url: row.external_url ?? undefined,
       status: row.status as EntityStatus,
-      content_hash: row.content_hash,
+      content_hash: row.content_hash ?? undefined,
       created_at: row.created_at,
       updated_at: row.updated_at,
       created_by: row.created_by || undefined,
