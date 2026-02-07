@@ -68,7 +68,7 @@ export async function generateContract(
     }
   } else {
     const files = await fg(
-      ["**/*.ts", "**/*.tsx", "**/*.go", "**/*.py"],
+      ["**/*.ts", "**/*.tsx", "**/*.go"],
       {
         cwd: resolvedPath,
         ignore: ["**/node_modules/**", "**/.git/**", "**/dist/**"],

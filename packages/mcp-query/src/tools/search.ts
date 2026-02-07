@@ -18,7 +18,8 @@ export async function querySearchHandler(
   const result = await adapter.search({
     query: args.query,
     scope,
-    proposal_id: args.proposal_id,
+    root_id: args.root_id,
+    versions: args.versions,
     limit,
     offset,
   });

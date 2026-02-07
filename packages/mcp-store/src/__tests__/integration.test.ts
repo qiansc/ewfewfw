@@ -9,10 +9,14 @@ import {
   type StorageAdapter,
 } from "@c4a/storage";
 import {
+  storeAddVersionHandler,
   storeDeleteHandler,
+  storeFeatChecklistHandler,
   storeFeatLifecycleHandler,
   storeListHandler,
+  storePublishVersionHandler,
   storeReadHandler,
+  storeRemoveVersionHandler,
   storeSaveHandler,
   storeSyncHandler,
 } from "../tools/index.js";
@@ -22,25 +26,6 @@ const TMP_ROOT = join(ORIGINAL_CWD, ".tmp", `mcp-store-tests-${Date.now()}`);
 const DB_PATH = join(TMP_ROOT, "store.db");
 const CONTEXT_DIR = join(TMP_ROOT, ".context");
 const PROJECT_ID = "mcp-store-project";
-const SAVE_DEFAULTS = {
-  format: "yaml" as const,
-  enforce_adr: false,
-  skip_adr_check: false,
-  ignore_concurrent_warning: false,
-  force_save: false,
-};
-const READ_DEFAULTS = {
-  format: "object" as const,
-  proposal_id: null as string | null,
-};
-const DELETE_DEFAULTS = {
-  proposal_id: null as string | null,
-  force: false,
-};
-const FEAT_LIFECYCLE_DEFAULTS = {
-  sync_checklist: true,
-  force_publish: false,
-};
 
 let adapter: StorageAdapter;
 
@@ -94,6 +79,20 @@ function writeLocalConfig(): void {
   writeFileSync(join(CONTEXT_DIR, ".c4a.yaml"), config, "utf-8");
 }
 
+function writeServerConfig(): void {
+  const config = [
+    "mode: server",
+    "server:",
+    "  url: http://localhost:8055",
+    "  embedding:",
+    "    provider: pseudo",
+    "    vectorDim: 16",
+    "",
+  ].join("\n");
+  mkdirSync(CONTEXT_DIR, { recursive: true });
+  writeFileSync(join(CONTEXT_DIR, ".c4a.yaml"), config, "utf-8");
+}
+
 function resetDatabase(): void {
   const store = SQLiteStore.getInstance({ dbPath: DB_PATH });
   const db = store.getDatabase();
@@ -102,12 +101,12 @@ function resetDatabase(): void {
     DELETE FROM metadata;
     DELETE FROM entities;
     DELETE FROM entity_history;
-    DELETE FROM feats;
     DELETE FROM feat_history;
     DELETE FROM graph_cache;
     DELETE FROM workflow_states;
     DELETE FROM compensation_logs;
     DELETE FROM configs;
+    DELETE FROM entity_versions;
   `);
 }
 
@@ -152,131 +151,150 @@ describe("MCP Store Integration", () => {
     it("should save entity with valid DSL", async () => {
       const entityId = makeId("sys");
       const result = await storeSaveHandler({
-        ...SAVE_DEFAULTS,
         type: "system",
         data: buildSystemDsl(entityId, "Demo System", "Demo"),
-        source_project: PROJECT_ID,
-        proposal_id: null,
+        root_id: PROJECT_ID,
       });
 
       expect(result.success).toBe(true);
       expect(result.id).toBe(entityId);
+      expect(result.entity.uuid).toBeTruthy();
+      expect(result.entity.versions?.includes("0.0.0")).toBe(true);
 
-      const read = await storeReadHandler({ ...READ_DEFAULTS, id: entityId });
+      const read = await storeReadHandler({ root_id: PROJECT_ID, id: entityId });
       expect(read && "entity" in read).toBe(true);
       if (read && "entity" in read) {
         expect(read.entity?.id).toBe(entityId);
+        expect(read.entity?.root_id).toBe(PROJECT_ID);
       }
+    });
+
+    it("should update entity when uuid provided", async () => {
+      const entityId = makeId("sys");
+      const created = await storeSaveHandler({
+        type: "system",
+        data: buildSystemDsl(entityId, "Base System", "Base"),
+        root_id: PROJECT_ID,
+      });
+
+      const updated = await storeSaveHandler({
+        type: "system",
+        uuid: created.entity.uuid,
+        data: buildSystemDsl(entityId, "Updated System", "Updated"),
+        root_id: PROJECT_ID,
+      });
+
+      expect(updated.entity.uuid).toBe(created.entity.uuid);
+      expect(updated.entity.data?.system?.name).toBe("Updated System");
     });
 
     it("should reject invalid DSL", async () => {
       await expect(
         storeSaveHandler({
-          ...SAVE_DEFAULTS,
           type: "system",
           content: "invalid: [",
           format: "yaml",
-          source_project: PROJECT_ID,
-          proposal_id: null,
+          root_id: PROJECT_ID,
         })
       ).rejects.toThrow();
     });
+  });
 
-    it("should handle concurrent modification warning", async () => {
-      const entityId = makeId("sys");
-      await storeSaveHandler({
-        ...SAVE_DEFAULTS,
-        type: "system",
-        data: buildSystemDsl(entityId, "Base System", "Main"),
-        source_project: PROJECT_ID,
-        proposal_id: null,
+  describe("c4a_store_feat_*", () => {
+    it("should return feat uuid, transition status, and link checklist to feat", async () => {
+      const featId = makeId("feat");
+
+      const created = await storeFeatLifecycleHandler({
+        action: "create",
+        feat_id: featId,
+        sync_checklist: false,
+        force_publish: false,
+        metadata: {
+          title: "Feat",
+          description: "Demo",
+          created_by: "tester",
+        },
       });
+      expect(created.success).toBe(true);
+      expect(created.feat_uuid).toBeTruthy();
 
-      await storeSaveHandler({
-        ...SAVE_DEFAULTS,
-        type: "system",
-        data: buildSystemDsl(entityId, "Feat B", "Feat B"),
-        source_project: PROJECT_ID,
-        proposal_id: "feat-b",
+      const approved = await storeFeatLifecycleHandler({
+        action: "transition",
+        feat_id: featId,
+        to_status: "approved",
+        sync_checklist: false,
+        force_publish: false,
       });
+      expect(approved.success).toBe(true);
+      expect(approved.from_status).toBe("draft");
+      expect(approved.to_status).toBe("approved");
 
-      const result = await storeSaveHandler({
-        ...SAVE_DEFAULTS,
-        type: "system",
-        data: buildSystemDsl(entityId, "Feat A", "Feat A"),
-        source_project: PROJECT_ID,
-        proposal_id: "feat-a",
+      const published = await storeFeatLifecycleHandler({
+        action: "transition",
+        feat_id: featId,
+        to_status: "published",
+        sync_checklist: false,
+        force_publish: false,
       });
+      expect(published.success).toBe(true);
+      expect(published.from_status).toBe("approved");
+      expect(published.to_status).toBe("published");
 
-      expect(result.warnings?.some((warning) => warning.code === "CONCURRENT_MODIFICATION")).toBe(
-        true
-      );
+      const checklist = await storeFeatChecklistHandler({
+        action: "generate",
+        feat_id: featId,
+        source: "technical_spec",
+      });
+      expect(checklist.success).toBe(true);
+
+      const featUuid = created.feat_uuid ?? "";
+      const checklistEntities = await storeListHandler({
+        type: "checklist",
+        root_id: "",
+        requirement_id: featUuid,
+        limit: 10,
+      });
+      if ("items" in checklistEntities) {
+        expect(checklistEntities.items.length).toBe(1);
+      } else {
+        throw new Error("Unexpected list result for checklist entities");
+      }
     });
   });
 
   describe("c4a_store_read", () => {
-    it("should read entity by id", async () => {
+    it("should read entity by uuid", async () => {
       const entityId = makeId("sys");
-      await storeSaveHandler({
-        ...SAVE_DEFAULTS,
+      const saved = await storeSaveHandler({
         type: "system",
         data: buildSystemDsl(entityId, "Read System", "Read"),
-        source_project: PROJECT_ID,
-        proposal_id: null,
+        root_id: PROJECT_ID,
       });
 
-      const result = await storeReadHandler({ ...READ_DEFAULTS, id: entityId });
+      const result = await storeReadHandler({ uuid: saved.entity.uuid });
       expect(result && "entity" in result).toBe(true);
       if (result && "entity" in result) {
         expect(result.entity?.id).toBe(entityId);
       }
     });
 
-    it("should return reference integrity warnings", async () => {
-      const systemId = makeId("sys");
-      const targetId = makeId("target");
-      const consumerId = makeId("consumer");
-
+    it("should return version chain when include_versions is true", async () => {
+      const entityId = makeId("sys");
       await storeSaveHandler({
-        ...SAVE_DEFAULTS,
         type: "system",
-        data: buildSystemDsl(systemId, "System", "System"),
-        source_project: PROJECT_ID,
-        proposal_id: null,
+        data: buildSystemDsl(entityId, "Chain System", "Chain"),
+        root_id: PROJECT_ID,
       });
 
-      await storeSaveHandler({
-        ...SAVE_DEFAULTS,
-        type: "container",
-        data: buildContainerDsl(targetId, systemId, "Target", "Target"),
-        source_project: PROJECT_ID,
-        proposal_id: null,
+      const result = await storeReadHandler({
+        root_id: PROJECT_ID,
+        id: entityId,
+        include_versions: true,
       });
-
-      await storeSaveHandler({
-        ...SAVE_DEFAULTS,
-        type: "container",
-        data: buildContainerDsl(consumerId, systemId, "Consumer", "Consumer", [
-          { to: targetId, description: "depends" },
-        ]),
-        source_project: PROJECT_ID,
-        proposal_id: null,
-      });
-
-      const result = await storeSaveHandler({
-        ...SAVE_DEFAULTS,
-        type: "container",
-        data: {
-          ...buildContainerDsl(targetId, systemId, "Target", "Target"),
-          status: "deprecated",
-        },
-        source_project: PROJECT_ID,
-        proposal_id: null,
-      });
-
-      expect(result.warnings?.some((warning) => warning.code === "DANGLING_REFERENCE")).toBe(
-        true
-      );
+      expect(Array.isArray(result)).toBe(true);
+      if (Array.isArray(result)) {
+        expect(result.length).toBeGreaterThan(0);
+      }
     });
   });
 
@@ -286,24 +304,20 @@ describe("MCP Store Integration", () => {
       const containerId = makeId("container");
 
       await storeSaveHandler({
-        ...SAVE_DEFAULTS,
         type: "system",
         data: buildSystemDsl(sysId, "List System", "List"),
-        source_project: PROJECT_ID,
-        proposal_id: null,
+        root_id: PROJECT_ID,
       });
 
       await storeSaveHandler({
-        ...SAVE_DEFAULTS,
         type: "container",
         data: buildContainerDsl(containerId, sysId, "List Container", "List"),
-        source_project: PROJECT_ID,
-        proposal_id: null,
+        root_id: PROJECT_ID,
       });
 
       const result = await storeListHandler({
         type: "system",
-        project_id: PROJECT_ID,
+        root_id: PROJECT_ID,
         limit: 10,
         offset: 0,
         count_only: false,
@@ -314,203 +328,142 @@ describe("MCP Store Integration", () => {
         expect(result.items.every((item) => item.type === "system")).toBe(true);
       }
     });
-
-    it("should support pagination", async () => {
-      const sysIds = [makeId("sys"), makeId("sys"), makeId("sys")];
-      for (const id of sysIds) {
-        await storeSaveHandler({
-          ...SAVE_DEFAULTS,
-          type: "system",
-          data: buildSystemDsl(id, "Paged System", "Paged"),
-          source_project: PROJECT_ID,
-          proposal_id: null,
-        });
-      }
-
-      const result = await storeListHandler({
-        type: "system",
-        project_id: PROJECT_ID,
-        limit: 1,
-        offset: 0,
-        count_only: false,
-      });
-
-      if ("pagination" in result) {
-        expect(result.pagination?.has_more).toBe(true);
-      }
-    });
   });
 
   describe("c4a_store_delete", () => {
-    it("should soft delete entity", async () => {
+    it("should delete entity by uuid", async () => {
       const entityId = makeId("sys");
-
-      await storeSaveHandler({
-        ...SAVE_DEFAULTS,
+      const saved = await storeSaveHandler({
         type: "system",
         data: buildSystemDsl(entityId, "Main", "Main"),
-        source_project: PROJECT_ID,
-        proposal_id: null,
+        root_id: PROJECT_ID,
       });
 
-      await storeSaveHandler({
-        ...SAVE_DEFAULTS,
-        type: "system",
-        data: buildSystemDsl(entityId, "Feat", "Feat"),
-        source_project: PROJECT_ID,
-        proposal_id: "feat-soft",
-      });
+      await storeDeleteHandler({ uuid: saved.entity.uuid, cascade: false });
 
-      await storeDeleteHandler({ id: entityId, proposal_id: "feat-soft", force: false });
-
-      const result = await storeReadHandler({
-        id: entityId,
-        format: "object",
-        proposal_id: "feat-soft",
-      });
-
-      expect(result && "entity" in result).toBe(true);
-      if (result && "entity" in result) {
-        expect(result.entity?.metadata.status).toBe("archived");
-      }
+      const read = await storeReadHandler({ uuid: saved.entity.uuid });
+      expect(read && "entity" in read).toBe(false);
     });
 
-    it("should check references before delete", async () => {
-      const systemId = makeId("sys");
-      const targetId = makeId("target");
-      const consumerId = makeId("consumer");
-
-      await storeSaveHandler({
-        ...SAVE_DEFAULTS,
+    it("should cascade delete entities with same root_id/id", async () => {
+      const entityId = makeId("sys");
+      const first = await adapter.save({
+        uuid: undefined,
+        id: entityId,
+        root_id: PROJECT_ID,
         type: "system",
-        data: buildSystemDsl(systemId, "System", "System"),
-        source_project: PROJECT_ID,
-        proposal_id: null,
+        data: buildSystemDsl(entityId, "Cascade", "Cascade"),
+      });
+      const second = await adapter.save({
+        uuid: undefined,
+        id: entityId,
+        root_id: PROJECT_ID,
+        type: "system",
+        data: buildSystemDsl(entityId, "Cascade 2", "Cascade"),
       });
 
-      await storeSaveHandler({
-        ...SAVE_DEFAULTS,
-        type: "container",
-        data: buildContainerDsl(targetId, systemId, "Target", "Target"),
-        source_project: PROJECT_ID,
-        proposal_id: null,
-      });
-
-      await storeSaveHandler({
-        ...SAVE_DEFAULTS,
-        type: "container",
-        data: buildContainerDsl(consumerId, systemId, "Consumer", "Consumer", [
-          { to: targetId, description: "depends" },
-        ]),
-        source_project: PROJECT_ID,
-        proposal_id: null,
-      });
-
-      const result = await adapter.delete({ id: targetId, force: false });
-      expect(result.warnings?.some((warning) => warning.code === "DANGLING_REFERENCE")).toBe(
-        true
-      );
+      await storeDeleteHandler({ uuid: first.uuid!, cascade: true });
+      const remaining = await adapter.list({ root_id: PROJECT_ID, id: entityId });
+      expect(remaining.length).toBe(0);
+      expect(second.uuid).toBeTruthy();
     });
   });
 
-  describe("c4a_store_feat_lifecycle", () => {
-    it("should create feat", async () => {
-      const featId = `feat-${Date.now()}`;
-      const result = await storeFeatLifecycleHandler({
-        ...FEAT_LIFECYCLE_DEFAULTS,
-        action: "create",
-        feat_id: featId,
-        metadata: {
-          title: "feat",
-          description: "desc",
-          created_by: "tester",
-        },
+  describe("c4a_store_version", () => {
+    it("should add and remove versions", async () => {
+      const entityId = makeId("sys");
+      const saved = await storeSaveHandler({
+        type: "system",
+        data: buildSystemDsl(entityId, "Version System", "Version"),
+        root_id: PROJECT_ID,
       });
 
+      const added = await storeAddVersionHandler({
+        uuid: saved.entity.uuid,
+        version: "1.0.0",
+      });
+      expect(added.versions.includes("1.0.0")).toBe(true);
+
+      const removed = await storeRemoveVersionHandler({
+        uuid: saved.entity.uuid,
+        version: "1.0.0",
+      });
+      expect(removed.versions.includes("1.0.0")).toBe(false);
+    });
+
+    it("should reject adding 0.0.0 manually", async () => {
+      const entityId = makeId("sys");
+      const saved = await storeSaveHandler({
+        type: "system",
+        data: buildSystemDsl(entityId, "Latest System", "Latest"),
+        root_id: PROJECT_ID,
+      });
+
+      await expect(
+        storeAddVersionHandler({
+          uuid: saved.entity.uuid,
+          version: "0.0.0",
+        })
+      ).rejects.toMatchObject({ code: "C4A-VERSION-005" });
+    });
+
+    it("should publish version for latest entities", async () => {
+      const sysA = makeId("sys");
+      const sysB = makeId("sys");
+      await storeSaveHandler({
+        type: "system",
+        data: buildSystemDsl(sysA, "Publish A", "Publish"),
+        root_id: PROJECT_ID,
+      });
+      await storeSaveHandler({
+        type: "system",
+        data: buildSystemDsl(sysB, "Publish B", "Publish"),
+        root_id: PROJECT_ID,
+      });
+
+      const result = await storePublishVersionHandler({
+        root_id: PROJECT_ID,
+        version: "2.0.0",
+      });
       expect(result.success).toBe(true);
-      expect(result.status).toBe("draft");
+      expect(result.affected_entities).toBeGreaterThan(0);
+
+      const versioned = await adapter.list({ root_id: PROJECT_ID, version: "2.0.0" });
+      expect(versioned.length).toBeGreaterThan(0);
     });
 
-    it("should transition draft → approved → published", async () => {
-      const featId = `feat-${Date.now()}`;
-      await storeFeatLifecycleHandler({
-        ...FEAT_LIFECYCLE_DEFAULTS,
-        action: "create",
-        feat_id: featId,
-        metadata: {
-          title: "feat",
-          description: "desc",
-          created_by: "tester",
-        },
-      });
-
-      const approved = await storeFeatLifecycleHandler({
-        ...FEAT_LIFECYCLE_DEFAULTS,
-        action: "transition",
-        feat_id: featId,
-        to_status: "approved",
-      });
-      expect(approved.success).toBe(true);
-      expect(approved.to_status).toBe("approved");
-
-      const published = await storeFeatLifecycleHandler({
-        ...FEAT_LIFECYCLE_DEFAULTS,
-        action: "transition",
-        feat_id: featId,
-        to_status: "published",
-      });
-      expect(published.success).toBe(true);
-      expect(published.to_status).toBe("published");
-    });
-
-    it("should handle merge conflicts", async () => {
-      const featId = `feat-${Date.now()}`;
-      const entityId = makeId("conflict");
-
-      await storeSaveHandler({
-        ...SAVE_DEFAULTS,
+    it("should read and list entities by version", async () => {
+      const entityId = makeId("sys");
+      const saved = await storeSaveHandler({
         type: "system",
-        data: buildSystemDsl(entityId, "Main", "Main"),
-        source_project: PROJECT_ID,
-        proposal_id: null,
+        data: buildSystemDsl(entityId, "Versioned System", "Versioned"),
+        root_id: PROJECT_ID,
       });
 
-      await storeFeatLifecycleHandler({
-        ...FEAT_LIFECYCLE_DEFAULTS,
-        action: "create",
-        feat_id: featId,
-        metadata: {
-          title: "feat",
-          description: "desc",
-          created_by: "tester",
-        },
+      await storeAddVersionHandler({
+        uuid: saved.entity.uuid,
+        version: "1.0.0",
       });
 
-      await storeSaveHandler({
-        ...SAVE_DEFAULTS,
+      const listResult = await storeListHandler({
+        root_id: PROJECT_ID,
         type: "system",
-        data: buildSystemDsl(entityId, "Feat", "Feat"),
-        source_project: PROJECT_ID,
-        proposal_id: featId,
+        version: "1.0.0",
+        count_only: false,
       });
 
-      await storeFeatLifecycleHandler({
-        ...FEAT_LIFECYCLE_DEFAULTS,
-        action: "transition",
-        feat_id: featId,
-        to_status: "approved",
-      });
+      if ("items" in listResult) {
+        expect(listResult.items.some((item) => item.id === entityId)).toBe(true);
+      }
 
-      const published = await storeFeatLifecycleHandler({
-        ...FEAT_LIFECYCLE_DEFAULTS,
-        action: "transition",
-        feat_id: featId,
-        to_status: "published",
+      const readResult = await storeReadHandler({
+        root_id: PROJECT_ID,
+        id: entityId,
+        version: "1.0.0",
       });
-
-      expect(published.success).toBe(false);
-      expect(published.error).toBe("merge_conflict");
-      expect(Array.isArray(published.conflicts)).toBe(true);
+      if (readResult && "entity" in readResult) {
+        expect(readResult.entity?.versions?.includes("1.0.0")).toBe(true);
+      }
     });
   });
 
@@ -548,11 +501,9 @@ describe("MCP Store Integration", () => {
       const entityId = makeId("sys");
 
       await storeSaveHandler({
-        ...SAVE_DEFAULTS,
         type: "system",
         data: buildSystemDsl(entityId, "Sync System", "Sync"),
-        source_project: PROJECT_ID,
-        proposal_id: null,
+        root_id: PROJECT_ID,
       });
 
       const result = await storeSyncHandler({
@@ -568,47 +519,58 @@ describe("MCP Store Integration", () => {
       const exportedPath = join(syncRoot, "systems", `${entityId}.yaml`);
       expect(existsSync(exportedPath)).toBe(true);
     });
+  });
 
-    it("should detect conflicts", async () => {
-      const syncRoot = join(TMP_ROOT, "sync-conflict");
-      const entityId = makeId("sys");
+  describe("Server mode E2E", () => {
+    beforeAll(async () => {
+      writeServerConfig();
+      resetAdapter();
+      resetWriteQueue();
+      adapter = await getAdapter();
+    });
 
-      await storeSaveHandler({
-        ...SAVE_DEFAULTS,
+    it("should handle save/read/list/version lifecycle in server mode", async () => {
+      const rootId = "@acme/server";
+      const entityId = makeId("server");
+
+      const created = await storeSaveHandler({
         type: "system",
-        data: buildSystemDsl(entityId, "Sync System", "Sync"),
-        source_project: PROJECT_ID,
-        proposal_id: null,
+        data: buildSystemDsl(entityId, "Server System", "Server"),
+        root_id: rootId,
       });
+      expect(created.success).toBe(true);
+      expect(created.entity.root_id).toBe(rootId);
 
-      await storeSyncHandler({
-        direction: "export",
-        path: syncRoot,
-        mode: "incremental",
-        format: "yaml",
-        status_filter: "all",
-        conflict_policy: "skip",
+      const read = await storeReadHandler({ root_id: rootId, id: entityId });
+      expect(read && "entity" in read).toBe(true);
+      if (read && "entity" in read) {
+        expect(read.entity?.uuid).toBe(created.entity.uuid);
+      }
+
+      const listed = await storeListHandler({ root_id: rootId, limit: 10 });
+      if (!("items" in listed)) {
+        throw new Error("Expected list result with items");
+      }
+      expect(Array.isArray(listed.items)).toBe(true);
+      expect(listed.items.some((item) => item.id === entityId)).toBe(true);
+
+      const addVersion = await storeAddVersionHandler({
+        uuid: created.entity.uuid,
+        version: "1.0.0",
       });
+      expect(addVersion.versions.includes("1.0.0")).toBe(true);
 
-      await storeSaveHandler({
-        ...SAVE_DEFAULTS,
-        type: "system",
-        data: buildSystemDsl(entityId, "Sync System Updated", "Sync"),
-        source_project: PROJECT_ID,
-        proposal_id: null,
+      const publish = await storePublishVersionHandler({
+        root_id: rootId,
+        version: "1.1.0",
       });
+      expect(publish.success).toBe(true);
 
-      const result = await storeSyncHandler({
-        direction: "export",
-        path: syncRoot,
-        mode: "incremental",
-        format: "yaml",
-        status_filter: "all",
-        conflict_policy: "warn",
+      const removeVersion = await storeRemoveVersionHandler({
+        uuid: created.entity.uuid,
+        version: "1.0.0",
       });
-
-      expect(result.stats.conflicted).toBe(1);
-      expect(result.details?.some((detail) => detail.action === "conflict")).toBe(true);
+      expect(removeVersion.versions.includes("1.0.0")).toBe(false);
     });
   });
 });

@@ -147,7 +147,7 @@ export async function extract(input: ExtractInput): Promise<ExtractResult> {
 
 function getDefaultPatterns(language?: SupportedLanguage): string[] {
   if (!language) {
-    return ["*.ts", "*.tsx", "*.js", "*.jsx", "*.go", "*.py"];
+    return ["*.ts", "*.tsx", "*.js", "*.jsx", "*.go"];
   }
 
   switch (language) {
@@ -155,8 +155,6 @@ function getDefaultPatterns(language?: SupportedLanguage): string[] {
       return ["*.ts", "*.tsx", "*.js", "*.jsx"];
     case "go":
       return ["*.go"];
-    case "python":
-      return ["*.py"];
     default:
       return ["*"];
   }

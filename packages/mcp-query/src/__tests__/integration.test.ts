@@ -5,6 +5,7 @@ import {
   LiteAdapter,
   SQLiteStore,
   type LiteAdapterConfig,
+  ServerAdapter,
 } from "@c4a/storage";
 import { queryDepsHandler } from "../tools/deps.js";
 import { queryImpactHandler } from "../tools/impact.js";
@@ -12,10 +13,10 @@ import { querySearchHandler } from "../tools/search.js";
 
 const TMP_ROOT = join(process.cwd(), ".tmp", "mcp-query-tests");
 const DB_PATH = join(TMP_ROOT, `mcp-query-${Date.now()}.db`);
-const PROJECT_ID = "mcp-query-project";
-const PROPOSAL_ID = `feat-${Date.now()}`;
+const ROOT_ID = "mcp-query-root";
 
 let adapter: LiteAdapter;
+let serverAdapter: ServerAdapter | null = null;
 
 function resetSQLiteStore(): void {
   const storeClass = SQLiteStore as unknown as { instance: SQLiteStore | null };
@@ -25,7 +26,7 @@ function resetSQLiteStore(): void {
 async function createAdapter(): Promise<LiteAdapter> {
   const config: LiteAdapterConfig = {
     dbPath: DB_PATH,
-    defaultProject: PROJECT_ID,
+    defaultProject: ROOT_ID,
     enableVectorSearch: false,
     repoId: null,
     feat: {
@@ -44,12 +45,13 @@ async function saveEntity(params: {
   name: string;
   description: string;
   relationships?: Array<{ to: string; description?: string }>;
-}): Promise<void> {
-  await adapter.save({
+  versions?: string[];
+}): Promise<{ uuid?: string }> {
+  return adapter.save({
     type: params.type,
     id: params.id,
-    source_project: PROJECT_ID,
-    proposal_id: PROPOSAL_ID,
+    root_id: ROOT_ID,
+    versions: params.versions,
     data: {
       id: params.id,
       name: params.name,
@@ -101,7 +103,6 @@ describe("MCP Query Integration", () => {
           scope: "all",
           limit: 5,
           offset: 0,
-          proposal_id: PROPOSAL_ID,
         },
         { adapter }
       );
@@ -137,7 +138,6 @@ describe("MCP Query Integration", () => {
           scope: "system",
           limit: 10,
           offset: 0,
-          proposal_id: PROPOSAL_ID,
         },
         { adapter }
       );
@@ -173,7 +173,6 @@ describe("MCP Query Integration", () => {
           type_filter: "system",
           limit: 10,
           offset: 0,
-          proposal_id: PROPOSAL_ID,
         },
         { adapter }
       );
@@ -183,6 +182,47 @@ describe("MCP Query Integration", () => {
       expect(result.items.every((item) => item.type === "system")).toBe(true);
       expect(result.items.some((item) => item.id === containerId)).toBe(false);
     });
+
+    it("should filter by versions", async () => {
+      const token = buildToken("versions");
+      const mainId = buildId("system");
+      const releaseId = buildId("system");
+
+      await saveEntity({
+        type: "system",
+        id: mainId,
+        name: `Main ${token}`,
+        description: `Main ${token}`,
+      });
+
+      const release = await adapter.save({
+        type: "system",
+        id: releaseId,
+        root_id: ROOT_ID,
+        data: {
+          id: releaseId,
+          name: `Release ${token}`,
+          description: `Release ${token}`,
+          scope: "project",
+        },
+      });
+      await adapter.addVersion(release.uuid!, "1.0.0");
+
+      const result = await querySearchHandler(
+        {
+          query: "Release",
+          versions: ["1.0.0"],
+          limit: 10,
+          offset: 0,
+        },
+        { adapter }
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.items.some((item) => item.id === releaseId)).toBe(true);
+      expect(result.items.some((item) => item.id === mainId)).toBe(false);
+    });
+
   });
 
   describe("c4a_query_deps", () => {
@@ -208,10 +248,9 @@ describe("MCP Query Integration", () => {
       const result = await queryDepsHandler(
         {
           id: rootId,
-          source_project: PROJECT_ID,
+          root_id: ROOT_ID,
           direction: "downstream",
           depth: 1,
-          proposal_id: PROPOSAL_ID,
         },
         { adapter }
       );
@@ -251,10 +290,9 @@ describe("MCP Query Integration", () => {
       const result = await queryDepsHandler(
         {
           id: rootId,
-          source_project: PROJECT_ID,
+          root_id: ROOT_ID,
           direction: "downstream",
           depth: 1,
-          proposal_id: PROPOSAL_ID,
         },
         { adapter }
       );
@@ -297,10 +335,9 @@ describe("MCP Query Integration", () => {
       const result = await queryImpactHandler(
         {
           id: rootId,
-          source_project: PROJECT_ID,
+          root_id: ROOT_ID,
           depth: 2,
           change_type: "remove",
-          proposal_id: PROPOSAL_ID,
         },
         { adapter }
       );
@@ -314,5 +351,140 @@ describe("MCP Query Integration", () => {
         expect(direct?.reason).toBe("breaking");
       }
     });
+
+    it("should analyze impact across versions", async () => {
+      const rootId = buildId("impact-version-root");
+      const directId = buildId("impact-version-direct");
+      const indirectId = buildId("impact-version-indirect");
+
+      await saveEntity({
+        type: "component",
+        id: indirectId,
+        name: `Indirect ${indirectId}`,
+        description: `Indirect ${indirectId}`,
+      });
+
+      await saveEntity({
+        type: "component",
+        id: directId,
+        name: `Direct ${directId}`,
+        description: `Direct ${directId}`,
+        relationships: [{ to: indirectId, description: "calls" }],
+      });
+
+      const root = await saveEntity({
+        type: "component",
+        id: rootId,
+        name: `Root ${rootId}`,
+        description: `Root ${rootId}`,
+        relationships: [{ to: directId, description: "calls" }],
+      });
+
+      if (!root.uuid) {
+        throw new Error("missing root uuid");
+      }
+      await adapter.addVersion(root.uuid, "1.0.0");
+
+      const result = await queryImpactHandler(
+        {
+          uuid: root.uuid,
+          depth: 2,
+          change_type: "upgrade",
+        },
+        { adapter }
+      );
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        const direct = result.items?.find((item) => item.id === directId);
+        const indirect = result.items?.find((item) => item.id === indirectId);
+        expect(direct?.impact_level).toBe("direct");
+        expect(indirect?.impact_level).toBe("indirect");
+      }
+    });
+  });
+});
+
+describe("MCP Query Integration (Server Mode)", () => {
+  const ROOT_ID = "@acme/server-query";
+
+  beforeAll(async () => {
+    serverAdapter = new ServerAdapter({
+      url: "http://localhost:8055",
+      embedding: { provider: "pseudo", vectorDim: 16 },
+    });
+    await serverAdapter.initialize();
+  });
+
+  afterAll(async () => {
+    if (serverAdapter) {
+      await serverAdapter.close();
+      serverAdapter = null;
+    }
+  });
+
+  it("should run search/deps/impact in server mode", async () => {
+    if (!serverAdapter) {
+      throw new Error("Server adapter not initialized");
+    }
+
+    const systemId = buildId("server-system");
+    const componentId = buildId("server-component");
+
+    const component = await serverAdapter.save({
+      type: "component",
+      id: componentId,
+      root_id: ROOT_ID,
+      data: {
+        id: componentId,
+        name: "Server Component",
+        description: "Server component description",
+        scope: "project",
+      },
+    });
+
+    const system = await serverAdapter.save({
+      type: "system",
+      id: systemId,
+      root_id: ROOT_ID,
+      data: {
+        id: systemId,
+        name: "Server System",
+        description: "Server system description",
+        scope: "project",
+        relationships: [
+          {
+            to_uuid: component.uuid,
+            to_id: componentId,
+            to_root_id: ROOT_ID,
+            to_type: "component",
+            rel_type: "DEPENDS_ON",
+          },
+        ],
+      },
+    });
+
+    const search = await querySearchHandler(
+      { query: "Server System", scope: "all", root_id: ROOT_ID, limit: 10, offset: 0 },
+      { adapter: serverAdapter }
+    );
+    expect(search.success).toBe(true);
+    expect(search.items.some((item) => item.id === systemId)).toBe(true);
+
+    const deps = await queryDepsHandler(
+      { uuid: system.uuid, direction: "downstream", depth: 2 },
+      { adapter: serverAdapter }
+    );
+    expect(deps.success).toBe(true);
+    expect(deps.items.some((node) => node.uuid === component.uuid)).toBe(true);
+
+    const impact = await queryImpactHandler(
+      { uuid: system.uuid, depth: 2 },
+      { adapter: serverAdapter }
+    );
+    if (impact.success === false) {
+      throw new Error(`Impact query failed: ${impact.error}`);
+    }
+    expect(impact.items.some((node) => node.uuid === component.uuid)).toBe(true);
   });
 });

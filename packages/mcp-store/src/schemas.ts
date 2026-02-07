@@ -19,6 +19,9 @@ export const EntityTypeSchema = z.enum([
   "product",
   "process",
   "sor",
+  "feat",
+  "checklist",
+  "spec",
 ]);
 
 /**
@@ -38,16 +41,28 @@ export const EntityStatusSchema = z.enum([
 export const FormatSchema = z.enum(["object", "yaml", "json"]);
 
 /**
- * proposal_id 格式验证
- * 格式：^feat-[a-z0-9]+(-[a-z0-9]+)*$
+ * UUID 格式
  */
-export const ProposalIdSchema = z
+export const UuidSchema = z.string().uuid().describe("UUID v4");
+
+/**
+ * root_id 格式
+ */
+export const RootIdSchema = z.string().describe("包边界标识（允许空字符串）");
+
+/**
+ * SemVer 版本格式（允许预发布）
+ */
+export const VersionSchema = z
   .string()
-  .regex(/^feat-[a-z0-9]+(-[a-z0-9]+)*$/, {
-    message: "proposal_id 必须符合格式：feat-{小写字母/数字/连字符}",
-  })
-  .nullable()
-  .default(null);
+  .regex(/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/, {
+    message: "version 必须符合 SemVer 格式，例如 1.0.0 或 1.0.0-alpha.1",
+  });
+
+/**
+ * requirement_id 格式（Feat UUID，可为 null 表示主分支）
+ */
+export const RequirementIdSchema = UuidSchema.nullable().describe("关联的 Feat UUID（可为空）");
 
 // ============ c4a_store_save ============
 
@@ -61,17 +76,17 @@ export const StoreSaveInputSchema = z.object({
   type: EntityTypeSchema.describe("实体类型"),
   data: z.record(z.any()).optional().describe("实体内容（业务数据对象，与 content 二选一）"),
   content: z.string().optional().describe("实体内容（YAML/JSON 字符串，与 data 二选一）"),
-  format: z.enum(["yaml", "json"]).optional().default("yaml").describe("content 的格式（当使用 content 时必填）"),
+  format: z.enum(["yaml", "json"]).optional().describe("content 的格式（当使用 content 时必填）"),
   id: z.string().optional().describe("指定 ID（不传则可由系统生成）"),
-  source_project: z
+  uuid: UuidSchema.optional().describe("实体 UUID（不传则自动生成）"),
+  root_id: RootIdSchema.optional().describe("包边界标识（Server 模式必填；Feat/Checklist 自动为空字符串）"),
+  requirement_id: UuidSchema.optional().describe("关联的 Feat UUID（可选）"),
+  component_id: z.string().optional().describe("关联的父 Component ID（可选）"),
+  expected_updated_at: z
     .string()
     .optional()
-    .describe("实体归属项目（可选，未传将从配置 project_id 自动补齐；Server 模式仍需有效值）"),
-  proposal_id: ProposalIdSchema.describe("feat/提案隔离（主分支为 null）"),
-  enforce_adr: z.boolean().optional().default(false).describe("是否强制 ADR 检查"),
-  skip_adr_check: z.boolean().optional().default(false).describe("跳过 ADR 检查（需要特殊权限）"),
-  ignore_concurrent_warning: z.boolean().optional().default(false).describe("忽略并发修改警告"),
-  force_save: z.boolean().optional().default(false).describe("强制保存（跳过所有警告，需要特殊权限）"),
+    .describe("乐观锁：期望的 updated_at 值（ISO 8601）"),
+  force: z.boolean().optional().describe("强制覆盖（跳过乐观锁检查）"),
 });
 
 /**
@@ -127,7 +142,7 @@ export const StoreSaveResultSchema = z.object({
   success: z.boolean().describe("是否成功"),
   id: z.string().describe("实体 ID"),
   status: EntityStatusSchema.describe("实体状态"),
-  adr_check: AdrCheckResultSchema.optional().describe("ADR 检查结果"),
+  entity: z.record(z.any()).describe("完整实体"),
   warnings: z.array(WarningSchema).optional().describe("警告信息列表"),
 });
 
@@ -137,17 +152,15 @@ export const StoreSaveResultSchema = z.object({
  * c4a_store_read 输入参数
  */
 export const StoreReadInputSchema = z.object({
-  id: z.string().optional().describe("实体 ID"),
-  format: FormatSchema.optional().default("object").describe("返回格式"),
-  proposal_id: z.union([
-    z.string(),
-    z.array(z.string()),
-    z.null(),
-  ]).optional().default(null).describe("Feat 隔离查询"),
-  filter: z.record(z.any()).optional().describe("通用过滤条件"),
-  limit: z.number().optional().describe("返回结果数量上限"),
-  include_relations: z.boolean().optional().describe("是否包含关系"),
-  filter_relations: z.record(z.any()).optional().describe("关系过滤条件"),
+  uuid: UuidSchema.optional().describe("实体 UUID（优先级高于 id/root_id）"),
+  root_id: RootIdSchema.optional().describe("包边界标识（与 id 组合使用）"),
+  id: z.string().optional().describe("实体 ID（与 root_id 组合使用）"),
+  version: VersionSchema.optional().describe("指定版本号（缺省为 0.0.0）"),
+  format: FormatSchema.optional().describe("返回格式"),
+  include_versions: z
+    .boolean()
+    .optional()
+    .describe("是否返回指定实体的全部版本链"),
 });
 
 /**
@@ -162,6 +175,7 @@ export const StoreReadResultSchema = z.union([
  * c4a_store_read 返回结果（format=yaml/json）
  */
 export const StoreReadFormattedResultSchema = z.object({
+  uuid: UuidSchema.optional().describe("实体 UUID"),
   id: z.string().describe("实体 ID"),
   type: z.string().describe("实体类型"),
   status: z.string().describe("实体状态"),
@@ -175,35 +189,33 @@ export const StoreReadFormattedResultSchema = z.object({
  * c4a_store_list 输入参数
  */
 export const StoreListInputSchema = z.object({
-  filter: z.record(z.any()).optional().describe("通用过滤条件"),
+  root_id: RootIdSchema.optional().describe("按 root_id 筛选"),
+  id: z.string().optional().describe("按实体 ID 筛选"),
+  requirement_id: UuidSchema.optional().describe("按 Feat UUID 筛选"),
+  version: VersionSchema.optional().describe("按版本筛选（versions 包含）"),
   type: EntityTypeSchema.or(z.literal("all")).optional().describe("类型筛选"),
-  project_id: z.string().optional().describe("按项目 ID 筛选"),
-  proposal_id: z.union([
-    z.string(),
-    z.null(),
-  ]).optional().describe("按提案 ID 筛选"),
   status: EntityStatusSchema.optional().describe("按状态筛选"),
   updated_after: z.string().optional().describe("按更新时间筛选（ISO 8601 格式）"),
-  limit: z.number().optional().default(100).describe("返回结果数量上限"),
-  offset: z.number().optional().default(0).describe("分页偏移量"),
+  limit: z.number().optional().describe("返回结果数量上限"),
+  offset: z.number().optional().describe("分页偏移量"),
   group_by: z.enum(["type", "status"]).optional().describe("分组统计"),
-  count_only: z.boolean().optional().default(false).describe("仅返回数量统计"),
+  count_only: z.boolean().optional().describe("仅返回数量统计"),
 });
 
 /**
  * 实体概要信息
  */
 export const EntitySummarySchema = z.object({
+  uuid: UuidSchema.describe("实体 UUID"),
   id: z.string().describe("实体 ID"),
+  root_id: RootIdSchema.describe("包边界标识"),
   type: z.string().describe("实体类型"),
   status: z.string().describe("实体状态"),
   updated_at: z.string().describe("更新时间"),
   content_hash: z.string().describe("内容哈希"),
-  source_project: z
-    .string()
-    .optional()
-    .describe("归属项目（可选，未传将从配置 project_id 自动补齐；Server 模式仍需有效值）"),
-  proposal_id: z.string().optional().describe("提案 ID"),
+  versions: z.array(z.string()).optional().describe("版本集合"),
+  requirement_id: UuidSchema.optional().describe("关联的 Feat UUID"),
+  component_id: z.string().optional().describe("关联的父 Component ID"),
 });
 
 /**
@@ -249,9 +261,8 @@ export const StoreListGroupResultSchema = z.object({
  * c4a_store_delete 输入参数
  */
 export const StoreDeleteInputSchema = z.object({
-  id: z.string().describe("实体 ID（必需）"),
-  proposal_id: ProposalIdSchema.describe("feat/提案隔离（默认 null 表示主分支）"),
-  force: z.boolean().optional().default(false).describe("强制删除（跳过关联检查）"),
+  uuid: UuidSchema.describe("实体 UUID（必需）"),
+  cascade: z.boolean().optional().describe("是否级联删除版本链"),
 });
 
 /**
@@ -259,8 +270,73 @@ export const StoreDeleteInputSchema = z.object({
  */
 export const StoreDeleteResultSchema = z.object({
   success: z.boolean().describe("是否成功"),
+  uuid: UuidSchema.describe("实体 UUID"),
   id: z.string().describe("实体 ID"),
   deleted_relations: z.number().optional().describe("级联删除的关系数量"),
+});
+
+// ============ 版本管理工具 ============
+
+/**
+ * c4a_store_add_version 输入参数
+ */
+export const StoreAddVersionInputSchema = z.object({
+  uuid: UuidSchema.describe("实体 UUID（必填）"),
+  version: VersionSchema.describe("要追加的版本号（必填）"),
+});
+
+/**
+ * c4a_store_add_version 返回结果
+ */
+export const StoreAddVersionResultSchema = z.object({
+  success: z.boolean().describe("是否成功"),
+  entity_uuid: UuidSchema.describe("实体 UUID"),
+  versions: z.array(z.string()).describe("更新后的版本列表"),
+  warning: z.string().optional().describe("警告信息"),
+});
+
+/**
+ * c4a_store_remove_version 输入参数
+ */
+export const StoreRemoveVersionInputSchema = z.object({
+  uuid: UuidSchema.describe("实体 UUID（必填）"),
+  version: VersionSchema.describe("要移除的版本号（必填）"),
+  fallback_version: VersionSchema.optional().describe("移除 0.0.0 时的回退版本（可选）"),
+});
+
+/**
+ * c4a_store_remove_version 返回结果
+ */
+export const StoreRemoveVersionResultSchema = z.object({
+  success: z.boolean().describe("是否成功"),
+  entity_uuid: UuidSchema.describe("实体 UUID"),
+  versions: z.array(z.string()).describe("更新后的版本列表"),
+  deleted: z.boolean().describe("是否已删除实体"),
+  latest_fallback: z.object({
+    previous_latest: z.string().describe("回退到的版本"),
+    target_uuid: UuidSchema.describe("0.0.0 转移到的实体 UUID"),
+  }).optional().describe("移除 0.0.0 时的回退信息"),
+});
+
+/**
+ * c4a_store_publish_version 输入参数
+ */
+export const StorePublishVersionInputSchema = z.object({
+  root_id: RootIdSchema.describe("包 ID（必填）"),
+  version: VersionSchema.describe("要发布的版本号（必填）"),
+  transfer_latest: z.boolean().optional().describe("是否转移 0.0.0（latest 指针）"),
+});
+
+/**
+ * c4a_store_publish_version 返回结果
+ */
+export const StorePublishVersionResultSchema = z.object({
+  success: z.boolean().describe("是否成功"),
+  root_id: RootIdSchema.describe("包 ID"),
+  version: z.string().describe("发布的版本号"),
+  affected_entities: z.number().describe("受影响的实体数量"),
+  latest_transferred: z.boolean().describe("是否转移了 0.0.0"),
+  warnings: z.array(z.string()).optional().describe("警告信息"),
 });
 
 // ============ 错误响应 ============
@@ -291,7 +367,7 @@ export const ErrorResponseSchema = z.object({
 export type EntityType = z.infer<typeof EntityTypeSchema>;
 export type EntityStatus = z.infer<typeof EntityStatusSchema>;
 export type Format = z.infer<typeof FormatSchema>;
-export type ProposalId = z.infer<typeof ProposalIdSchema>;
+export type RequirementId = z.infer<typeof RequirementIdSchema>;
 
 export type StoreSaveInput = z.infer<typeof StoreSaveInputSchema>;
 export type StoreSaveResult = z.infer<typeof StoreSaveResultSchema>;
@@ -311,6 +387,12 @@ export type Pagination = z.infer<typeof PaginationSchema>;
 
 export type StoreDeleteInput = z.infer<typeof StoreDeleteInputSchema>;
 export type StoreDeleteResult = z.infer<typeof StoreDeleteResultSchema>;
+export type StoreAddVersionInput = z.infer<typeof StoreAddVersionInputSchema>;
+export type StoreAddVersionResult = z.infer<typeof StoreAddVersionResultSchema>;
+export type StoreRemoveVersionInput = z.infer<typeof StoreRemoveVersionInputSchema>;
+export type StoreRemoveVersionResult = z.infer<typeof StoreRemoveVersionResultSchema>;
+export type StorePublishVersionInput = z.infer<typeof StorePublishVersionInputSchema>;
+export type StorePublishVersionResult = z.infer<typeof StorePublishVersionResultSchema>;
 
 export type ErrorResponse = z.infer<typeof ErrorResponseSchema>;
 export type RecoverableAction = z.infer<typeof RecoverableActionSchema>;
@@ -350,6 +432,25 @@ export const StoreSyncResultSchema = z.object({
   details: z.array(z.record(z.any())).optional().describe("详细信息"),
 });
 
+// ============ c4a_store_sync_status ============
+
+/**
+ * c4a_store_sync_status 输入参数
+ */
+export const StoreSyncStatusInputSchema = z.object({});
+
+/**
+ * c4a_store_sync_status 返回结果
+ */
+export const StoreSyncStatusResultSchema = z.object({
+  pending_count: z.number().describe("待处理任务数"),
+  failed_count: z.number().describe("失败任务数"),
+  last_sync_at: z.string().nullable().describe("最后同步时间"),
+  is_syncing: z.boolean().describe("是否正在同步"),
+  lag_seconds: z.number().describe("同步延迟（秒）"),
+  sync_warning: z.string().optional().describe("同步状态提示"),
+});
+
 // ============ c4a_store_plan_sync ============
 
 /**
@@ -361,7 +462,7 @@ export const LocalFileManifestSchema = z.object({
   type: z.string().describe("实体类型"),
   content_hash: z.string().describe("内容哈希（SHA-256）"),
   updated_at: z.string().describe("本地文件修改时间（ISO 8601）"),
-  proposal_id: z.string().optional().describe("feat 分支标识"),
+  requirement_id: RequirementIdSchema.optional().describe("关联的 Feat UUID"),
   content: z.string().optional().describe("文件内容（execute=true 时必须提供）"),
 });
 
@@ -372,7 +473,7 @@ export const SyncSnapshotSchema = z.object({
   synced_at: z.string().describe("同步时间"),
   entities: z.record(z.object({
     content_hash: z.string().describe("内容哈希"),
-    proposal_id: z.string().optional().describe("提案 ID"),
+    requirement_id: RequirementIdSchema.optional().describe("关联的 Feat UUID"),
   })).describe("实体快照"),
 });
 
@@ -380,7 +481,7 @@ export const SyncSnapshotSchema = z.object({
  * 同步选项
  */
 export const SyncOptionsSchema = z.object({
-  proposal_id: z.string().optional().describe("指定同步的 feat 分支"),
+  requirement_id: RequirementIdSchema.optional().describe("指定同步的 Feat UUID"),
   status_filter: z.enum(["published", "approved", "all"]).optional().describe("按状态筛选"),
   conflict_policy: z.enum(["warn", "skip", "override", "prompt"]).optional().describe("冲突处理策略"),
 });
@@ -455,6 +556,8 @@ export const StorePlanSyncExecutedResultSchema = z.object({
 export type StoreSyncInput = z.infer<typeof StoreSyncInputSchema>;
 export type StoreSyncResult = z.infer<typeof StoreSyncResultSchema>;
 export type SyncStats = z.infer<typeof SyncStatsSchema>;
+export type StoreSyncStatusInput = z.infer<typeof StoreSyncStatusInputSchema>;
+export type StoreSyncStatusResult = z.infer<typeof StoreSyncStatusResultSchema>;
 
 export type StorePlanSyncInput = z.infer<typeof StorePlanSyncInputSchema>;
 export type StorePlanSyncResult = z.infer<typeof StorePlanSyncResultSchema>;
@@ -497,6 +600,7 @@ export const MergeResultSchema = z.object({
 export const StoreFeatLifecycleResultSchema = z.object({
   success: z.boolean().describe("是否成功"),
   feat_id: z.string().describe("Feat ID"),
+  feat_uuid: UuidSchema.optional().describe("Feat UUID"),
   status: z.string().optional().describe("当前状态（create 用）"),
   from_status: z.string().optional().describe("原状态（transition 用）"),
   to_status: z.string().optional().describe("目标状态（transition 用）"),
@@ -818,7 +922,7 @@ export const ValidateCheckResultSchema = z.object({
  * c4a_store_validate 输入参数
  */
 export const StoreValidateInputSchema = z.object({
-  proposal_id: z.string().optional().describe("指定 feat 分支"),
+  requirement_id: RequirementIdSchema.optional().describe("指定 Feat UUID"),
   checks: z.array(ValidateCheckTypeSchema).optional().describe("检查项"),
   options: z.object({
     check_depth: z.number().default(2).describe("依赖检查深度"),
@@ -831,7 +935,7 @@ export const StoreValidateInputSchema = z.object({
  */
 export const StoreValidateResultSchema = z.object({
   success: z.boolean().describe("是否成功"),
-  proposal_id: z.string().optional().describe("Feat ID"),
+  requirement_id: RequirementIdSchema.optional().describe("Feat UUID"),
   summary: z.object({
     passed: z.number().describe("通过数量"),
     warnings: z.number().describe("警告数量"),

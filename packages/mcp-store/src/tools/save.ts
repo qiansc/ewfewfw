@@ -2,12 +2,38 @@
  * c4a_store_save 工具实现
  *
  * 保存/更新实体到数据库
- * 基于设计文档：v0.3.0/detailed-design/mcp/store-crud.md §3.1
  */
 import type { StoreSaveInput, StoreSaveResult } from "../schemas.js";
 import { StoreSaveInputSchemaWithRefine } from "../schemas.js";
-import { getAdapter, loadConfig } from "@c4a/storage";
+import { getAdapter, isServerMode, loadConfig } from "@c4a/storage";
 import { InputError, INPUT_ERROR_CODES } from "@c4a/core/types";
+import type { Warning } from "../schemas.js";
+import YAML from "yaml";
+
+function parseContent(content: string, format: "yaml" | "json"): Record<string, unknown> {
+  if (format === "json") {
+    return JSON.parse(content) as Record<string, unknown>;
+  }
+  return YAML.parse(content) as Record<string, unknown>;
+}
+
+function getStringField(input: Record<string, unknown>, key: string): string | undefined {
+  const value = input[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function resolveIdFromData(data: Record<string, unknown>, type: string): string | undefined {
+  const direct = getStringField(data, "id");
+  if (direct) return direct;
+
+  const key = type === "system" ? "system" : type;
+  const nested = data[key];
+  if (nested && typeof nested === "object") {
+    return getStringField(nested as Record<string, unknown>, "id");
+  }
+
+  return undefined;
+}
 
 /**
  * c4a_store_save 处理函数
@@ -21,66 +47,104 @@ export async function storeSaveHandler(args: StoreSaveInput): Promise<StoreSaveR
   const parsed = StoreSaveInputSchemaWithRefine.parse(args);
   const config = loadConfig();
   const adapter = await getAdapter();
+  const warnings: Warning[] = [];
 
   // 确保适配器已初始化
   await adapter.initialize();
 
-  const dataSourceProject =
-    parsed.data && typeof parsed.data.source_project === "string"
-      ? parsed.data.source_project
-      : undefined;
-  const metadataSourceProject =
-    parsed.data &&
-    typeof parsed.data.metadata === "object" &&
-    parsed.data.metadata &&
-    typeof (parsed.data.metadata as Record<string, unknown>).source_project === "string"
-      ? ((parsed.data.metadata as Record<string, unknown>).source_project as string)
-      : undefined;
-  const resolvedSourceProject =
-    parsed.source_project || dataSourceProject || metadataSourceProject || config.project_id;
-  if (!resolvedSourceProject) {
+  const data = parsed.data ?? parseContent(parsed.content ?? "", parsed.format ?? "yaml");
+  if (!data || typeof data !== "object") {
     throw new InputError(
-      INPUT_ERROR_CODES.MISSING_REQUIRED_FIELD,
+      INPUT_ERROR_CODES.INVALID_FIELD_FORMAT,
       {
-        field: "source_project",
-        expected: "非空字符串",
-        actual: "",
-        suggestion: "请在参数中传入 source_project，或在 .context/.c4a.yaml 设置 project_id",
-        recoverable_actions: [
-          {
-            action: "retry",
-            label: "补充 source_project 后重试",
-            params: {
-              source_project: config.project_id ?? "<your_project_id>",
-            },
-          },
-        ],
+        field: "data",
+        expected: "object",
+        actual: String(data),
+        suggestion: "请提供合法的实体数据对象或正确的 content 内容",
       },
-      "缺少 source_project（project_id）"
+      "实体数据解析失败"
     );
   }
 
+  const resolvedId = parsed.id ?? resolveIdFromData(data, parsed.type);
+  if (!resolvedId) {
+    throw new InputError(
+      INPUT_ERROR_CODES.MISSING_REQUIRED_FIELD,
+      {
+        field: "id",
+        expected: "非空字符串",
+        actual: "",
+        suggestion: "请在参数中传入 id，或在 data 中包含 id 字段",
+      },
+      "缺少实体 id"
+    );
+  }
+
+  const dataRootId =
+    getStringField(data, "root_id") ??
+    (data.metadata && typeof data.metadata === "object"
+      ? getStringField(data.metadata as Record<string, unknown>, "root_id")
+      : undefined);
+  const defaultRootId = config.local?.defaultProject ?? config.root_id;
+  let resolvedRootId = parsed.root_id ?? dataRootId ?? defaultRootId;
+  if (parsed.type === "feat" || parsed.type === "checklist") {
+    resolvedRootId = "";
+  }
+
+  if (resolvedRootId === undefined || resolvedRootId === null) {
+    throw new InputError(
+      INPUT_ERROR_CODES.MISSING_REQUIRED_FIELD,
+      {
+        field: "root_id",
+        expected: "非空字符串或空字符串（feat/checklist）",
+        actual: "",
+        suggestion: isServerMode()
+          ? "Server 模式必须显式传入 root_id"
+          : "请在 .context/.c4a.yaml 配置 defaultProject 或在参数中传入 root_id",
+      },
+      "缺少 root_id"
+    );
+  }
+
+  const requirementId = parsed.requirement_id ?? getStringField(data, "requirement_id");
+  const componentId = parsed.component_id ?? getStringField(data, "component_id");
+  const uuid = parsed.uuid ?? getStringField(data, "uuid");
+
+  if ("versions" in data) {
+    delete (data as Record<string, unknown>).versions;
+    warnings.push({
+      code: "C4A-VERSION-IGNORED",
+      message: "versions 字段为受控字段，已忽略传入值",
+      severity: "warning",
+      details: { field: "versions" },
+    });
+  }
+
   // 调用 StorageAdapter.save()
-  const result = await adapter.save({
-    type: parsed.type,
-    data: parsed.data,
-    content: parsed.content,
-    format: parsed.format,
-    id: parsed.id,
-    source_project: resolvedSourceProject,
-    proposal_id: parsed.proposal_id,
-    enforce_adr: parsed.enforce_adr,
-    adr_policy: config.adr_policy,
-    skip_adr_check: parsed.skip_adr_check,
-    ignore_concurrent_warning: parsed.ignore_concurrent_warning,
-    force_save: parsed.force_save,
-  });
+  const result = await adapter.save(
+    {
+      uuid,
+      id: resolvedId,
+      root_id: resolvedRootId,
+      type: parsed.type,
+      data,
+      requirement_id: requirementId,
+      component_id: componentId,
+      kind: getStringField(data, "kind"),
+      scope: getStringField(data, "scope"),
+      perspective: getStringField(data, "perspective"),
+    },
+    {
+      expected_updated_at: parsed.expected_updated_at,
+      force: parsed.force ?? false,
+    }
+  );
 
   return {
-    success: result.success,
+    success: true,
     id: result.id,
-    status: result.status,
-    adr_check: result.adr_check,
-    warnings: result.warnings,
+    status: result.metadata.status,
+    entity: result,
+    warnings: warnings.length > 0 ? warnings : undefined,
   };
 }

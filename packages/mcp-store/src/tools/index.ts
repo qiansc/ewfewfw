@@ -5,7 +5,12 @@ export { storeSaveHandler } from "./save.js";
 export { storeReadHandler } from "./read.js";
 export { storeListHandler } from "./list.js";
 export { storeDeleteHandler } from "./delete.js";
-export { storeSyncHandler } from "./sync.js";
+export {
+  storeAddVersionHandler,
+  storeRemoveVersionHandler,
+  storePublishVersionHandler,
+} from "./version.js";
+export { storeSyncHandler, storeSyncStatusHandler } from "./sync.js";
 export { storePlanSyncHandler } from "./planSync.js";
 export { storeFeatLifecycleHandler } from "./featLifecycle.js";
 export { storeFeatMergeHandler } from "./featMerge.js";

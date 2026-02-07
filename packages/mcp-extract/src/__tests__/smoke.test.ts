@@ -22,9 +22,6 @@ const tsRelFromRoot = "sample.ts";
 const goFile = join(fixtureRoot, "sample.go");
 const goRel = join(fixtureRel, "sample.go");
 const goRelFromRoot = "sample.go";
-const pyFile = join(fixtureRoot, "sample.py");
-const pyRel = join(fixtureRel, "sample.py");
-const pyRelFromRoot = "sample.py";
 const outsideFile = resolve(fixtureRoot, "..", "outside.ts");
 const outsideRelFromRoot = "../outside.ts";
 const symlinkPath = join(fixtureRoot, "outside-link");
@@ -71,20 +68,6 @@ beforeAll(async () => {
       "",
     ].join("\n")
   );
-  await writeFile(
-    pyFile,
-    [
-      "class Client:",
-      "    base_url: str",
-      "",
-      "    def get(self, path: str) -> str:",
-      "        return path",
-      "",
-      "def fetch_user(user_id: str) -> str:",
-      "    return user_id",
-      "",
-    ].join("\n")
-  );
   await writeFile(outsideFile, "export const outside = true;\n");
   try {
     await symlink(resolve(fixtureRoot, ".."), symlinkPath);
@@ -120,15 +103,11 @@ describe("mcp-extract tools", () => {
     expect(user?.exported).toBe(true);
   });
 
-  test("extract supports go and python", async () => {
+  test("extract supports go", async () => {
     const goResult = await extract({ path: goRel, language: "go", recursive: false });
     const goNames = goResult.interfaces.map((iface) => iface.name);
     expect(goNames).toContain("Reader");
     expect(goNames).toContain("User");
-
-    const pyResult = await extract({ path: pyRel, language: "python", recursive: false });
-    const pyNames = pyResult.interfaces.map((iface) => iface.name);
-    expect(pyNames).toContain("Client");
   });
 
   test("analyze supports summary_only and pagination", async () => {
@@ -141,10 +120,9 @@ describe("mcp-extract tools", () => {
       offset: 0,
     });
     expect(summaryOnly.files).toBeUndefined();
-    expect(summaryOnly.summary.totalFiles).toBe(3);
+    expect(summaryOnly.summary.totalFiles).toBe(2);
     expect(summaryOnly.summary.languages.typescript).toBe(1);
     expect(summaryOnly.summary.languages.go).toBe(1);
-    expect(summaryOnly.summary.languages.python).toBe(1);
 
     const paged = await analyze({
       path: fixtureRel,
@@ -155,8 +133,8 @@ describe("mcp-extract tools", () => {
       includeMetrics: true,
     });
     expect(paged.files?.length).toBe(1);
-    expect(paged.pagination?.total).toBe(3);
-    expect(paged.pagination?.has_more).toBe(true);
+    expect(paged.pagination?.total).toBe(2);
+    expect(paged.pagination?.has_more).toBe(false);
   });
 
   test("ast returns filtered nodes", async () => {

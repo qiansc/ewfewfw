@@ -16,6 +16,7 @@
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@c4a/core": "workspace:*",
     "@c4a/storage": "workspace:*",
+    "yaml": "^2.4.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {

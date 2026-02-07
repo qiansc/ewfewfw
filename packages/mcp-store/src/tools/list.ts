@@ -2,15 +2,30 @@
  * c4a_store_list 工具实现
  *
  * 列出实体概要
- * 基于设计文档：v0.3.0/detailed-design/mcp/store-crud.md §3.3
  */
 import type {
   StoreListInput,
   StoreListResult,
   StoreListCountResult,
   StoreListGroupResult,
+  EntitySummary,
 } from "../schemas.js";
 import { getAdapter, loadConfig } from "@c4a/storage";
+
+function toSummary(entity: Record<string, any>): EntitySummary {
+  return {
+    uuid: entity.uuid ?? "",
+    id: entity.id,
+    root_id: entity.root_id ?? "",
+    type: entity.type,
+    status: entity.metadata?.status ?? "draft",
+    updated_at: entity.metadata?.updated_at ?? "",
+    content_hash: entity.metadata?.content_hash ?? "",
+    versions: entity.versions ?? [],
+    requirement_id: entity.requirement_id ?? undefined,
+    component_id: entity.component_id ?? undefined,
+  };
+}
 
 /**
  * c4a_store_list 处理函数
@@ -29,30 +44,70 @@ export async function storeListHandler(
   // 确保适配器已初始化
   await adapter.initialize();
 
-  const resolvedProjectId = args.project_id ?? config.project_id;
+  const resolvedRootId =
+    args.root_id ?? config.local?.defaultProject ?? config.root_id;
 
-  // 调用 StorageAdapter.list()
-  const result = await adapter.list({
-    filter: args.filter,
-    type: args.type,
-    project_id: resolvedProjectId,
-    proposal_id: args.proposal_id,
-    status: args.status,
-    updated_after: args.updated_after,
-    limit: args.limit ?? 100,
-    offset: args.offset ?? 0,
-    group_by: args.group_by,
-    count_only: args.count_only ?? false,
+  const entities = await adapter.list({
+    root_id: resolvedRootId ?? undefined,
+    id: args.id,
+    requirement_id: args.requirement_id,
+    version: args.version,
+    type: args.type && args.type !== "all" ? args.type : undefined,
   });
 
-  // 根据返回类型返回不同格式
-  if (args.count_only) {
-    return result as StoreListCountResult;
+  let filtered = entities;
+  if (args.status) {
+    filtered = filtered.filter((entity) => entity.metadata?.status === args.status);
   }
+  if (args.updated_after) {
+    filtered = filtered.filter((entity) => entity.metadata?.updated_at > args.updated_after!);
+  }
+
+  const countOnly = args.count_only ?? false;
+  if (countOnly) {
+    const byType: Record<string, number> = {};
+    const byStatus: Record<string, number> = {};
+    for (const entity of filtered) {
+      const type = entity.type ?? "unknown";
+      const status = entity.metadata?.status ?? "unknown";
+      byType[type] = (byType[type] ?? 0) + 1;
+      byStatus[status] = (byStatus[status] ?? 0) + 1;
+    }
+    return {
+      total: filtered.length,
+      by_type: byType,
+      by_status: byStatus,
+    } as StoreListCountResult;
+  }
+
+  const offset = args.offset ?? 0;
+  const limit = args.limit ?? 100;
 
   if (args.group_by) {
-    return result as StoreListGroupResult;
+    const groups: Record<string, { count: number; items?: EntitySummary[] }> = {};
+    for (const entity of filtered) {
+      const groupKey =
+        args.group_by === "type"
+          ? (entity.type ?? "unknown")
+          : (entity.metadata?.status ?? "unknown");
+      if (!groups[groupKey]) {
+        groups[groupKey] = { count: 0, items: [] };
+      }
+      groups[groupKey].count += 1;
+      groups[groupKey].items?.push(toSummary(entity));
+    }
+    return { groups } as StoreListGroupResult;
   }
 
-  return result as StoreListResult;
+  const items = filtered.slice(offset, offset + limit).map(toSummary);
+
+  return {
+    items,
+    pagination: {
+      total: filtered.length,
+      offset,
+      limit,
+      has_more: offset + limit < filtered.length,
+    },
+  } as StoreListResult;
 }

@@ -5,7 +5,7 @@
 /**
  * Supported programming languages
  */
-export type SupportedLanguage = "typescript" | "go" | "python";
+export type SupportedLanguage = "typescript" | "go";
 
 /**
  * Code location information

@@ -67,12 +67,13 @@ export type QuerySearchResult = QuerySuccessResult<SearchHit>;
  * 依赖节点
  */
 export interface DepsNode {
+  uuid: string;
   id: string;
+  root_id: string;
   type: EntityType;
   distance: number;
   relation_type: string;
   path?: string[];
-  source_project?: string | null;
 }
 
 export type QueryDepsResult = QuerySuccessResult<DepsNode>;
@@ -81,12 +82,13 @@ export type QueryDepsResult = QuerySuccessResult<DepsNode>;
  * 影响节点
  */
 export interface ImpactNode {
+  uuid: string;
   id: string;
+  root_id: string;
   type: EntityType;
   distance: number;
   impact_level: "direct" | "indirect";
   reason?: string;
-  source_project?: string | null;
 }
 
 export type QueryImpactResult = QuerySuccessResult<ImpactNode>;

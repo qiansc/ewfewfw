@@ -62,7 +62,6 @@ export async function analyze(input: AnalyzeInput): Promise<AnalyzeResult> {
       languages: {
         typescript: 0,
         go: 0,
-        python: 0,
       },
       dependencies: [],
     },
@@ -192,7 +191,7 @@ export async function analyze(input: AnalyzeInput): Promise<AnalyzeResult> {
 
 function getPatterns(language?: SupportedLanguage): string[] {
   if (!language) {
-    return ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/*.go", "**/*.py"];
+    return ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/*.go"];
   }
 
   switch (language) {
@@ -200,8 +199,6 @@ function getPatterns(language?: SupportedLanguage): string[] {
       return ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"];
     case "go":
       return ["**/*.go"];
-    case "python":
-      return ["**/*.py"];
     default:
       return ["**/*"];
   }

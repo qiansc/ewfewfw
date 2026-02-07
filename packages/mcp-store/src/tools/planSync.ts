@@ -150,11 +150,30 @@ function buildExecutedStats(
   return stats;
 }
 
-function ensureSnapshot(snapshot?: SyncSnapshot | null): SyncSnapshot {
-  if (snapshot) {
-    return snapshot;
+type SnapshotLike = {
+  synced_at: string;
+  entities: Record<
+    string,
+    { content_hash: string; root_id?: string | null; requirement_id?: string | null }
+  >;
+};
+
+function normalizeSnapshot(snapshot?: SnapshotLike | null): SyncSnapshot {
+  if (!snapshot) {
+    return { synced_at: new Date().toISOString(), entities: {} };
   }
-  return { synced_at: new Date().toISOString(), entities: {} };
+  const entities: SyncSnapshot["entities"] = {};
+  for (const [key, value] of Object.entries(snapshot.entities ?? {})) {
+    entities[key] = {
+      content_hash: value.content_hash,
+      root_id: value.root_id ?? undefined,
+      requirement_id: value.requirement_id ?? undefined,
+    };
+  }
+  return {
+    synced_at: snapshot.synced_at,
+    entities,
+  };
 }
 
 /**
@@ -176,10 +195,18 @@ export async function storePlanSyncHandler(
 
   // 调用 StorageAdapter.planSync()
   // 类型转换：schemas 中的类型与 adapter 中的类型略有差异
+  const normalizedOptions = args.options
+    ? {
+        requirement_id: args.options.requirement_id ?? undefined,
+        status_filter: args.options.status_filter,
+        conflict_policy: args.options.conflict_policy,
+      }
+    : undefined;
+
   const result = await adapter.planSync({
     local_manifest: args.local_manifest as unknown as LocalManifest,
-    snapshot: args.snapshot as unknown as SyncSnapshot | null,
-    options: args.options,
+    snapshot: normalizeSnapshot(args.snapshot as SnapshotLike | null),
+    options: normalizedOptions,
     execute: args.execute ?? false,
   });
 
@@ -190,7 +217,7 @@ export async function storePlanSyncHandler(
       success: true,
       executed: false,
       actions,
-      new_snapshot: ensureSnapshot(result.new_snapshot ?? null),
+      new_snapshot: normalizeSnapshot(result.new_snapshot ?? null),
       stats,
     };
   }
@@ -202,7 +229,7 @@ export async function storePlanSyncHandler(
       ...executed,
       actions,
       stats: buildExecutedStats(actions, executed.results, executed.stats),
-      new_snapshot: ensureSnapshot(executed.new_snapshot ?? null),
+      new_snapshot: normalizeSnapshot(executed.new_snapshot ?? null),
     };
   }
 
@@ -213,7 +240,7 @@ export async function storePlanSyncHandler(
       success: draft.success ?? true,
       executed: false,
       actions,
-      new_snapshot: ensureSnapshot(draft.new_snapshot ?? null),
+      new_snapshot: normalizeSnapshot(draft.new_snapshot ?? null),
       stats: draft.stats ?? buildStatsFromActions(actions),
     };
   }

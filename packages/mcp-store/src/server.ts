@@ -11,7 +11,11 @@ import {
   StoreReadInputSchema,
   StoreListInputSchema,
   StoreDeleteInputSchema,
+  StoreAddVersionInputSchema,
+  StoreRemoveVersionInputSchema,
+  StorePublishVersionInputSchema,
   StoreSyncInputSchema,
+  StoreSyncStatusInputSchema,
   StorePlanSyncInputSchema,
   StoreFeatLifecycleInputSchema,
   StoreFeatMergeInputSchema,
@@ -28,7 +32,11 @@ import {
   storeReadHandler,
   storeListHandler,
   storeDeleteHandler,
+  storeAddVersionHandler,
+  storeRemoveVersionHandler,
+  storePublishVersionHandler,
   storeSyncHandler,
+  storeSyncStatusHandler,
   storePlanSyncHandler,
   storeFeatLifecycleHandler,
   storeFeatMergeHandler,
@@ -175,6 +183,96 @@ export function createServer(): McpServer {
     }
   );
 
+  // 注册 c4a_store_add_version 工具
+  server.tool(
+    "c4a_store_add_version",
+    "向实体追加版本标签",
+    StoreAddVersionInputSchema.shape,
+    async (args) => {
+      try {
+        const result = await storeAddVersionHandler(args as never);
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // 注册 c4a_store_remove_version 工具
+  server.tool(
+    "c4a_store_remove_version",
+    "从实体移除版本标签",
+    StoreRemoveVersionInputSchema.shape,
+    async (args) => {
+      try {
+        const result = await storeRemoveVersionHandler(args as never);
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // 注册 c4a_store_publish_version 工具
+  server.tool(
+    "c4a_store_publish_version",
+    "发布版本并处理 latest 指针",
+    StorePublishVersionInputSchema.shape,
+    async (args) => {
+      try {
+        const result = await storePublishVersionHandler(args as never);
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
   // 注册 c4a_store_sync 工具
   server.tool(
     "c4a_store_sync",
@@ -183,6 +281,36 @@ export function createServer(): McpServer {
     async (args) => {
       try {
         const result = await storeSyncHandler(args as never);
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(buildErrorResponse(error), null, 2),
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // 注册 c4a_store_sync_status 工具
+  server.tool(
+    "c4a_store_sync_status",
+    "Server 模式同步状态查询",
+    StoreSyncStatusInputSchema.shape,
+    async (args) => {
+      try {
+        const result = await storeSyncStatusHandler(args as never);
         return {
           content: [
             {

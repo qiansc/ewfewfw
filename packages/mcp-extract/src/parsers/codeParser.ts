@@ -9,7 +9,6 @@ import { extname } from "node:path";
 import type { ASTNode, CodeAnalysis, SupportedLanguage } from "../types/index.js";
 import { buildSimplifiedAST } from "./astBuilder.js";
 import { parseGo } from "./goParser.js";
-import { parsePython } from "./pythonParser.js";
 import { parseTypeScript } from "./typescriptParser.js";
 
 export function detectLanguage(filePath: string): SupportedLanguage | null {
@@ -26,9 +25,6 @@ export function detectLanguage(filePath: string): SupportedLanguage | null {
       return "typescript";
     case ".go":
       return "go";
-    case ".py":
-    case ".pyi":
-      return "python";
     default:
       return null;
   }
@@ -51,8 +47,6 @@ export async function parseFile(
       return parseTypeScript(filePath, fileContent);
     case "go":
       return await parseGo(filePath, fileContent);
-    case "python":
-      return await parsePython(filePath, fileContent);
     default:
       throw new Error(`Unsupported language: ${lang}`);
   }

@@ -6,7 +6,7 @@ import { z } from "zod";
 /**
  * Supported languages
  */
-export const SupportedLanguageSchema = z.enum(["typescript", "go", "python"]);
+export const SupportedLanguageSchema = z.enum(["typescript", "go"]);
 
 /**
  * c4a_extract_interfaces input schema

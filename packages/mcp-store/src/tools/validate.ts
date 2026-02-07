@@ -20,7 +20,7 @@ export async function storeValidateHandler(
   await adapter.initialize();
 
   const result = await adapter.validate({
-    proposal_id: args.proposal_id,
+    requirement_id: args.requirement_id ?? undefined,
     checks: args.checks,
     options: args.options,
   });

@@ -2,10 +2,10 @@
  * c4a_store_delete 工具实现
  *
  * 删除实体
- * 基于设计文档：v0.3.0/detailed-design/mcp/store-crud.md §3.4
  */
 import type { StoreDeleteInput, StoreDeleteResult } from "../schemas.js";
 import { getAdapter } from "@c4a/storage";
+import { DataError, DATA_ERROR_CODES } from "@c4a/core/types";
 
 /**
  * c4a_store_delete 处理函数
@@ -21,15 +21,35 @@ export async function storeDeleteHandler(args: StoreDeleteInput): Promise<StoreD
   // 确保适配器已初始化
   await adapter.initialize();
 
-  // 调用 StorageAdapter.delete()
-  const result = await adapter.delete({
-    id: args.id,
-    proposal_id: args.proposal_id,
-    force: args.force ?? false,
+  const entity = await adapter.readByUuid(args.uuid);
+  if (!entity) {
+    throw new DataError(
+      DATA_ERROR_CODES.ENTITY_NOT_FOUND,
+      {
+        field: "uuid",
+        expected: "已存在的实体 UUID",
+        actual: args.uuid,
+        suggestion: "请确认 uuid 是否正确",
+      },
+      "实体不存在"
+    );
+  }
+
+  const targets = args.cascade
+    ? await adapter.list({ root_id: entity.root_id ?? "", id: entity.id })
+    : [entity];
+
+  await adapter.transaction(async (tx) => {
+    for (const target of targets) {
+      if (target.uuid) {
+        await tx.delete(target.uuid);
+      }
+    }
   });
 
   return {
-    success: result.success,
-    id: result.id,
+    success: true,
+    uuid: args.uuid,
+    id: entity.id,
   };
 }

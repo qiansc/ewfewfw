@@ -61,6 +61,43 @@ describe("mcp-query handlers", () => {
     expect(result.degraded).toBe(true);
   });
 
+  test("search passes versions and root_id filters to adapter", async () => {
+    let observedParams: { versions?: string[]; root_id?: string } | null = null;
+    const adapter = {
+      async initialize() {},
+      async search(params: SearchParams): Promise<SearchResult> {
+        observedParams = params;
+        return {
+          items: [],
+          degraded: false,
+          search_mode: "vector",
+        };
+      },
+      async queryDeps(_params: DepsParams): Promise<DepsResult> {
+        return { nodes: [], degraded: false };
+      },
+      async queryImpact(_params: ImpactParams): Promise<ImpactResult> {
+        return { nodes: [], degraded: false };
+      },
+    };
+
+    await querySearchHandler(
+      {
+        query: "hello",
+        versions: ["1.0.0"],
+        root_id: "@acme/app",
+        limit: 10,
+        offset: 0,
+      },
+      { adapter }
+    );
+
+    expect(observedParams).not.toBeNull();
+    const observed = observedParams as unknown as { versions?: string[]; root_id?: string };
+    expect(observed.versions).toEqual(["1.0.0"]);
+    expect(observed.root_id).toBe("@acme/app");
+  });
+
   test("deps returns degraded context when provided", async () => {
     let observedDepth: number | undefined;
     const adapter = {
@@ -77,8 +114,9 @@ describe("mcp-query handlers", () => {
         return {
           nodes: [
             {
+              uuid: "uuid-dep-1",
               id: "dep-1",
-              source_project: "alpha",
+              root_id: "alpha",
               type: "component",
               distance: 1,
               relation_type: "depends_on",
@@ -93,7 +131,7 @@ describe("mcp-query handlers", () => {
     };
 
     const result = await queryDepsHandler(
-      { id: "svc-1", direction: "downstream", proposal_id: null },
+      { id: "svc-1", direction: "downstream" },
       {
         adapter,
         checkSyncStatus: async () => ({
@@ -135,7 +173,7 @@ describe("mcp-query handlers", () => {
     };
 
     const result = await queryDepsHandler(
-      { id: "svc-1", direction: "downstream", proposal_id: null },
+      { id: "svc-1", direction: "downstream" },
       {
         adapter,
         checkSyncStatus: async () => ({ degraded: false }),
@@ -164,8 +202,9 @@ describe("mcp-query handlers", () => {
         return {
           nodes: [
             {
+              uuid: "uuid-dep-1",
               id: "dep-1",
-              source_project: "alpha",
+              root_id: "alpha",
               type: "component",
               distance: 1,
               impact_level: "direct",
@@ -177,7 +216,7 @@ describe("mcp-query handlers", () => {
     };
 
     const result = await queryImpactHandler(
-      { id: "svc-1", proposal_id: null },
+      { id: "svc-1" },
       {
         adapter,
         checkSyncStatus: async () => ({ degraded: false }),
@@ -214,7 +253,7 @@ describe("mcp-query handlers", () => {
     };
 
     const result = await queryImpactHandler(
-      { id: "svc-1", proposal_id: null },
+      { id: "svc-1" },
       {
         adapter,
         checkSyncStatus: async () => ({
@@ -258,7 +297,7 @@ describe("mcp-query handlers", () => {
     };
 
     const result = await queryImpactHandler(
-      { id: "svc-1", proposal_id: null },
+      { id: "svc-1" },
       {
         adapter,
         checkSyncStatus: async () => ({ degraded: false }),

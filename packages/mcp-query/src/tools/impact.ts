@@ -1,4 +1,4 @@
-import { getAdapter, isLocalMode, loadConfig } from "@c4a/storage";
+import { getAdapter, isLocalMode } from "@c4a/storage";
 import { checkSyncStatus } from "../checkSyncStatus.js";
 import type { QueryHandlerOptions } from "../handlerContext.js";
 import type { QueryImpactInput } from "../schemas.js";
@@ -8,13 +8,18 @@ export async function queryImpactHandler(
   args: QueryImpactInput,
   options: QueryHandlerOptions = {}
 ): Promise<QueryImpactResponse> {
-  const config = loadConfig();
   const adapter = options.adapter ?? (await getAdapter());
 
   // 确保适配器已初始化
   await adapter.initialize();
 
-  const context = await checkSyncStatus([args.id], options.checkSyncStatus);
+  if (!args.uuid && !args.id) {
+    throw new Error("缺少 uuid 或 id");
+  }
+  const context = await checkSyncStatus(
+    args.uuid ? [args.uuid] : args.id ? [args.id] : [],
+    options.checkSyncStatus
+  );
   const isLocal = options.isLocalMode ?? isLocalMode;
 
   if (context.degraded && !isLocal()) {
@@ -26,17 +31,12 @@ export async function queryImpactHandler(
     };
   }
 
-  const resolvedSourceProject =
-    args.source_project ?? config.project_id ?? config.local?.defaultProject;
-  if (!resolvedSourceProject) {
-    throw new Error("缺少 source_project（project_id）");
-  }
   const result = await adapter.queryImpact({
+    uuid: args.uuid,
     id: args.id,
-    source_project: resolvedSourceProject,
+    root_id: args.root_id,
     change_type: args.change_type,
     depth: args.depth,
-    proposal_id: args.proposal_id,
   });
 
   const degraded = result.degraded || context.degraded;
