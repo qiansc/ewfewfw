@@ -55,7 +55,7 @@ describe("Validator", () => {
           repository: {
             url: "https://github.com/org/repo"
           },
-          references: ["project:frontend-app/auth-component", "repo:company/shared-lib/jwt-utils"]
+          references: ["root:frontend-app/auth-component", "repo:company/shared-lib/jwt-utils"]
         }
       };
       const result = validateDSL(data, "container");
@@ -93,11 +93,11 @@ describe("Validator", () => {
         schema: "c4a/v1",
         type: "adr",
         adr: {
-          id: "adr-a001-init",
+          id: "adr-001-init",
           title: "Initial Decision",
           status: "approved",
           date: "2024-01-01",
-          references: ["sys-test", "project:alpha/auth-service"]
+          references: ["sys-test", "root:alpha/auth-service"]
         },
         context: "Context here",
         decision: "Decision here",
@@ -115,7 +115,7 @@ describe("Validator", () => {
         schema: "c4a/v1",
         type: "adr",
         adr: {
-          id: "adr-a001-init",
+          id: "adr-001-init",
           title: "Initial Decision",
           status: "approved",
           date: "not-a-date"
@@ -151,12 +151,12 @@ describe("Validator", () => {
         schema: "c4a/v1",
         type: "process",
         process: {
-          id: "prc-b-a001",
+          id: "prc-b-001",
           name: "Process A",
           description: "Process description",
           process_type: "business",
           scope: "domain",
-          references: ["product-a", "project:alpha/sys-test"]
+          references: ["product-a", "root:alpha/sys-test"]
         },
         steps: [
           { id: "step-1", name: "Step 1" }
@@ -171,14 +171,14 @@ describe("Validator", () => {
         schema: "c4a/v1",
         type: "sor",
         sor: {
-          id: "sor-b-a001",
+          id: "sor-b-001",
           name: "Requirement A",
           description: "Requirement description",
           scope: "project",
           sor_type: "business_rule",
           entity_type: "system",
           entity_id: "sys-test",
-          references: ["prc-b-a001", "scope:domain/product-a"]
+          references: ["prc-b-001", "scope:domain/product-a"]
         }
       };
       const result = validateDSL(data, "sor");
@@ -211,7 +211,7 @@ describe("Validator", () => {
           name: "Auth API",
           contract_type: "openapi",
           status: "draft",
-          references: ["sor-b-a001"]
+          references: ["sor-b-001"]
         }
       };
       const result = validateDSL(data, "contract");

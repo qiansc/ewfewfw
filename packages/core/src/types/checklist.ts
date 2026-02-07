@@ -5,6 +5,8 @@
  * 存储在数据库中，本地只有只读视图
  */
 
+import type { Entity } from './entities.js';
+
 // ============================================================================
 // Checklist Item 状态
 // ============================================================================
@@ -71,9 +73,9 @@ export interface ChecklistItem {
  *
  * 对应数据库中的 checklist 字段（详见 store-feat-checklist.md）。
  */
-export interface Checklist {
-  /** 版本 */
-  version: string;
+export interface Checklist extends Entity {
+  /** 类型标识 */
+  type: 'checklist';
 
   /** 生成元信息 */
   metadata?: {

@@ -5,7 +5,8 @@
  * 支持 Copy-on-Write 机制
  */
 
-import type { LifecycleStatus, Owner } from './base.js';
+import type { Owner } from './base.js';
+import type { Entity } from './entities.js';
 
 // ============================================================================
 // Feat 状态
@@ -139,41 +140,11 @@ export interface WorkflowStep {
 /**
  * Feat（需求迭代）
  *
- * 命名规范：feat-{序号}-{简短描述}，如 feat-a001-user-login
+ * 命名规范：feat-{slug}，如 feat-user-login
  */
-export interface Feat {
-  /** Feat ID，如 feat-a001-user-login */
-  id: string;
-
+export interface Feat extends Entity {
   /** 类型标识 */
   type: 'feat';
-
-  /** 显示名称 */
-  name: string;
-
-  /** 描述 */
-  description?: string;
-
-  /** 状态 */
-  status: FeatStatus;
-
-  /** 所属项目 */
-  source_project: string;
-
-  /** 所属仓库 */
-  source_repo?: string;
-
-  /** 创建时间 */
-  created_at: string;
-
-  /** 更新时间 */
-  updated_at?: string;
-
-  /** 创建者 */
-  created_by?: string;
-
-  /** 负责人 */
-  owner?: Owner;
 
   /** 变更记录列表 */
   changes?: FeatChange[];
@@ -223,10 +194,6 @@ export interface CreateFeatParams {
   name: string;
   /** 描述 */
   description?: string;
-  /** 所属项目 */
-  source_project: string;
-  /** 所属仓库 */
-  source_repo?: string;
   /** 创建者 */
   created_by?: string;
   /** 负责人 */

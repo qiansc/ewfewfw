@@ -87,12 +87,6 @@ export interface StoredRelation extends Relation {
 
   /** 目标实体类型 */
   to_type?: string;
-
-  /** 提案 ID（用于 feat 隔离） */
-  proposal_id?: string | null;
-
-  /** 所属项目 */
-  source_project?: string | null;
 }
 
 // ============================================================================
@@ -104,7 +98,6 @@ export interface StoredRelation extends Relation {
  */
 export type ReferenceType =
   | 'simple' // 简单 ID：entity-id
-  | 'project' // 跨项目：project:project-id/entity-id
   | 'repo' // 跨仓库：repo:org/repo/entity-id
   | 'scope'; // 指定层级：scope:enterprise/entity-id
 
@@ -121,9 +114,6 @@ export interface ResolvedReference {
   /** 实体 ID */
   entity_id: string;
 
-  /** 项目 ID（如果指定） */
-  project_id?: string;
-
   /** 仓库 ID（如果指定） */
   repo_id?: string;
 
@@ -134,9 +124,9 @@ export interface ResolvedReference {
 /**
  * 引用解析优先级
  *
- * 1. 本项目（同 source_project）
- * 2. 同仓库基建实体（source_project = NULL）
- * 3. 其他项目（按 source_project 查找）
+ * 1. 当前包（同 root_id）
+ * 2. 同仓库基建实体（root_id = ''）
+ * 3. 其他包（按 root_id 查找）
  * 4. Enterprise 层实体
  * 5. Domain 层实体
  */
@@ -175,9 +165,6 @@ export interface RelationQueryParams {
 
   /** 是否包含 feat 中的关系 */
   include_feat?: boolean;
-
-  /** feat ID（如果只查询特定 feat） */
-  proposal_id?: string;
 }
 
 /**
@@ -259,46 +246,18 @@ export function getReverseRelationSemantic(type: RelationType): string {
  * 解析引用字符串
  */
 export function parseReference(ref: string): ResolvedReference {
-  // project:project-id/entity-id
-  if (ref.startsWith('project:')) {
-    const rest = ref.slice('project:'.length);
-    const slashIndex = rest.indexOf('/');
-    if (slashIndex > 0) {
-      return {
-        raw: ref,
-        type: 'project',
-        project_id: rest.slice(0, slashIndex),
-        entity_id: rest.slice(slashIndex + 1),
-      };
-    }
-  }
-
   // repo:org/repo/entity-id
-  // repo:org/repo/project:project-id/entity-id
   if (ref.startsWith('repo:')) {
     const rest = ref.slice('repo:'.length);
     const parts = rest.split('/');
     if (parts.length >= 3) {
       const repoId = `${parts[0]}/${parts[1]}`;
       const remainder = parts.slice(2).join('/');
-      let projectId: string | undefined;
-      let entityId = remainder;
-
-      if (remainder.startsWith('project:')) {
-        const nested = remainder.slice('project:'.length);
-        const slashIndex = nested.indexOf('/');
-        if (slashIndex > 0) {
-          projectId = nested.slice(0, slashIndex);
-          entityId = nested.slice(slashIndex + 1);
-        }
-      }
-
       return {
         raw: ref,
         type: 'repo',
         repo_id: repoId,
-        project_id: projectId,
-        entity_id: entityId,
+        entity_id: remainder,
       };
     }
   }
@@ -331,12 +290,7 @@ export function parseReference(ref: string): ResolvedReference {
  */
 export function buildReference(resolved: ResolvedReference): string {
   switch (resolved.type) {
-    case 'project':
-      return `project:${resolved.project_id}/${resolved.entity_id}`;
     case 'repo':
-      if (resolved.project_id) {
-        return `repo:${resolved.repo_id}/project:${resolved.project_id}/${resolved.entity_id}`;
-      }
       return `repo:${resolved.repo_id}/${resolved.entity_id}`;
     case 'scope':
       return `scope:${resolved.scope}/${resolved.entity_id}`;

@@ -38,6 +38,7 @@ const SCHEMA_MAP: Record<string, string> = {
   contract: 'https://context4ai.org/schemas/c4a-contract.schema.json',
   feat: 'https://context4ai.org/schemas/c4a-feat.schema.json',
   checklist: 'https://context4ai.org/schemas/c4a-checklist.schema.json',
+  spec: 'https://context4ai.org/schemas/c4a-spec.schema.json',
 };
 
 // ============================================================================
@@ -91,7 +92,7 @@ export function validateSchema(
  */
 export function validateEntity(
   data: unknown,
-  type: EntityType | 'checklist',
+  type: EntityType,
 ): ValidationResult {
   // 优先使用 validator 模块的预编译验证器
   const validator = getValidator(type as SchemaType);

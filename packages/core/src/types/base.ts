@@ -89,6 +89,8 @@ export const ENTITY_TYPE_DEFS = {
   adr: { dir: 'adrs', perspective: 'technical' as const },
   contract: { dir: 'contracts', perspective: 'technical' as const },
   feat: { dir: 'feat', perspective: null },
+  checklist: { dir: 'checklists', perspective: null },
+  spec: { dir: 'specs', perspective: null },
 } as const;
 
 /**
@@ -129,6 +131,7 @@ export const SCHEMA_TYPES = [
   'contract',
   'feat',
   'checklist',
+  'spec',
 ] as const;
 
 export type SchemaType = (typeof SCHEMA_TYPES)[number];
@@ -218,8 +221,23 @@ export interface Link {
  * 所有实体都必须包含这些字段
  */
 export interface BaseEntityMetadata {
+  /** 物理主键（UUID），由系统生成 */
+  uuid?: string;
+
   /** 实体唯一标识 */
   id: string;
+
+  /** 包边界标识（Feat/Checklist 为空字符串） */
+  root_id?: string;
+
+  /** 版本集合（受控字段） */
+  versions?: string[];
+
+  /** 关联的 Feat UUID（可选，用于追溯来源） */
+  requirement_id?: string;
+
+  /** 归属的父 Component（用户可见） */
+  component_id?: string;
 
   /** 实体类型 */
   type: EntityType;
@@ -238,9 +256,6 @@ export interface BaseEntityMetadata {
 
   /** 描述 */
   description?: string;
-
-  /** 版本号 */
-  version?: string;
 
   /** 标签 */
   tags?: string[];
@@ -272,14 +287,14 @@ export interface BaseEntityMetadata {
  * 包含额外的存储层字段
  */
 export interface StoredEntityMetadata extends BaseEntityMetadata {
-  /** 提案 ID，用于 Copy-on-Write 机制 */
-  proposal_id?: string | null;
+  /** 物理主键（UUID），必填 */
+  uuid: string;
 
-  /** 实体归属的项目 ID */
-  source_project?: string | null;
+  /** 包边界标识（Feat/Checklist 为空字符串），必填 */
+  root_id: string;
 
-  /** 实体归属的代码仓库 URL */
-  source_repo?: string | null;
+  /** 版本集合（受控字段），必填 */
+  versions: string[];
 
   /** 外部系统/组件 URL */
   external_url?: string | null;

@@ -36,3 +36,5 @@ export function now(): string {
 export * from "./id.js";
 export * from "./security.js";
 export * from "./hash.js";
+export * from "./uuid.js";
+export * from "./version.js";

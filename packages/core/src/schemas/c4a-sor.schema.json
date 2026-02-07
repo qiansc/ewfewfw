@@ -22,8 +22,8 @@
       "properties": {
         "id": {
           "type": "string",
-          "pattern": "^sor-[bt]-[a-z]\\d{3}$",
-          "description": "SoR ID (e.g. sor-b-a001)"
+          "pattern": "^sor-[bt]-(?:\\d{3}|[a-z]\\d{3})$",
+          "description": "SoR ID (e.g. sor-b-001)"
         },
         "name": {
           "type": "string",

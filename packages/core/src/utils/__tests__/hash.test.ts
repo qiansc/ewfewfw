@@ -39,11 +39,14 @@ describe('normalizeForHash', () => {
     expect(normalized).toEqual({ id: 'test', name: 'Test' });
   });
 
-  test('excludes content_hash and proposal_id', () => {
+  test('excludes content_hash and system-managed fields', () => {
     const obj = {
       id: 'test',
       content_hash: 'abc123',
-      proposal_id: 'adr-001',
+      uuid: '550e8400-e29b-41d4-a716-446655440000',
+      root_id: '@acme/payment-service',
+      versions: ['0.0.0'],
+      requirement_id: '550e8400-e29b-41d4-a716-446655440001',
     };
     const normalized = normalizeForHash(obj);
     expect(normalized).toEqual({ id: 'test' });

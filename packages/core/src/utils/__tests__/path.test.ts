@@ -9,6 +9,8 @@ import {
   CONFIG_FILENAME,
   DSL_EXTENSION,
   TYPE_TO_DIR,
+  escapeEntityId,
+  unescapeEntityId,
   getPerspective,
   getPerspectiveFromId,
   getEntityPath,
@@ -63,18 +65,18 @@ describe('getPerspective', () => {
 
 describe('getPerspectiveFromId', () => {
   test('returns business for prc-b/sor-b prefix', () => {
-    expect(getPerspectiveFromId('prc-b-a001')).toBe('business');
-    expect(getPerspectiveFromId('sor-b-a001')).toBe('business');
+    expect(getPerspectiveFromId('prc-b-001')).toBe('business');
+    expect(getPerspectiveFromId('sor-b-001')).toBe('business');
   });
 
   test('returns technical for prc-t/sor-t prefix', () => {
-    expect(getPerspectiveFromId('prc-t-a001')).toBe('technical');
-    expect(getPerspectiveFromId('sor-t-a001')).toBe('technical');
+    expect(getPerspectiveFromId('prc-t-001')).toBe('technical');
+    expect(getPerspectiveFromId('sor-t-001')).toBe('technical');
   });
 
   test('returns null for other IDs', () => {
     expect(getPerspectiveFromId('my-system')).toBeNull();
-    expect(getPerspectiveFromId('feat-a001')).toBeNull();
+    expect(getPerspectiveFromId('feat-user-login')).toBeNull();
   });
 });
 
@@ -90,8 +92,13 @@ describe('getEntityPath', () => {
   });
 
   test('generates technical path for adr', () => {
-    const path = getEntityPath('adr-a001-init', 'adr');
-    expect(path).toBe('.context/technical/adrs/adr-a001-init.c4a.yaml');
+    const path = getEntityPath('adr-001-init', 'adr');
+    expect(path).toBe('.context/technical/adrs/adr-001-init.c4a.yaml');
+  });
+
+  test('escapes scoped package IDs in filenames', () => {
+    const path = getEntityPath('@byted-tiktok/tux-web', 'component');
+    expect(path).toBe('.context/technical/components/@byted-tiktok--tux-web.c4a.yaml');
   });
 
   test('generates business path for product', () => {
@@ -100,18 +107,18 @@ describe('getEntityPath', () => {
   });
 
   test('generates business path for business process', () => {
-    const path = getEntityPath('prc-b-a001', 'process');
-    expect(path).toBe('.context/business/processes/prc-b-a001.c4a.yaml');
+    const path = getEntityPath('prc-b-001', 'process');
+    expect(path).toBe('.context/business/processes/prc-b-001.c4a.yaml');
   });
 
   test('generates technical path for technical process', () => {
-    const path = getEntityPath('prc-t-a001', 'process');
-    expect(path).toBe('.context/technical/processes/prc-t-a001.c4a.yaml');
+    const path = getEntityPath('prc-t-001', 'process');
+    expect(path).toBe('.context/technical/processes/prc-t-001.c4a.yaml');
   });
 
   test('generates feat path for entity in feat', () => {
-    const path = getEntityPath('auth-service', 'container', { featId: 'feat-a001-user-login' });
-    expect(path).toBe('.context/feat/feat-a001-user-login/technical/containers/auth-service.c4a.yaml');
+    const path = getEntityPath('auth-service', 'container', { featId: 'feat-user-login' });
+    expect(path).toBe('.context/feat/feat-user-login/technical/containers/auth-service.c4a.yaml');
   });
 
   test('allows explicit perspective override', () => {
@@ -122,8 +129,8 @@ describe('getEntityPath', () => {
 
 describe('getFeatPath', () => {
   test('generates feat metadata path', () => {
-    const path = getFeatPath('feat-a001-user-login');
-    expect(path).toBe('.context/feat/feat-a001-user-login/feat.yaml');
+    const path = getFeatPath('feat-user-login');
+    expect(path).toBe('.context/feat/feat-user-login/feat.yaml');
   });
 });
 
@@ -141,8 +148,8 @@ describe('getAssetsPath', () => {
   });
 
   test('generates feat assets path', () => {
-    const path = getAssetsPath('feat-a001-user-login');
-    expect(path).toBe('.context/feat/feat-a001-user-login/assets');
+    const path = getAssetsPath('feat-user-login');
+    expect(path).toBe('.context/feat/feat-user-login/assets');
   });
 });
 
@@ -166,18 +173,18 @@ describe('parseEntityPath', () => {
   });
 
   test('parses feat entity path', () => {
-    const result = parseEntityPath('.context/feat/feat-a001-user-login/technical/containers/auth-service.c4a.yaml');
+    const result = parseEntityPath('.context/feat/feat-user-login/technical/containers/auth-service.c4a.yaml');
     expect(result.valid).toBe(true);
     expect(result.id).toBe('auth-service');
     expect(result.type).toBe('container');
     expect(result.perspective).toBe('technical');
-    expect(result.featId).toBe('feat-a001-user-login');
+    expect(result.featId).toBe('feat-user-login');
   });
 
   test('parses adr path', () => {
-    const result = parseEntityPath('.context/technical/adrs/adr-a001-init.c4a.yaml');
+    const result = parseEntityPath('.context/technical/adrs/adr-001-init.c4a.yaml');
     expect(result.valid).toBe(true);
-    expect(result.id).toBe('adr-a001-init');
+    expect(result.id).toBe('adr-001-init');
     expect(result.type).toBe('adr');
     expect(result.perspective).toBe('technical');
   });
@@ -202,5 +209,14 @@ describe('parseEntityPath', () => {
     expect(result.valid).toBe(true);
     expect(result.id).toBe('my-system');
     expect(result.type).toBe('system');
+  });
+});
+
+describe('escapeEntityId/unescapeEntityId', () => {
+  test('escapes and unescapes scoped package IDs', () => {
+    const raw = '@byted-tiktok/tux-web';
+    const escaped = escapeEntityId(raw);
+    expect(escaped).toBe('@byted-tiktok--tux-web');
+    expect(unescapeEntityId(escaped)).toBe(raw);
   });
 });

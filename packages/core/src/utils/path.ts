@@ -29,6 +29,9 @@ export const CONFIG_FILENAME = '.c4a.yaml';
 /** DSL 文件扩展名 */
 export const DSL_EXTENSION = '.c4a.yaml';
 
+/** 路径转义：用于文件名中的 / */
+const PATH_ESCAPE_SEQUENCE = '--';
+
 // 重新导出 Perspective 类型（保持向后兼容）
 export type { Perspective };
 
@@ -42,6 +45,20 @@ export type TechnicalEntityType = TechnicalPerspectiveType;
 
 /** 实体类型到目录名映射 */
 export const TYPE_TO_DIR: Record<string, string> = ENTITY_TYPE_TO_DIR;
+
+/**
+ * 将实体 ID 转为安全文件名（仅处理路径分隔符）
+ */
+export function escapeEntityId(id: string): string {
+  return id.replace(/\//g, PATH_ESCAPE_SEQUENCE);
+}
+
+/**
+ * 从文件名还原实体 ID
+ */
+export function unescapeEntityId(id: string): string {
+  return id.replace(/--/g, '/');
+}
 
 // ============================================================================
 // 路径生成
@@ -80,7 +97,7 @@ export function getEntityPath(
   },
 ): string {
   const typeDir = TYPE_TO_DIR[type] || type;
-  const filename = `${id}${DSL_EXTENSION}`;
+  const filename = `${escapeEntityId(id)}${DSL_EXTENSION}`;
 
   // 确定视角
   let perspective = options?.perspective || getPerspective(type);
@@ -194,7 +211,7 @@ export function parseEntityPath(path: string): ParsedEntityPath {
   }
 
   // 提取 ID
-  result.id = filename.slice(0, -DSL_EXTENSION.length);
+  result.id = unescapeEntityId(filename.slice(0, -DSL_EXTENSION.length));
 
   // 解析路径结构
   if (parts[0] === 'feat' && parts.length >= 5) {

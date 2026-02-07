@@ -4,18 +4,47 @@
   "title": "C4A Feat Schema",
   "description": "C4A Feat（需求迭代）实体 Schema",
   "type": "object",
-  "required": ["id", "type", "name", "status", "source_project", "created_at"],
+  "required": ["uuid", "root_id", "versions", "id", "type", "name", "status", "scope"],
   "additionalProperties": false,
   "properties": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid",
+      "description": "物理主键"
+    },
+    "root_id": {
+      "type": "string",
+      "description": "包边界标识（Feat 为空字符串）"
+    },
+    "versions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "版本集合（受控字段）"
+    },
+    "requirement_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "关联的 Feat UUID（可选，用于追溯来源）"
+    },
+    "component_id": {
+      "type": "string",
+      "description": "归属的父 Component（用户可见）"
+    },
     "id": {
       "type": "string",
-      "pattern": "^feat-[a-z]\\d{3}(-[a-z0-9]+)*$",
-      "description": "Feat ID，格式：feat-{序号}-{简短描述}"
+      "pattern": "^feat-[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "description": "Feat ID，格式：feat-{slug}"
     },
     "type": {
       "type": "string",
       "const": "feat",
       "description": "类型标识"
+    },
+    "scope": {
+      "type": "string",
+      "enum": ["domain", "enterprise", "project"],
+      "description": "知识层级"
     },
     "name": {
       "type": "string",
@@ -26,16 +55,29 @@
       "type": "string",
       "description": "描述"
     },
+    "kind": {
+      "type": "string",
+      "enum": ["implementation", "external", "concept"],
+      "description": "知识点类型"
+    },
+    "perspective": {
+      "type": "string",
+      "enum": ["business", "technical"],
+      "description": "视角"
+    },
     "status": {
       "$ref": "#/$defs/featStatus"
     },
-    "source_project": {
-      "type": "string",
-      "description": "所属项目"
+    "tags": {
+      "$ref": "c4a-common.schema.json#/$defs/tags"
     },
-    "source_repo": {
-      "type": "string",
-      "description": "所属仓库"
+    "owner": {
+      "$ref": "c4a-common.schema.json#/$defs/owner"
+    },
+    "links": {
+      "type": "array",
+      "items": { "$ref": "c4a-common.schema.json#/$defs/link" },
+      "description": "相关链接"
     },
     "created_at": {
       "type": "string",
@@ -51,8 +93,18 @@
       "type": "string",
       "description": "创建者"
     },
-    "owner": {
-      "$ref": "c4a-common.schema.json#/$defs/owner"
+    "updated_by": {
+      "type": "string",
+      "description": "更新者"
+    },
+    "orphaned": {
+      "type": "boolean",
+      "description": "是否孤儿实体"
+    },
+    "orphaned_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "孤儿标记时间"
     },
     "changes": {
       "type": "array",

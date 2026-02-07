@@ -22,8 +22,8 @@
       "properties": {
         "id": {
           "type": "string",
-          "pattern": "^prc-[bt]-[a-z]\\d{3}$",
-          "description": "流程 ID (e.g. prc-b-a001)"
+          "pattern": "^prc-[bt]-(?:\\d{3}|[a-z]\\d{3})$",
+          "description": "流程 ID (e.g. prc-b-001)"
         },
         "name": {
           "type": "string",

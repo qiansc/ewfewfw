@@ -163,6 +163,7 @@ export function validateDSLAuto(data: unknown): ValidationResult {
     contract: "contract",
     feat: "feat",
     checklist: "checklist",
+    spec: "spec",
   };
 
   const mappedType = typeMap[type];

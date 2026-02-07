@@ -41,11 +41,11 @@ export interface ADRPolicyConfig {
  * C4A 项目配置（.context/.c4a.yaml）
  */
 export interface C4AConfig {
-  /** 仓库标识 */
-  repo_id?: string;
+  /** 包边界标识 */
+  root_id?: string;
 
-  /** 项目标识 */
-  project_id?: string;
+  /** 当前工作版本 */
+  version?: string;
 
   /** 运行模式 */
   mode?: C4AMode;

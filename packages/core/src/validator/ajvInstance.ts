@@ -86,6 +86,7 @@ export function getValidator(type: SchemaType): ValidateFunction | null {
     contract: "https://context4ai.org/schemas/c4a-contract.schema.json",
     feat: "https://context4ai.org/schemas/c4a-feat.schema.json",
     checklist: "https://context4ai.org/schemas/c4a-checklist.schema.json",
+    spec: "https://context4ai.org/schemas/c4a-spec.schema.json",
   };
 
   const schemaId = schemaMap[type];

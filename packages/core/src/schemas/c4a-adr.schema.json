@@ -26,8 +26,8 @@
       "properties": {
         "id": {
           "type": "string",
-          "pattern": "^adr-[a-z]\\d{3}(-[a-z0-9]+)*$",
-          "description": "ADR ID，格式：adr-{序号}-{简短描述}，如 adr-a001-introduce-mq"
+          "pattern": "^adr-(?:\\d{3}|[a-z]\\d{3})(?:-[a-z0-9]+)*$",
+          "description": "ADR ID，格式：adr-{序号}-{简短描述}，如 adr-001-introduce-mq"
         },
         "title": {
           "type": "string",
@@ -165,19 +165,19 @@
       "properties": {
         "supersedes": {
           "type": "string",
-          "pattern": "^adr-[a-z]\\d{3}(-[a-z0-9]+)*$",
+          "pattern": "^adr-(?:\\d{3}|[a-z]\\d{3})(?:-[a-z0-9]+)*$",
           "description": "替代的 ADR ID"
         },
         "superseded_by": {
           "type": "string",
-          "pattern": "^adr-[a-z]\\d{3}(-[a-z0-9]+)*$",
+          "pattern": "^adr-(?:\\d{3}|[a-z]\\d{3})(?:-[a-z0-9]+)*$",
           "description": "被哪个 ADR 替代"
         },
         "related_adrs": {
           "type": "array",
           "items": {
             "type": "string",
-            "pattern": "^adr-[a-z]\\d{3}(-[a-z0-9]+)*$"
+            "pattern": "^adr-(?:\\d{3}|[a-z]\\d{3})(?:-[a-z0-9]+)*$"
           },
           "description": "相关 ADR 列表"
         }

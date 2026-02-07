@@ -10,14 +10,17 @@ import type { EntityType } from '../types/base.js';
 // ID 格式常量
 // ============================================================================
 
-/** 序号格式正则：一个小写字母 + 三位数字 */
-const SEQUENCE_PATTERN = /^[a-z]\d{3}$/;
+/** 序号格式正则：三位数字 或 一个小写字母 + 三位数字 */
+const SEQUENCE_PATTERN = /^(?:\d{3}|[a-z]\d{3})$/;
+
+/** npm 包名格式（含可选 scope） */
+const PACKAGE_NAME_PATTERN = /^(?:@[a-z0-9-]+\/)?[a-z][a-z0-9-]*$/;
 
 /** kebab-case 格式正则 */
 const KEBAB_CASE_PATTERN = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
 /** 带序号的 ID 前缀 */
-const SEQUENCED_PREFIXES = ['feat', 'adr', 'prc-b', 'prc-t', 'sor-b', 'sor-t'] as const;
+const SEQUENCED_PREFIXES = ['adr', 'prc-b', 'prc-t', 'sor-b', 'sor-t'] as const;
 
 type SequencedPrefix = (typeof SEQUENCED_PREFIXES)[number];
 
@@ -66,25 +69,27 @@ export function isValidEntityId(id: string, type?: EntityType): boolean {
   if (type) {
     switch (type) {
       case 'feat':
-        return /^feat-[a-z]\d{3}(-[a-z0-9]+)*$/.test(id);
+        return /^feat-[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(id);
       case 'adr':
-        return /^adr-[a-z]\d{3}(-[a-z0-9]+)*$/.test(id);
+        return /^adr-(?:\d{3}|[a-z]\d{3})(?:-[a-z0-9]+)*$/.test(id);
       case 'process':
-        return /^prc-[bt]-[a-z]\d{3}$/.test(id);
+        return /^prc-[bt]-(?:\d{3}|[a-z]\d{3})$/.test(id);
       case 'sor':
-        return /^sor-[bt]-[a-z]\d{3}$/.test(id);
+        return /^sor-[bt]-(?:\d{3}|[a-z]\d{3})$/.test(id);
       default:
-        return isValidKebabCase(id);
+        return PACKAGE_NAME_PATTERN.test(id) || isValidKebabCase(id);
     }
   }
 
-  // 通用验证：kebab-case 或带前缀的序号 ID
-  // feat/adr 允许后缀：feat-a001-xxx, adr-a001-xxx
-  // prc/sor 不允许后缀：prc-b-a001, sor-t-a001
+  // 通用验证：kebab-case / npm 包名 / 带前缀的序号 ID
+  // feat/adr 允许后缀：feat-user-login, adr-001-introduce-mq
+  // prc/sor 不允许后缀：prc-b-001, sor-t-001
   return (
+    PACKAGE_NAME_PATTERN.test(id) ||
     isValidKebabCase(id) ||
-    /^(feat|adr)-[a-z]\d{3}(-[a-z0-9]+)*$/.test(id) ||
-    /^(prc|sor)-[bt]-[a-z]\d{3}$/.test(id)
+    /^feat-[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(id) ||
+    /^adr-(?:\d{3}|[a-z]\d{3})(?:-[a-z0-9]+)*$/.test(id) ||
+    /^(prc|sor)-[bt]-(?:\d{3}|[a-z]\d{3})$/.test(id)
   );
 }
 
@@ -94,11 +99,19 @@ export function isValidEntityId(id: string, type?: EntityType): boolean {
 
 /**
  * 递增序号
- * a001 → a002 → ... → a999 → b001 → ... → z999 → 溢出
+ * 001 → 002 → ... → 999 → a001 → ... → a999 → b001 → ... → z999 → 溢出
  */
 export function incrementSequence(seq: string): string {
   if (!isValidSequence(seq)) {
     throw new Error(`Invalid sequence format: ${seq}`);
+  }
+
+  if (/^\d{3}$/.test(seq)) {
+    const num = parseInt(seq, 10);
+    if (num < 999) {
+      return String(num + 1).padStart(3, '0');
+    }
+    return 'a001';
   }
 
   const letter = seq[0];
@@ -121,7 +134,7 @@ export function incrementSequence(seq: string): string {
  * 获取初始序号
  */
 export function getInitialSequence(): string {
-  return 'a001';
+  return '001';
 }
 
 // ============================================================================
@@ -143,8 +156,7 @@ export function generateEntityId(
 ): string {
   switch (type) {
     case 'feat':
-      if (!sequence) throw new Error('Feat ID requires sequence');
-      return `feat-${sequence}-${toKebabCase(name)}`;
+      return `feat-${toKebabCase(name)}`;
 
     case 'adr':
       if (!sequence) throw new Error('ADR ID requires sequence');
@@ -165,16 +177,6 @@ export function generateEntityId(
     default:
       return toKebabCase(name);
   }
-}
-
-/**
- * 生成提案 ID（用于 feat/adr 的简短引用）
- */
-export function generateProposalId(type: 'feat' | 'adr', sequence: string): string {
-  if (!isValidSequence(sequence)) {
-    throw new Error(`Invalid sequence format: ${sequence}`);
-  }
-  return `${type}-${sequence}`;
 }
 
 // ============================================================================
@@ -213,17 +215,16 @@ export function parseEntityId(id: string): ParsedEntityId {
     return result;
   }
 
-  // feat-a001-xxx 或 feat-a001
-  const featMatch = id.match(/^feat-([a-z]\d{3})(?:-(.+))?$/);
+  // feat-xxx
+  const featMatch = id.match(/^feat-([a-z0-9]+(?:-[a-z0-9]+)*)$/);
   if (featMatch) {
     result.type = 'feat';
-    result.sequence = featMatch[1];
-    result.name = featMatch[2] || null;
+    result.name = featMatch[1];
     return result;
   }
 
-  // adr-a001-xxx 或 adr-a001
-  const adrMatch = id.match(/^adr-([a-z]\d{3})(?:-(.+))?$/);
+  // adr-001-xxx 或 adr-a001-xxx
+  const adrMatch = id.match(/^adr-((?:\d{3}|[a-z]\d{3}))(?:-(.+))?$/);
   if (adrMatch) {
     result.type = 'adr';
     result.sequence = adrMatch[1];
@@ -231,8 +232,8 @@ export function parseEntityId(id: string): ParsedEntityId {
     return result;
   }
 
-  // prc-b-a001 或 prc-t-a001
-  const prcMatch = id.match(/^prc-([bt])-([a-z]\d{3})$/);
+  // prc-b-001 或 prc-t-a001
+  const prcMatch = id.match(/^prc-([bt])-((?:\d{3}|[a-z]\d{3}))$/);
   if (prcMatch) {
     result.type = 'process';
     result.perspective = prcMatch[1] === 'b' ? 'business' : 'technical';
@@ -240,8 +241,8 @@ export function parseEntityId(id: string): ParsedEntityId {
     return result;
   }
 
-  // sor-b-a001 或 sor-t-a001
-  const sorMatch = id.match(/^sor-([bt])-([a-z]\d{3})$/);
+  // sor-b-001 或 sor-t-a001
+  const sorMatch = id.match(/^sor-([bt])-((?:\d{3}|[a-z]\d{3}))$/);
   if (sorMatch) {
     result.type = 'sor';
     result.perspective = sorMatch[1] === 'b' ? 'business' : 'technical';
@@ -249,8 +250,8 @@ export function parseEntityId(id: string): ParsedEntityId {
     return result;
   }
 
-  // 普通 kebab-case ID
-  if (isValidKebabCase(id)) {
+  // 普通 ID（kebab-case 或 npm 包名）
+  if (isValidKebabCase(id) || PACKAGE_NAME_PATTERN.test(id)) {
     result.name = id;
   }
 

@@ -11,7 +11,6 @@ import {
   getInitialSequence,
   toKebabCase,
   generateEntityId,
-  generateProposalId,
   parseEntityId,
 } from '../id.js';
 
@@ -36,6 +35,7 @@ describe('isValidKebabCase', () => {
 
 describe('isValidSequence', () => {
   test('valid sequence', () => {
+    expect(isValidSequence('001')).toBe(true);
     expect(isValidSequence('a001')).toBe(true);
     expect(isValidSequence('z999')).toBe(true);
     expect(isValidSequence('m123')).toBe(true);
@@ -53,32 +53,39 @@ describe('isValidSequence', () => {
 
 describe('isValidEntityId', () => {
   test('valid feat ID', () => {
-    expect(isValidEntityId('feat-a001', 'feat')).toBe(true);
-    expect(isValidEntityId('feat-a001-user-login', 'feat')).toBe(true);
+    expect(isValidEntityId('feat-user-login', 'feat')).toBe(true);
+    expect(isValidEntityId('feat-dark-mode', 'feat')).toBe(true);
   });
 
   test('valid adr ID', () => {
-    expect(isValidEntityId('adr-a001', 'adr')).toBe(true);
+    expect(isValidEntityId('adr-001-introduce-mq', 'adr')).toBe(true);
     expect(isValidEntityId('adr-b002-introduce-mq', 'adr')).toBe(true);
   });
 
   test('valid process ID', () => {
-    expect(isValidEntityId('prc-b-a001', 'process')).toBe(true);
+    expect(isValidEntityId('prc-b-001', 'process')).toBe(true);
     expect(isValidEntityId('prc-t-z999', 'process')).toBe(true);
   });
 
   test('valid sor ID', () => {
-    expect(isValidEntityId('sor-b-a001', 'sor')).toBe(true);
+    expect(isValidEntityId('sor-b-001', 'sor')).toBe(true);
     expect(isValidEntityId('sor-t-m123', 'sor')).toBe(true);
   });
 
   test('valid kebab-case ID for other types', () => {
     expect(isValidEntityId('my-system', 'system')).toBe(true);
     expect(isValidEntityId('auth-service', 'container')).toBe(true);
+    expect(isValidEntityId('@byted-tiktok/tux-web', 'component')).toBe(true);
   });
 });
 
 describe('incrementSequence', () => {
+  test('increment numeric sequence', () => {
+    expect(incrementSequence('001')).toBe('002');
+    expect(incrementSequence('099')).toBe('100');
+    expect(incrementSequence('999')).toBe('a001');
+  });
+
   test('increment within same letter', () => {
     expect(incrementSequence('a001')).toBe('a002');
     expect(incrementSequence('a099')).toBe('a100');
@@ -96,8 +103,8 @@ describe('incrementSequence', () => {
 });
 
 describe('getInitialSequence', () => {
-  test('returns a001', () => {
-    expect(getInitialSequence()).toBe('a001');
+  test('returns 001', () => {
+    expect(getInitialSequence()).toBe('001');
   });
 });
 
@@ -131,29 +138,29 @@ describe('toKebabCase', () => {
 
 describe('generateEntityId', () => {
   test('generates feat ID', () => {
-    const id = generateEntityId('feat', 'User Login', 'a001');
-    expect(id).toBe('feat-a001-user-login');
+    const id = generateEntityId('feat', 'User Login');
+    expect(id).toBe('feat-user-login');
   });
 
   test('generates adr ID', () => {
-    const id = generateEntityId('adr', 'Introduce MQ', 'b002');
-    expect(id).toBe('adr-b002-introduce-mq');
+    const id = generateEntityId('adr', 'Introduce MQ', '001');
+    expect(id).toBe('adr-001-introduce-mq');
   });
 
   test('generates process ID with perspective', () => {
-    const bizId = generateEntityId('process', 'Order Flow', 'a001', 'business');
-    expect(bizId).toBe('prc-b-a001');
+    const bizId = generateEntityId('process', 'Order Flow', '001', 'business');
+    expect(bizId).toBe('prc-b-001');
 
-    const techId = generateEntityId('process', 'Data Sync', 'a001', 'technical');
-    expect(techId).toBe('prc-t-a001');
+    const techId = generateEntityId('process', 'Data Sync', '001', 'technical');
+    expect(techId).toBe('prc-t-001');
   });
 
   test('generates sor ID with perspective', () => {
-    const bizId = generateEntityId('sor', 'User Profile', 'a001', 'business');
-    expect(bizId).toBe('sor-b-a001');
+    const bizId = generateEntityId('sor', 'User Profile', '001', 'business');
+    expect(bizId).toBe('sor-b-001');
 
-    const techId = generateEntityId('sor', 'Cache Store', 'a001', 'technical');
-    expect(techId).toBe('sor-t-a001');
+    const techId = generateEntityId('sor', 'Cache Store', '001', 'technical');
+    expect(techId).toBe('sor-t-001');
   });
 
   test('generates simple kebab-case ID for other types', () => {
@@ -165,50 +172,38 @@ describe('generateEntityId', () => {
   });
 });
 
-describe('generateProposalId', () => {
-  test('generates proposal ID with type and sequence', () => {
-    const id = generateProposalId('adr', 'a001');
-    expect(id).toBe('adr-a001');
-  });
-
-  test('generates feat proposal ID', () => {
-    const id = generateProposalId('feat', 'b002');
-    expect(id).toBe('feat-b002');
-  });
-});
-
 describe('parseEntityId', () => {
   test('parses feat ID', () => {
-    const result = parseEntityId('feat-a001-user-login');
+    const result = parseEntityId('feat-user-login');
     expect(result.type).toBe('feat');
-    expect(result.sequence).toBe('a001');
+    expect(result.sequence).toBeNull();
     expect(result.name).toBe('user-login');
-    expect(result.raw).toBe('feat-a001-user-login');
+    expect(result.raw).toBe('feat-user-login');
   });
 
   test('parses adr ID', () => {
-    const result = parseEntityId('adr-b002-introduce-mq');
+    const result = parseEntityId('adr-001-introduce-mq');
     expect(result.type).toBe('adr');
-    expect(result.sequence).toBe('b002');
+    expect(result.sequence).toBe('001');
     expect(result.name).toBe('introduce-mq');
   });
 
   test('parses process ID with perspective', () => {
-    const bizResult = parseEntityId('prc-b-a001');
+    const bizResult = parseEntityId('prc-b-001');
     expect(bizResult.type).toBe('process');
     expect(bizResult.perspective).toBe('business');
-    expect(bizResult.sequence).toBe('a001');
+    expect(bizResult.sequence).toBe('001');
 
-    const techResult = parseEntityId('prc-t-a001');
+    const techResult = parseEntityId('prc-t-001');
     expect(techResult.type).toBe('process');
     expect(techResult.perspective).toBe('technical');
   });
 
   test('parses sor ID with perspective', () => {
-    const bizResult = parseEntityId('sor-b-a001');
+    const bizResult = parseEntityId('sor-b-001');
     expect(bizResult.type).toBe('sor');
     expect(bizResult.perspective).toBe('business');
-    expect(bizResult.sequence).toBe('a001');
+    expect(bizResult.sequence).toBe('001');
   });
 
   test('returns object with null fields for invalid ID', () => {

@@ -8,11 +8,14 @@ import { validateEntity, validateSchema } from '../schema.js';
 describe('validateEntity', () => {
   test('validates feat entity', () => {
     const feat = {
-      id: 'feat-a001-test',
+      uuid: '550e8400-e29b-41d4-a716-446655440000',
+      root_id: '',
+      versions: ['0.0.0'],
+      id: 'feat-user-login',
       type: 'feat',
       name: 'Test Feat',
       status: 'draft',
-      source_project: 'demo-project',
+      scope: 'project',
       created_at: new Date().toISOString(),
     };
 
@@ -22,9 +25,16 @@ describe('validateEntity', () => {
 
   test('validates checklist entity', () => {
     const checklist = {
-      version: '1.0',
+      uuid: '550e8400-e29b-41d4-a716-446655440010',
+      root_id: '',
+      versions: ['0.0.0'],
+      id: 'checklist-user-login',
+      type: 'checklist',
+      name: 'User Login Checklist',
+      status: 'draft',
+      scope: 'project',
       metadata: {
-        feat_id: 'feat-a001-test',
+        feat_id: 'feat-user-login',
         generated_at: new Date().toISOString(),
         source: 'technical_spec',
       },
@@ -44,6 +54,27 @@ describe('validateEntity', () => {
     expect(result.valid).toBe(true);
   });
 
+  test('validates spec entity', () => {
+    const spec = {
+      uuid: '550e8400-e29b-41d4-a716-446655440020',
+      root_id: '@acme/payment-service',
+      versions: ['1.0.0'],
+      id: 'spec-payment-service',
+      type: 'spec',
+      name: 'Payment Service Spec',
+      status: 'draft',
+      scope: 'project',
+      data: {
+        perspective: 'technical',
+        format: 'markdown',
+        content: '# Payment Spec',
+      },
+    };
+
+    const result = validateEntity(spec, 'spec');
+    expect(result.valid).toBe(true);
+  });
+
   test('reports errors for invalid feat entity', () => {
     const invalidFeat = {
       type: 'feat',
@@ -59,11 +90,14 @@ describe('validateEntity', () => {
 describe('validateSchema', () => {
   test('validates using schema $id', () => {
     const feat = {
-      id: 'feat-a001-test',
+      uuid: '550e8400-e29b-41d4-a716-446655440000',
+      root_id: '',
+      versions: ['0.0.0'],
+      id: 'feat-user-login',
       type: 'feat',
       name: 'Test Feat',
       status: 'draft',
-      source_project: 'demo-project',
+      scope: 'project',
       created_at: new Date().toISOString(),
     };
 

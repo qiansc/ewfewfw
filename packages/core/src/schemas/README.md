@@ -22,14 +22,19 @@ C4A DSL 的 JSON Schema 定义，用于校验 YAML 格式的架构描述文件�
 
 ## 使用方式
 
-```python
-import json
-from jsonschema import validate
+```ts
+import { readFile } from "node:fs/promises";
+import Ajv from "ajv";
 
-# 加载 Schema
-with open("c4a-system.schema.json") as f:
-    schema = json.load(f)
+const ajv = new Ajv();
 
-# 验证 YAML 数据
-validate(instance=yaml_data, schema=schema)
+// 加载 Schema
+const schema = JSON.parse(await readFile("c4a-system.schema.json", "utf-8"));
+
+// 验证 YAML 数据
+const validate = ajv.compile(schema);
+const valid = validate(yamlData);
+if (!valid) {
+  console.error(validate.errors);
+}
 ```

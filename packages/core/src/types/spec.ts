@@ -5,7 +5,7 @@
  * 由现有实体组合而成，不是独立的实体类型
  */
 
-import type { Product, System, Container, Component, Process, SoR } from './entities.js';
+import type { Product, System, Container, Component, Process, SoR, Entity } from './entities.js';
 import type { Contract } from './attached.js';
 
 // ============================================================================
@@ -46,6 +46,27 @@ export interface TechnicalSpec {
   sors: SoR[];
   /** 契约列表 */
   contracts: Contract[];
+}
+
+// ============================================================================
+// Spec 实体
+// ============================================================================
+
+/**
+ * Spec 实体（Functional/Technical Spec 存储体）
+ */
+export interface SpecEntity extends Entity {
+  type: 'spec';
+  data?: {
+    /** 视角（功能/技术） */
+    perspective?: 'business' | 'technical';
+    /** 规格内容（可为结构化对象或字符串） */
+    content?: Record<string, unknown> | string;
+    /** 内容格式 */
+    format?: 'markdown' | 'yaml' | 'json';
+    /** 扩展字段 */
+    [key: string]: unknown;
+  };
 }
 
 // ============================================================================

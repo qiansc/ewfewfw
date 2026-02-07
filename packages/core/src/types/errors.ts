@@ -2,7 +2,7 @@
  * C4A 错误类型定义
  *
  * 错误码格式：C4A-{类别}-{编号}
- * 类别：INPUT | DATA | SYS | BIZ | STORE | PERM | MIGRATE
+ * 类别：INPUT | DATA | SYS | BIZ | STORE | PERM | MIGRATE | VERSION
  */
 
 // ============================================================================
@@ -20,6 +20,7 @@ export type ErrorCategory =
   | 'STORE' // 存储操作
   | 'PERM' // 权限错误
   | 'MIGRATE' // 数据迁移错误
+  | 'VERSION' // 版本管理错误
   | 'EXTRACT' // Extract MCP 错误
   | 'QUERY' // Query MCP 错误
   | 'VISUAL'; // Visual MCP 错误
@@ -106,14 +107,24 @@ export const PERM_ERROR_CODES = {
  * MIGRATE 类错误码
  */
 export const MIGRATE_ERROR_CODES = {
-  MISSING_SOURCE_PROJECT: 'C4A-MIGRATE-001', // 缺少 source_project 字段
+  MISSING_ROOT_ID: 'C4A-MIGRATE-001', // 缺少 root_id 字段
   MISSING_SOURCE_REPO: 'C4A-MIGRATE-002', // 缺少 source_repo 字段
-  INVALID_SOURCE_PROJECT_FORMAT: 'C4A-MIGRATE-003', // source_project 格式不正确
+  INVALID_ROOT_ID_FORMAT: 'C4A-MIGRATE-003', // root_id 格式不正确
   SOURCE_REPO_FORMAT_SUGGESTION: 'C4A-MIGRATE-004', // source_repo 格式建议改进
-  NON_PROJECT_SCOPE_HAS_SOURCE_PROJECT: 'C4A-MIGRATE-005', // Domain/Enterprise 层级不应有 source_project
+  NON_PROJECT_SCOPE_HAS_ROOT_ID: 'C4A-MIGRATE-005', // Domain/Enterprise 层级不应有 root_id
   NON_PROJECT_SCOPE_HAS_SOURCE_REPO: 'C4A-MIGRATE-006', // Domain/Enterprise 层级不应有 source_repo
-  EXTERNAL_ENTITY_HAS_SOURCE_PROJECT: 'C4A-MIGRATE-007', // external 实体不应有 source_project
+  EXTERNAL_ENTITY_HAS_ROOT_ID: 'C4A-MIGRATE-007', // external 实体不应有 root_id
   EXTERNAL_ENTITY_MISSING_URL: 'C4A-MIGRATE-008', // external 实体缺少 external_url
+} as const;
+
+/**
+ * VERSION 类错误码
+ */
+export const VERSION_ERROR_CODES = {
+  INVALID_VERSION_FORMAT: 'C4A-VERSION-002', // 版本格式无效
+  VERSION_NOT_FOUND: 'C4A-VERSION-003', // 版本不存在
+  NO_FALLBACK_VERSION: 'C4A-VERSION-004', // 无可回退的正式版本
+  CANNOT_ADD_LATEST: 'C4A-VERSION-005', // 不允许手动添加 0.0.0
 } as const;
 
 /**
@@ -148,6 +159,7 @@ export const ERROR_CODES = {
   ...STORE_ERROR_CODES,
   ...PERM_ERROR_CODES,
   ...MIGRATE_ERROR_CODES,
+  ...VERSION_ERROR_CODES,
   ...EXTRACT_ERROR_CODES,
   ...QUERY_ERROR_CODES,
   ...VISUAL_ERROR_CODES,
@@ -161,6 +173,7 @@ export type ErrorCode =
   | (typeof STORE_ERROR_CODES)[keyof typeof STORE_ERROR_CODES]
   | (typeof PERM_ERROR_CODES)[keyof typeof PERM_ERROR_CODES]
   | (typeof MIGRATE_ERROR_CODES)[keyof typeof MIGRATE_ERROR_CODES]
+  | (typeof VERSION_ERROR_CODES)[keyof typeof VERSION_ERROR_CODES]
   | (typeof EXTRACT_ERROR_CODES)[keyof typeof EXTRACT_ERROR_CODES]
   | (typeof QUERY_ERROR_CODES)[keyof typeof QUERY_ERROR_CODES]
   | (typeof VISUAL_ERROR_CODES)[keyof typeof VISUAL_ERROR_CODES];
@@ -223,6 +236,11 @@ export const ERROR_CODE_TO_HTTP_STATUS: Record<ErrorCode, number> = {
   'C4A-MIGRATE-006': 422,
   'C4A-MIGRATE-007': 422,
   'C4A-MIGRATE-008': 422,
+  // VERSION
+  'C4A-VERSION-002': 422,
+  'C4A-VERSION-003': 422,
+  'C4A-VERSION-004': 422,
+  'C4A-VERSION-005': 422,
   'C4A-EXTRACT-001': 500,
   'C4A-QUERY-001': 500,
   'C4A-VISUAL-001': 500,
@@ -284,23 +302,28 @@ export const ERROR_MESSAGES: Record<ErrorCode, { zh: string; en: string }> = {
   'C4A-PERM-004': { zh: '认证失败', en: 'Authentication failed' },
   'C4A-PERM-005': { zh: '跨项目操作权限不足', en: 'Insufficient cross-project permission' },
   // MIGRATE
-  'C4A-MIGRATE-001': { zh: '缺少 source_project 字段', en: 'Missing source_project field' },
+  'C4A-MIGRATE-001': { zh: '缺少 root_id 字段', en: 'Missing root_id field' },
   'C4A-MIGRATE-002': { zh: '缺少 source_repo 字段', en: 'Missing source_repo field' },
-  'C4A-MIGRATE-003': { zh: 'source_project 格式不正确', en: 'Invalid source_project format' },
+  'C4A-MIGRATE-003': { zh: 'root_id 格式不正确', en: 'Invalid root_id format' },
   'C4A-MIGRATE-004': { zh: 'source_repo 格式建议改进', en: 'source_repo format should be owner/repo' },
   'C4A-MIGRATE-005': {
-    zh: 'Domain/Enterprise 层级不应有 source_project',
-    en: 'Domain/Enterprise scope should not have source_project',
+    zh: 'Domain/Enterprise 层级不应有 root_id',
+    en: 'Domain/Enterprise scope should not have root_id',
   },
   'C4A-MIGRATE-006': {
     zh: 'Domain/Enterprise 层级不应有 source_repo',
     en: 'Domain/Enterprise scope should not have source_repo',
   },
   'C4A-MIGRATE-007': {
-    zh: 'external 实体不应有 source_project',
-    en: 'External entity should not have source_project',
+    zh: 'external 实体不应有 root_id',
+    en: 'External entity should not have root_id',
   },
   'C4A-MIGRATE-008': { zh: 'external 实体缺少 external_url', en: 'External entity missing external_url' },
+  // VERSION
+  'C4A-VERSION-002': { zh: '版本格式无效', en: 'Invalid version format' },
+  'C4A-VERSION-003': { zh: '版本不存在', en: 'Version not found' },
+  'C4A-VERSION-004': { zh: '无可回退的正式版本', en: 'No fallback stable version' },
+  'C4A-VERSION-005': { zh: '不允许手动添加 0.0.0', en: 'Cannot manually add 0.0.0' },
   'C4A-EXTRACT-001': { zh: 'Extract MCP 内部错误', en: 'Extract MCP internal error' },
   'C4A-QUERY-001': { zh: 'Query MCP 内部错误', en: 'Query MCP internal error' },
   'C4A-VISUAL-001': { zh: 'Visual MCP 内部错误', en: 'Visual MCP internal error' },
@@ -443,6 +466,20 @@ export class DataError extends C4AError {
   ) {
     super(code, details, message);
     this.name = 'DataError';
+  }
+}
+
+/**
+ * 版本错误
+ */
+export class VersionError extends C4AError {
+  constructor(
+    code: (typeof VERSION_ERROR_CODES)[keyof typeof VERSION_ERROR_CODES],
+    details?: ErrorDetails,
+    message?: string,
+  ) {
+    super(code, details, message);
+    this.name = 'VersionError';
   }
 }
 

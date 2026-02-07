@@ -18,8 +18,8 @@ describe('getDefaultConfig', () => {
 describe('validateConfig', () => {
   test('validates valid local config', () => {
     const config: C4AConfig = {
-      repo_id: 'company/my-repo',
-      project_id: 'my-project',
+      root_id: '@acme/payment-service',
+      version: '1.0.0',
       mode: 'local',
     };
     const result = validateConfig(config);
@@ -29,8 +29,8 @@ describe('validateConfig', () => {
 
   test('validates valid server config', () => {
     const config: C4AConfig = {
-      repo_id: 'company/my-repo',
-      project_id: 'my-project',
+      root_id: '@acme/payment-service',
+      version: '1.0.0',
       mode: 'server',
       server: {
         url: 'http://localhost:8055',
@@ -43,8 +43,8 @@ describe('validateConfig', () => {
 
   test('validates valid remote config', () => {
     const config: C4AConfig = {
-      repo_id: 'company/my-repo',
-      project_id: 'my-project',
+      root_id: '@acme/payment-service',
+      version: '1.0.0',
       mode: 'remote',
       remote: {
         url: 'https://c4a.example.com:8055',

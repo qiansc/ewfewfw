@@ -25,7 +25,10 @@ export function normalizeForHash(obj: Record<string, unknown>): Record<string, u
     'created_at',
     'updated_at',
     'content_hash',
-    'proposal_id',
+    'uuid',
+    'root_id',
+    'versions',
+    'requirement_id',
     '_id',
     '__v',
   ]);

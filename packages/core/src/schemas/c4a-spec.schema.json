@@ -1,10 +1,10 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://context4ai.org/schemas/c4a-checklist.schema.json",
-  "title": "C4A Checklist Schema",
-  "description": "C4A Checklist 实体 Schema",
+  "$id": "https://context4ai.org/schemas/c4a-spec.schema.json",
+  "title": "C4A Spec Schema",
+  "description": "C4A Spec 实体 Schema",
   "type": "object",
-  "required": ["uuid", "root_id", "versions", "id", "type", "name", "status", "scope", "items"],
+  "required": ["uuid", "root_id", "versions", "id", "type", "name", "status", "scope"],
   "additionalProperties": false,
   "properties": {
     "uuid": {
@@ -14,7 +14,7 @@
     },
     "root_id": {
       "type": "string",
-      "description": "包边界标识（Checklist 为空字符串）"
+      "description": "包边界标识"
     },
     "versions": {
       "type": "array",
@@ -33,11 +33,11 @@
     },
     "id": {
       "type": "string",
-      "description": "Checklist ID"
+      "description": "Spec ID"
     },
     "type": {
       "type": "string",
-      "const": "checklist",
+      "const": "spec",
       "description": "类型标识"
     },
     "scope": {
@@ -107,80 +107,10 @@
       "format": "date-time",
       "description": "孤儿标记时间"
     },
-    "metadata": {
+    "data": {
       "type": "object",
-      "required": ["feat_id"],
-      "additionalProperties": false,
-      "properties": {
-        "feat_id": {
-          "type": "string",
-          "description": "关联的 Feat ID"
-        },
-        "generated_at": {
-          "type": "string",
-          "format": "date-time",
-          "description": "生成时间"
-        },
-        "source": {
-          "type": "string",
-          "description": "生成来源"
-        }
-      }
-    },
-    "items": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/checklistItem" },
-      "description": "任务列表"
-    }
-  },
-  "$defs": {
-    "checklistItemStatus": {
-      "type": "string",
-      "enum": ["pending", "in_progress", "completed", "blocked", "skipped"],
-      "description": "任务状态"
-    },
-    "checklistItemType": {
-      "type": "string",
-      "enum": ["dsl", "code", "test", "doc", "contract"],
-      "description": "任务类型"
-    },
-    "checklistItem": {
-      "type": "object",
-      "required": ["id", "title", "status"],
-      "additionalProperties": false,
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "任务 ID"
-        },
-        "title": {
-          "type": "string",
-          "description": "任务标题"
-        },
-        "status": {
-          "$ref": "#/$defs/checklistItemStatus"
-        },
-        "type": {
-          "$ref": "#/$defs/checklistItemType"
-        },
-        "entity_id": {
-          "type": "string",
-          "description": "关联实体 ID"
-        },
-        "assignee": {
-          "type": "string",
-          "description": "负责人"
-        },
-        "completed_at": {
-          "type": "string",
-          "format": "date-time",
-          "description": "完成时间"
-        },
-        "blocked_reason": {
-          "type": "string",
-          "description": "阻塞原因"
-        }
-      }
+      "additionalProperties": true,
+      "description": "Spec 内容"
     }
   }
 }
