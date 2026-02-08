@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "bun run src/index.tsx",
-    "build": "bun build src/index.tsx --outdir dist --target node && bun run scripts/syncSkills.ts",
+    "build": "bun build src/index.tsx --outdir dist --target node && bun run scripts/syncSkills.ts && bun run scripts/copy-model.ts",
     "typecheck": "tsc --noEmit",
     "test": "bun test"
   },

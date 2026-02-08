@@ -6,6 +6,7 @@ import { render } from "ink";
 import React from "react";
 import { App, type AppSelection } from "./App.js";
 import { runCommand } from "./commands/index.js";
+import { ensureGlobalConfig } from "./core/firstRun.js";
 import { promptInput } from "./utils/prompt.js";
 
 const args = process.argv.slice(2);
@@ -20,13 +21,11 @@ C4A CLI - Context For AI
 
 常用命令:
   init                   初始化项目配置
-  install <mode>         安装存储模式 (local/server/remote)
-  sync                   同步到知识库
   status                 查看状态
   validate [path]        验证 DSL 文件
 
-  server <subcommand>    服务模式命令 (需先安装 server 模式)
-  local <subcommand>     本地模式命令 (需先安装 local 模式)
+  server <subcommand>    服务模式命令 (需先完成 server 模式初始化)
+  local <subcommand>     本地模式命令 (需先完成 local 模式初始化)
 
 更多信息: https://github.com/your-org/c4a
 `);
@@ -77,34 +76,6 @@ async function handleSelection(selection: AppSelection | null): Promise<void> {
     await runCommand(["template", type]);
     return;
   }
-  if (selection.action === "schema") {
-    const type = await promptInput(
-      "Schema 类型 (system/container/component/adr/process/sor/feat/checklist/all)",
-    );
-    if (!type) return;
-    const allowed = new Set([
-      "system",
-      "container",
-      "component",
-      "adr",
-      "process",
-      "sor",
-      "feat",
-      "checklist",
-      "all",
-    ]);
-    if (!allowed.has(type)) {
-      console.error(`未知 Schema 类型: ${type}`);
-      return;
-    }
-    await runCommand(["schema", type]);
-    return;
-  }
-  if (selection.action === "feat-render") {
-    const featId = await promptInput("Feat ID");
-    if (!featId) return;
-    await runCommand(["feat", "render", featId]);
-  }
 }
 
 async function waitForAnyKey(message: string): Promise<void> {
@@ -129,6 +100,14 @@ async function waitForAnyKey(message: string): Promise<void> {
 
 // 主逻辑
 if (args.length > 0) {
+  const skipFirstRun =
+    args[0] === "config" ||
+    args[0] === "help" ||
+    args[0] === "--help" ||
+    args[0] === "-h";
+  if (!skipFirstRun) {
+    await ensureGlobalConfig();
+  }
   // 有参数：直接执行命令
   if (args[0] === "help" || args[0] === "--help" || args[0] === "-h") {
     printHelp();
@@ -136,6 +115,7 @@ if (args.length > 0) {
     await runCommand(args);
   }
 } else {
+  await ensureGlobalConfig();
   // 无参数：启动交互式菜单（会自动检查 TTY）
   while (true) {
     const selection = await runInteractiveMenu();

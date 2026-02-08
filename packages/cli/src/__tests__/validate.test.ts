@@ -64,22 +64,21 @@ describe("validateCommand", () => {
 
   test("strict mode returns warning exit code", async () => {
     await withTempDir(async (dir) => {
-      const featDir = join(dir, ".context", "feat", "feat-a001-test");
-      mkdirSync(featDir, { recursive: true });
+      const contractDir = join(dir, ".context", "technical", "contracts");
+      mkdirSync(contractDir, { recursive: true });
       writeFileSync(
-        join(featDir, "feat.yaml"),
+        join(contractDir, "demo.yaml"),
         [
-          "type: feat",
-          "uuid: 11111111-1111-4111-8111-111111111111",
-          "root_id: \"\"",
-          "versions:",
-          "  - 0.0.0",
-          "id: feat-a001-test",
-          "name: Test",
-          "status: draft",
-          "scope: project",
-          "related_adrs:",
-          "  - adr-a001-missing",
+          "schema: c4a/v1",
+          "type: contract",
+          "contract:",
+          "  id: demo-contract",
+          "  name: Demo Contract",
+          "  description: Demo Contract",
+          "  contract_type: openapi",
+          "  status: draft",
+          "  references:",
+          "    - missing-system",
           "",
         ].join("\n"),
         "utf-8",

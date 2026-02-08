@@ -317,13 +317,6 @@ function extractEntityInfo(
   if (typeof rawType !== "string") return {};
   const type = normalizeDslType(rawType);
   const status = extractStatus(data, type);
-  if (type === "feat" || type === "checklist") {
-    return {
-      id: typeof data.id === "string" ? data.id : undefined,
-      type,
-      status,
-    };
-  }
   const key = type === "system" ? "system" : type;
   const section = data[key] as Record<string, unknown> | undefined;
   const id =
@@ -343,7 +336,6 @@ function deriveIdFromPath(filePath: string): string {
 
 function normalizeIdType(type: string) {
   if (type === "software-system") return "system";
-  if (type === "checklist") return undefined;
   return type;
 }
 
@@ -374,9 +366,6 @@ function isPublished(status: string | null | undefined, scope?: "published"): bo
 }
 
 function checkDescription(data: Record<string, unknown>, type: string): ValidationIssue | null {
-  if (type === "feat" || type === "checklist") {
-    return null;
-  }
   const key = type === "system" ? "system" : type;
   const section = data[key] as Record<string, unknown> | undefined;
   if (!section || typeof section.description !== "string" || section.description.trim() === "") {
@@ -578,9 +567,6 @@ const KEBAB_CASE_PATTERN = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 function isValidEntityIdLocal(id: string, type?: string): boolean {
   if (!id || typeof id !== "string") return false;
 
-  if (type === "feat") {
-    return /^feat-[a-z]\d{3}(-[a-z0-9]+)*$/.test(id);
-  }
   if (type === "adr") {
     return /^adr-[a-z]\d{3}(-[a-z0-9]+)*$/.test(id);
   }
@@ -593,7 +579,7 @@ function isValidEntityIdLocal(id: string, type?: string): boolean {
 
   return (
     KEBAB_CASE_PATTERN.test(id) ||
-    /^(feat|adr)-[a-z]\d{3}(-[a-z0-9]+)*$/.test(id) ||
+    /^adr-[a-z]\d{3}(-[a-z0-9]+)*$/.test(id) ||
     /^(prc|sor)-[bt]-[a-z]\d{3}$/.test(id)
   );
 }

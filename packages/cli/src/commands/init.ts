@@ -178,7 +178,7 @@ function buildCursorRules(): string {
     "",
     "- 架构知识保存在 `.context/` 目录",
     "- 使用 `c4a init` 初始化项目配置",
-    "- 使用 `c4a sync` 同步本地文件与数据库",
+    "- 使用 `c4a version pull/push` 同步本地文件与数据库",
   ].join("\n");
 }
 
@@ -308,28 +308,24 @@ export async function initCommand(
     let defaultMode: CliMode = "remote";
     if (installedModes.includes("local")) {
       defaultMode = "local";
-    } else if (installedModes.includes("server")) {
-      defaultMode = "server";
     }
 
     const mode = await prompter.select(
       "选择项目使用的模式:",
       [
         { label: "local  - 使用本地数据库", value: "local" },
-        { label: "server - 使用 Docker 服务", value: "server" },
         { label: "remote - 使用远程服务", value: "remote" },
       ],
-      defaultMode === "local" ? 0 : defaultMode === "server" ? 1 : 2
+      defaultMode === "local" ? 0 : 1
     );
 
-    if ((mode === "local" || mode === "server") && !installedModes.includes(mode)) {
+    if (mode === "local" && !installedModes.includes(mode)) {
       printErrorResponse(
         buildErrorResponse(
           "C4A-INIT-001",
-          `${mode} 模式尚未安装，请先运行 c4a install ${mode} 或选择 remote 模式`,
-          { suggestion: `运行 c4a install ${mode} 或选择 remote 模式` },
+          `${mode} 模式尚未初始化，请先完成 ${mode} 模式准备或选择 remote 模式`,
+          { suggestion: `完成 ${mode} 模式准备或选择 remote 模式` },
           [
-            { action: "install", label: `安装 ${mode} 模式`, params: { mode } },
             { action: "select", label: "选择 remote 模式", params: { mode: "remote" } },
           ]
         )
@@ -401,7 +397,6 @@ export async function initCommand(
       skills,
       adr_policy: adrPolicy,
       sync: { auto_export: autoExport },
-      server: mode === "server" ? { url: "http://localhost:8051" } : undefined,
       remote: remoteUrl ? { url: remoteUrl } : undefined,
     };
 

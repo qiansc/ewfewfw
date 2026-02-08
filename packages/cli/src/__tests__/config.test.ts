@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdir, rm, readFile } from "node:fs/promises";
+import { mkdir, rm, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   loadGlobalConfig,
@@ -53,6 +53,29 @@ describe("config", () => {
         expect(loaded?.root_id).toBe("my-project");
         expect(loaded?.repo_id).toBe("company/my-repo");
         expect(loaded?.skills?.cursor).toBe(true);
+      } finally {
+        process.chdir(previousCwd);
+      }
+    });
+  });
+
+  test("maps legacy server mode to remote", async () => {
+    await withTempDir("cli-config-legacy", async (dir) => {
+      const previousCwd = process.cwd();
+      process.chdir(dir);
+      try {
+        await mkdir(join(dir, ".context"), { recursive: true });
+        const legacyContent = [
+          "root_id: my-project",
+          "mode: server",
+          "server:",
+          "  url: http://localhost:8055",
+          "",
+        ].join("\n");
+        await writeFile(join(dir, ".context", ".c4a.yaml"), legacyContent, "utf-8");
+        const loaded = await loadProjectConfig();
+        expect(loaded?.mode).toBe("remote");
+        expect(loaded?.remote?.url).toBe("http://localhost:8055");
       } finally {
         process.chdir(previousCwd);
       }

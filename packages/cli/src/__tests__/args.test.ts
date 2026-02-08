@@ -3,10 +3,9 @@ import { parseArgs } from "../utils/args.js";
 
 describe("parseArgs", () => {
   test("parses positionals and options", () => {
-    const result = parseArgs(["install", "local", "--mode", "server", "--flag", "--name=demo"]);
-    expect(result.positionals).toEqual(["install", "local"]);
+    const result = parseArgs(["version", "create", "1.0.0", "--flag", "--name=demo"]);
+    expect(result.positionals).toEqual(["version", "create", "1.0.0"]);
     expect(result.options).toEqual({
-      mode: "server",
       flag: true,
       name: "demo",
     });

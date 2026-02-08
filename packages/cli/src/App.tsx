@@ -45,13 +45,14 @@ export const App: React.FC<AppProps> = ({ onSelect }) => {
       const installedModes = getInstalledModes(globalConfig);
       const nextContext: MenuContext = {
         installedModes,
+        hasGlobalConfig: Boolean(globalConfig),
         projectMode: projectConfig?.mode,
         remoteUrl: projectConfig?.remote?.url,
       };
 
       if (!active) return;
       setContext(nextContext);
-      if (installedModes.length === 0 && !skipGuide) {
+      if (!globalConfig && !skipGuide) {
         setView("first-run");
       } else {
         setView("menu");
@@ -188,7 +189,7 @@ export const App: React.FC<AppProps> = ({ onSelect }) => {
       ? currentItem.disabledReason
       : currentItem?.description;
 
-  const hasInstalled = (context?.installedModes.length ?? 0) > 0;
+  const hasInstalled = context?.hasGlobalConfig ?? false;
   const remoteHint =
     context?.projectMode === "remote" && context.remoteUrl
       ? `远程服务: ${context.remoteUrl}`
@@ -216,13 +217,13 @@ export const App: React.FC<AppProps> = ({ onSelect }) => {
       ) : null}
       {view === "first-run" ? (
         <Box marginTop={1}>
-          <Text>检测到尚未安装存储模式，请选择:</Text>
+          <Text>检测到尚未配置存储模式，可继续进入主菜单:</Text>
         </Box>
       ) : null}
       {view === "menu" ? (
         <Box marginTop={1} flexDirection="column">
           {!hasInstalled ? (
-            <Text color="yellow">⚠ 尚未安装任何存储模式</Text>
+            <Text color="yellow">⚠ 尚未配置任何存储模式</Text>
           ) : null}
           {remoteHint ? <Text color="gray">{remoteHint}</Text> : null}
         </Box>

@@ -4,8 +4,10 @@ import { buildErrorResponse } from "../utils/errorResponse.js";
 import type { CommandIO } from "./serverTypes.js";
 
 function resolveServerUrl(config: GlobalConfig | null): string {
-  const serverUrl = config?.server?.url?.trim().replace(/\/+$/, "");
-  return serverUrl ? serverUrl : "http://localhost:8051";
+  const serverUrl =
+    config?.server_url ?? config?.remote?.url ?? config?.server?.url ?? "";
+  const normalized = serverUrl.trim().replace(/\/+$/, "");
+  return normalized ? normalized : "http://localhost:8051";
 }
 
 function createMcpClient(config: GlobalConfig | null): McpClient {

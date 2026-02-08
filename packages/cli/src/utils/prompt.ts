@@ -1,6 +1,6 @@
 import { createInterface } from "node:readline";
 
-export async function promptConfirm(question: string): Promise<boolean> {
+export async function promptConfirm(question: string, defaultValue = false): Promise<boolean> {
   const rl = createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -8,9 +8,13 @@ export async function promptConfirm(question: string): Promise<boolean> {
 
   try {
     const answer = await new Promise<string>((resolve) => {
-      rl.question(`${question} (y/N) `, (input) => resolve(input));
+      const suffix = defaultValue ? " (Y/n) " : " (y/N) ";
+      rl.question(`${question}${suffix}`, (input) => resolve(input));
     });
     const normalized = answer.trim().toLowerCase();
+    if (!normalized) {
+      return defaultValue;
+    }
     return normalized === "y" || normalized === "yes";
   } finally {
     rl.close();

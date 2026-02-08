@@ -55,8 +55,13 @@ function normalizeHttpUrl(value?: string): string | undefined {
   return `http://${value}`;
 }
 
-export function resolveServerUrl(config?: { server?: { url?: string } }): string {
-  const serverUrl = normalizeHttpUrl(config?.server?.url);
+export function resolveServerUrl(config?: {
+  server_url?: string;
+  remote?: { url?: string };
+  server?: { url?: string };
+}): string {
+  const value = config?.server_url ?? config?.remote?.url ?? config?.server?.url;
+  const serverUrl = normalizeHttpUrl(value);
   return serverUrl ?? "http://localhost:8051";
 }
 

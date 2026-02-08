@@ -103,8 +103,8 @@ export async function localCommand(
   const installed = getInstalledModes(globalConfig);
   if (!installed.includes("local")) {
     emitError(
-      buildErrorResponse("C4A-LOCAL-001", "未检测到 Local 模式安装记录", {
-        suggestion: "请先运行 c4a install local",
+      buildErrorResponse("C4A-LOCAL-001", "未检测到 Local 模式初始化记录", {
+        suggestion: "请先完成 local 模式初始化",
       }),
     );
     process.exitCode = 1;
@@ -119,7 +119,7 @@ export async function localCommand(
         emitError(
           buildErrorResponse("C4A-LOCAL-002", "数据库不存在", {
             actual: dbPath,
-            suggestion: "请先运行 c4a install local 初始化数据库",
+            suggestion: "请先完成 local 模式初始化以生成数据库",
           }),
         );
         process.exitCode = 1;
@@ -320,7 +320,7 @@ export async function localCommand(
         emitError(
           buildErrorResponse("C4A-LOCAL-008", "数据库不存在", {
             actual: dbPath,
-            suggestion: "请先运行 c4a install local 初始化数据库",
+            suggestion: "请先完成 local 模式初始化以生成数据库",
           }),
         );
         process.exitCode = 1;

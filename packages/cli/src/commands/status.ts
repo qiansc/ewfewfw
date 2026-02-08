@@ -12,7 +12,6 @@ type SkillsConfig = {
 
 type ProjectConfigWithExtras = Awaited<ReturnType<typeof loadProjectConfig>> & {
   skills?: SkillsConfig;
-  server?: { url?: string };
   remote?: { url?: string };
 };
 
@@ -97,10 +96,8 @@ export async function statusCommand(
 
   const mode = projectConfig?.mode;
   const remoteUrl = mode === "remote" ? projectConfig?.remote?.url : undefined;
-  const serverUrl = mode === "server" ? projectConfig?.server?.url : undefined;
-  const baseUrl = remoteUrl ?? serverUrl;
-  const transport: McpTransport =
-    mode === "remote" || mode === "server" ? "http" : "local";
+  const baseUrl = remoteUrl;
+  const transport: McpTransport = mode === "remote" ? "http" : "local";
 
   let listResult: ListResult | null = null;
   let listError: unknown = null;

@@ -1,13 +1,15 @@
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { parse, stringify } from "yaml";
 
-export type CliMode = "local" | "server" | "remote";
+export type CliMode = "local" | "remote";
 
 export interface GlobalConfig {
   version?: string;
+  mode?: CliMode;
+  server_url?: string;
   local?: { installed_at?: string; db_path?: string; embedding_model?: string };
   server?: {
     installed_at?: string;
@@ -50,11 +52,11 @@ const GLOBAL_CONFIG_DIR = ".c4a";
 const GLOBAL_CONFIG_FILE = "config.yaml";
 const PROJECT_CONFIG_PATH = join(".context", ".c4a.yaml");
 
-function resolveHomeDir(): string {
+export function resolveHomeDir(): string {
   return process.env.C4A_HOME || homedir();
 }
 
-function getGlobalConfigPath(): string {
+export function getGlobalConfigPath(): string {
   return join(resolveHomeDir(), GLOBAL_CONFIG_DIR, GLOBAL_CONFIG_FILE);
 }
 
@@ -80,7 +82,8 @@ async function writeYamlFile(filePath: string, data: unknown): Promise<void> {
 
 export async function loadGlobalConfig(): Promise<GlobalConfig | null> {
   const configPath = getGlobalConfigPath();
-  return readYamlFile<GlobalConfig>(configPath);
+  const config = await readYamlFile<GlobalConfig>(configPath);
+  return config ? normalizeGlobalConfig(config) : null;
 }
 
 export async function saveGlobalConfig(config: GlobalConfig): Promise<void> {
@@ -92,8 +95,20 @@ export async function saveGlobalConfig(config: GlobalConfig): Promise<void> {
   await writeYamlFile(configPath, config);
 }
 
+export async function removeGlobalConfig(): Promise<void> {
+  const configPath = getGlobalConfigPath();
+  try {
+    await rm(configPath, { force: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") {
+      throw error;
+    }
+  }
+}
+
 export async function loadProjectConfig(): Promise<ProjectConfig | null> {
-  return readYamlFile<ProjectConfig>(PROJECT_CONFIG_PATH);
+  const config = await readYamlFile<ProjectConfig>(PROJECT_CONFIG_PATH);
+  return config ? normalizeProjectConfig(config) : null;
 }
 
 export async function saveProjectConfig(config: ProjectConfig): Promise<void> {
@@ -106,16 +121,49 @@ export async function saveProjectConfig(config: ProjectConfig): Promise<void> {
 
 export function getInstalledModes(
   config: GlobalConfig | null,
-): Array<Exclude<CliMode, "remote">> {
+): Array<"local" | "server"> {
   if (!config) {
     return [];
   }
-  const modes: Array<Exclude<CliMode, "remote">> = [];
-  if (config.local?.installed_at) {
+  const modes: Array<"local" | "server"> = [];
+  if (config.local?.db_path || config.local?.installed_at) {
     modes.push("local");
   }
   if (config.server?.installed_at) {
     modes.push("server");
   }
   return modes;
+}
+
+function normalizeProjectConfig(config: ProjectConfig): ProjectConfig {
+  const rawMode = (config as { mode?: string }).mode;
+  let remote = config.remote;
+  if (!remote && config.server) {
+    remote = { ...config.server };
+  } else if (remote && !remote.url && config.server?.url) {
+    remote = { ...remote, url: config.server.url };
+  }
+  return {
+    ...config,
+    mode: rawMode === "server" ? "remote" : config.mode,
+    remote,
+  };
+}
+
+function normalizeGlobalConfig(config: GlobalConfig): GlobalConfig {
+  const rawMode = (config as { mode?: string }).mode;
+  let remote = config.remote;
+  if (!remote && config.server) {
+    remote = { ...config.server };
+  } else if (remote && !remote.url && config.server?.url) {
+    remote = { ...remote, url: config.server.url };
+  }
+  const serverUrl =
+    config.server_url ?? config.remote?.url ?? config.server?.url;
+  return {
+    ...config,
+    mode: rawMode === "server" ? "remote" : config.mode,
+    remote,
+    server_url: serverUrl,
+  };
 }

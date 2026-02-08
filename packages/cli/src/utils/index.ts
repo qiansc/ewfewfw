@@ -8,3 +8,4 @@ export {
   getContainerLogs,
 } from "./docker.js";
 export { calculateHash, hashString } from "./hash.js";
+export { resolveC4aConfig } from "./resolveConfig.js";

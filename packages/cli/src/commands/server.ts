@@ -92,8 +92,8 @@ export async function serverCommand(
   const installed = getInstalledModes(config);
   if (!installed.includes("server")) {
     emitError(
-      buildErrorResponse("C4A-SERVER-001", "未检测到 Server 模式安装记录", {
-        suggestion: "请先运行 c4a install server",
+      buildErrorResponse("C4A-SERVER-001", "未检测到 Server 服务安装记录", {
+        suggestion: "请先完成 server 服务安装",
       }),
     );
     process.exitCode = 1;

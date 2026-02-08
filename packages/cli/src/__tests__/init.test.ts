@@ -86,7 +86,7 @@ describe("initCommand", () => {
         );
 
         const rulesContent = await readFile(join(dir, ".cursorrules"), "utf-8");
-        expect(rulesContent).toContain("c4a sync");
+        expect(rulesContent).toContain("c4a version pull/push");
       } finally {
         process.chdir(previousCwd);
       }
