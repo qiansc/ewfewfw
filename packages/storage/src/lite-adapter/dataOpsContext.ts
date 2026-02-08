@@ -5,11 +5,7 @@
 import type { AdapterContext } from './types.js';
 import type { DataOpsContext, StorageOperations } from '../data-ops/types.js';
 import type { Database } from './dataOpsTypes.js';
-import { createFeatOperations } from './dataOpsFeat.js';
-import { createFeatEntityOperations } from './dataOpsFeatEntities.js';
 import { createMainEntityOperations } from './dataOpsMainEntities.js';
-import { createHistoryOperations } from './dataOpsHistory.js';
-import { createWorkflowOperations } from './dataOpsWorkflow.js';
 
 export function createDataOpsContext(ctx: AdapterContext): DataOpsContext {
   const vectorEnabled = ctx.config.enableVectorSearch && ctx.store.isVectorSearchEnabled();
@@ -44,18 +40,10 @@ function createStorageOperationsWithDb(db: Database, inTransaction: boolean): St
     return runner();
   };
 
-  const featOps = createFeatOperations(db);
-  const featEntityOps = createFeatEntityOperations(db, featOps.getFeat);
   const mainEntityOps = createMainEntityOperations(db);
-  const historyOps = createHistoryOperations(db, featOps.getFeat);
-  const workflowOps = createWorkflowOperations(db);
 
   return {
     transaction: withTransaction,
-    ...featOps,
-    ...featEntityOps,
     ...mainEntityOps,
-    ...historyOps,
-    ...workflowOps,
   };
 }

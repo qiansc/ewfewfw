@@ -12,10 +12,6 @@ export {
 } from "./version.js";
 export { storeSyncHandler, storeSyncStatusHandler } from "./sync.js";
 export { storePlanSyncHandler } from "./planSync.js";
-export { storeFeatLifecycleHandler } from "./featLifecycle.js";
-export { storeFeatMergeHandler } from "./featMerge.js";
-export { storeFeatChecklistHandler } from "./featChecklist.js";
-export { storeUpdateWorkflowStepHandler } from "./updateWorkflowStep.js";
 export { storeReadHistoryHandler } from "./readHistory.js";
 export { storeBackupHandler } from "./backup.js";
 export { storeRestoreHandler } from "./restore.js";

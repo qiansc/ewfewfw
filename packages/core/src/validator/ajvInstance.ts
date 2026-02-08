@@ -84,8 +84,6 @@ export function getValidator(type: SchemaType): ValidateFunction | null {
     sor: "https://context4ai.org/schemas/c4a-sor.schema.json",
     adr: "https://context4ai.org/schemas/c4a-adr.schema.json",
     contract: "https://context4ai.org/schemas/c4a-contract.schema.json",
-    feat: "https://context4ai.org/schemas/c4a-feat.schema.json",
-    checklist: "https://context4ai.org/schemas/c4a-checklist.schema.json",
     spec: "https://context4ai.org/schemas/c4a-spec.schema.json",
   };
 

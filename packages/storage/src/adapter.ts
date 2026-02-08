@@ -27,14 +27,12 @@ import type { SaveOptions, EntityFilter, EntityInput } from './adapterCrudTypes.
 import type { Entity } from './adapterBaseTypes.js';
 import type { SyncParams, SyncResult, PlanSyncParams, PlanSyncResult, SyncStatus } from './adapterSyncTypes.js';
 import type { SearchParams, SearchResult, DepsParams, DepsResult, ImpactParams, ImpactResult } from './adapterSearchTypes.js';
-import type { FeatLifecycleParams, FeatLifecycleResult, FeatMergeParams, FeatMergeResult, ChecklistParams, ChecklistResult, UpdateWorkflowStepParams, UpdateWorkflowStepResult } from './adapterFeatTypes.js';
 import type { ReadHistoryParams, ReadHistoryResult, BackupParams, BackupResult, RestoreParams, RestoreResult, RepairParams, RepairResult, ValidateParams, ValidateResult } from './adapterUtilsTypes.js';
 
 export type * from './adapterBaseTypes.js';
 export type * from './adapterCrudTypes.js';
 export type * from './adapterSearchTypes.js';
 export type * from './adapterSyncTypes.js';
-export type * from './adapterFeatTypes.js';
 export type * from './adapterUtilsTypes.js';
 
 // ============================================================
@@ -136,34 +134,6 @@ export interface StorageAdapter {
    * 对应 MCP 工具: c4a_query_impact
    */
   queryImpact(params: ImpactParams): Promise<ImpactResult>;
-
-  // ============================================================
-  // Feat 生命周期操作 (c4a_store_feat_*)
-  // ============================================================
-
-  /**
-   * Feat 生命周期管理
-   * 对应 MCP 工具: c4a_store_feat_lifecycle
-   */
-  featLifecycle(params: FeatLifecycleParams): Promise<FeatLifecycleResult>;
-
-  /**
-   * Feat 合并
-   * 对应 MCP 工具: c4a_store_feat_merge
-   */
-  featMerge(params: FeatMergeParams): Promise<FeatMergeResult>;
-
-  /**
-   * Checklist 管理
-   * 对应 MCP 工具: c4a_store_feat_checklist
-   */
-  featChecklist(params: ChecklistParams): Promise<ChecklistResult>;
-
-  /**
-   * 原子更新 workflow 步骤状态
-   * 对应 MCP 工具: c4a_store_update_workflow_step
-   */
-  updateWorkflowStep(params: UpdateWorkflowStepParams): Promise<UpdateWorkflowStepResult>;
 
   // ============================================================
   // 工具类操作 (c4a_store_read_history, backup, restore, repair, validate)

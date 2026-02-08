@@ -13,5 +13,4 @@ export type {
 } from './types.js';
 export { parseReference } from './parser.js';
 export { resolveReference } from './resolver.js';
-export { copyOnWrite } from './resolver.js';
 export { validateReferences } from './validator.js';

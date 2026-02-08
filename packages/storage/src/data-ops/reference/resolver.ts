@@ -1,9 +1,6 @@
 import { parseReference } from './parser.js';
 import { normalizeReferenceScope } from './types.js';
 import type { ReferenceCandidate, ResolvedReference, ResolveContext } from './types.js';
-import type { Entity } from '../../adapter.js';
-import type { StorageOperations } from '../types.js';
-import { randomUUID } from 'node:crypto';
 
 type ResolutionBucket =
   | 'current_root'
@@ -282,70 +279,5 @@ export function resolveReference(ref: string, context: ResolveContext): Resolved
     resolved: true,
     ambiguous,
     warning,
-  };
-}
-
-/**
- * Copy-on-Write: 从主分支复制实体到目标 feat 分支
- */
-export function copyOnWrite(
-  storage: StorageOperations,
-  entityId: string,
-  targetFeatId: string,
-  rootId?: string | null
-): Entity {
-  if (!entityId) {
-    throw new Error('entityId is required');
-  }
-  if (!targetFeatId) {
-    throw new Error('targetFeatId is required');
-  }
-
-  const existing = storage.getEntityInFeat({ entityId, featId: targetFeatId });
-  if (existing) {
-    return existing;
-  }
-
-  const mainRows = storage.listMainEntities(entityId);
-  const scopedProject = rootId ?? null;
-  const scopedRows =
-    scopedProject === null
-      ? mainRows
-      : mainRows.filter((row) => (row.root_id ?? '') === scopedProject);
-
-  if (scopedRows.length === 0) {
-    if (scopedProject) {
-      throw new Error(`Entity '${entityId}' not found in main branch for root '${scopedProject}'`);
-    }
-    throw new Error(`Entity '${entityId}' not found in main branch`);
-  }
-  if (scopedRows.length > 1) {
-    throw new Error(`Ambiguous entity '${entityId}' across multiple roots`);
-  }
-
-  const main = scopedRows[0];
-  const now = new Date().toISOString();
-
-  const feat = storage.getFeat(targetFeatId);
-  const requirementId = feat?.uuid ?? targetFeatId;
-  const newUuid = randomUUID();
-  storage.insertEntityWithMetadata({
-    entity: { ...main, uuid: newUuid },
-    requirementId: requirementId,
-    status: 'draft',
-    createdAt: now,
-    updatedAt: now,
-  });
-
-  return {
-    ...main,
-    uuid: newUuid,
-    requirement_id: requirementId,
-    metadata: {
-      ...main.metadata,
-      status: 'draft',
-      created_at: now,
-      updated_at: now,
-    },
   };
 }

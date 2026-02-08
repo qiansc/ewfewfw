@@ -27,14 +27,6 @@ import type {
   DepsResult,
   ImpactParams,
   ImpactResult,
-  FeatLifecycleParams,
-  FeatLifecycleResult,
-  FeatMergeParams,
-  FeatMergeResult,
-  ChecklistParams,
-  ChecklistResult,
-  UpdateWorkflowStepParams,
-  UpdateWorkflowStepResult,
   ReadHistoryParams,
   ReadHistoryResult,
   BackupParams,
@@ -61,7 +53,6 @@ import { save as saveEntity, read as readEntity, list as listEntities, del as de
 import { sync, planSync } from './lite-adapter/sync-operations.js';
 import { search } from './lite-adapter/search-operations.js';
 import { queryDeps, queryImpact } from './lite-adapter/graph-operations.js';
-import { featLifecycle, featMerge, featChecklist, updateWorkflowStep } from './lite-adapter/feat-operations.js';
 import { readHistory, backup, restore, repair, validate } from './lite-adapter/utils-operations.js';
 import { addVersion, removeVersion, splitEntity, listVersions, readByUuid } from './lite-adapter/version-operations.js';
 import { formatContent, parseContent, normalizeRequirementId } from './lite-adapter/helpers.js';
@@ -385,30 +376,6 @@ export class LiteAdapter implements StorageAdapter {
 
   async queryImpact(params: ImpactParams): Promise<ImpactResult> {
     return queryImpact(this.getContext(), params);
-  }
-
-  // ============================================================
-  // Feat 操作
-  // ============================================================
-
-  async featLifecycle(params: FeatLifecycleParams): Promise<FeatLifecycleResult> {
-    await this.initialize();
-    return featLifecycle(this.getContext(), params);
-  }
-
-  async featMerge(params: FeatMergeParams): Promise<FeatMergeResult> {
-    await this.initialize();
-    return featMerge(this.getContext(), params);
-  }
-
-  async featChecklist(params: ChecklistParams): Promise<ChecklistResult> {
-    await this.initialize();
-    return featChecklist(this.getContext(), params);
-  }
-
-  async updateWorkflowStep(params: UpdateWorkflowStepParams): Promise<UpdateWorkflowStepResult> {
-    await this.initialize();
-    return updateWorkflowStep(this.getContext(), params);
   }
 
   // ============================================================

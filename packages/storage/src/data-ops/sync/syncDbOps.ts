@@ -330,18 +330,7 @@ export function loadDbEntities(
   ctx: DataOpsContext,
   params: { statusFilter: 'published' | 'approved' | 'all'; featId: string | null }
 ): DbEntityInfo[] {
-  if (params.featId) {
-    const entities = ctx.storage.listFeatEntitiesForMerge(params.featId);
-    return entities.map((entity) => ({
-      id: entity.id,
-      type: entity.type as EntityType,
-      data: safeParseJson(entity.data),
-      status: entity.status,
-      content_hash: entity.content_hash,
-      updated_at: entity.updated_at,
-    }));
-  }
-
+  void params.featId;
   const entities = ctx.storage.listEntitiesForExport({ statusFilter: params.statusFilter });
   return entities.map((entity) => ({
     id: entity.id,

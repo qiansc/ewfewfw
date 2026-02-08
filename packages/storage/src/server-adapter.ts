@@ -22,14 +22,6 @@ import type {
   DepsResult,
   ImpactParams,
   ImpactResult,
-  FeatLifecycleParams,
-  FeatLifecycleResult,
-  FeatMergeParams,
-  FeatMergeResult,
-  ChecklistParams,
-  ChecklistResult,
-  UpdateWorkflowStepParams,
-  UpdateWorkflowStepResult,
   ReadHistoryParams,
   ReadHistoryResult,
   BackupParams,
@@ -420,24 +412,6 @@ export class ServerAdapter implements StorageAdapter {
 
   async queryImpact(params: ImpactParams): Promise<ImpactResult> {
     return this.neo4j.queryImpact(params);
-  }
-
-  async featLifecycle(params: FeatLifecycleParams): Promise<FeatLifecycleResult> {
-    return this.mongo.featLifecycle(params);
-  }
-
-  async featMerge(params: FeatMergeParams): Promise<FeatMergeResult> {
-    return this.mongo.featMerge(params);
-  }
-
-  async featChecklist(params: ChecklistParams): Promise<ChecklistResult> {
-    return this.mongo.featChecklist(params);
-  }
-
-  async updateWorkflowStep(
-    params: UpdateWorkflowStepParams
-  ): Promise<UpdateWorkflowStepResult> {
-    return this.mongo.updateWorkflowStep(params);
   }
 
   async readHistory(params: ReadHistoryParams): Promise<ReadHistoryResult> {

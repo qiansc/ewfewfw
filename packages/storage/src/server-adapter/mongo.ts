@@ -11,15 +11,9 @@ import type { Collection } from 'mongodb';
 import type {
   BackupParams,
   BackupResult,
-  ChecklistParams,
-  ChecklistResult,
   Entity,
   EntityFilter,
   EntityInput,
-  FeatLifecycleParams,
-  FeatLifecycleResult,
-  FeatMergeParams,
-  FeatMergeResult,
   SyncStatus,
   PlanSyncParams,
   PlanSyncResult,
@@ -32,8 +26,6 @@ import type {
   SaveOptions,
   SyncParams,
   SyncResult,
-  UpdateWorkflowStepParams,
-  UpdateWorkflowStepResult,
   ValidateParams,
   ValidateResult,
 } from '../adapter.js';
@@ -617,22 +609,6 @@ export class MongoAdapter {
         unchanged: [],
       },
     };
-  }
-
-  async featLifecycle(_params: FeatLifecycleParams): Promise<FeatLifecycleResult> {
-    return { success: false, feat_id: '', error: 'feat lifecycle not implemented' };
-  }
-
-  async featMerge(_params: FeatMergeParams): Promise<FeatMergeResult> {
-    return { success: false, merged: [], conflicts: [] };
-  }
-
-  async featChecklist(_params: ChecklistParams): Promise<ChecklistResult> {
-    return { success: false, feat_id: '' };
-  }
-
-  async updateWorkflowStep(_params: UpdateWorkflowStepParams): Promise<UpdateWorkflowStepResult> {
-    return { success: false, feat_id: _params.feat_id, step_id: _params.step_id };
   }
 
   async readHistory(_params: ReadHistoryParams): Promise<ReadHistoryResult> {

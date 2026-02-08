@@ -9,8 +9,6 @@ export * from './base.js';
 export * from './entities.js';
 export * from './relations.js';
 export * from './attached.js';
-export * from './feat.js';
-export * from './checklist.js';
 export * from './errors.js';
 export * from './spec.js';
 export * from './dataOps.js';

@@ -161,8 +161,6 @@ export function validateDSLAuto(data: unknown): ValidationResult {
     sor: "sor",
     adr: "adr",
     contract: "contract",
-    feat: "feat",
-    checklist: "checklist",
     spec: "spec",
   };
 

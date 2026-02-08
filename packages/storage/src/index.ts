@@ -23,7 +23,7 @@ export {
   resetAdapter,
   getCurrentMode,
   isLocalMode,
-  isServerMode,
+  isRemoteMode,
   loadConfig,
 } from './get-adapter.js';
 export type { StorageMode, ServerConfig, C4AConfig } from './get-adapter.js';

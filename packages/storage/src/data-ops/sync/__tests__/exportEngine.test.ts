@@ -1,5 +1,4 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test';
-import { randomUUID } from 'node:crypto';
 import { mkdirSync, rmSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { SQLiteStore } from '../../../sqlite-store.js';
@@ -72,25 +71,6 @@ function insertEntity(params: {
   });
 }
 
-function insertFeatEntity(featId: string): string {
-  const db = store.getDatabase();
-  const now = new Date().toISOString();
-  const featUuid = randomUUID();
-  db.prepare(`
-    INSERT INTO entities (
-      uuid, root_id, id, type, kind, scope, perspective, data, requirement_id, component_id, orphaned, orphaned_at
-    )
-    VALUES (?, '', ?, 'feat', NULL, NULL, NULL, ?, NULL, NULL, 0, NULL)
-  `).run(featUuid, featId, JSON.stringify({ id: featId, type: 'feat' }));
-  db.prepare(`
-    INSERT INTO metadata (
-      entity_uuid, source_repo, external_url, status, content_hash, created_at, updated_at, created_by, updated_by
-    )
-    VALUES (?, NULL, NULL, 'approved', NULL, ?, ?, NULL, NULL)
-  `).run(featUuid, now, now);
-  db.prepare(`INSERT INTO entity_versions (entity_uuid, version) VALUES (?, '0.0.0')`).run(featUuid);
-  return featUuid;
-}
 
 describe('export engine', () => {
   beforeAll(() => {
@@ -142,37 +122,4 @@ describe('export engine', () => {
     expect(content.includes('id: sys-export')).toBe(true);
   });
 
-  test('exports json under feat directory', async () => {
-    const ctx = createContext();
-    const dataOpsCtx = createDataOpsContext(ctx);
-    const featUuid = insertFeatEntity('feat-a001');
-    insertEntity({
-      ctx: dataOpsCtx,
-      data: { id: 'sys-feat', type: 'system', name: 'Feat Export' },
-      requirementId: featUuid,
-    });
-
-    const projectRoot = join(FILES_ROOT, 'feat');
-    const result = await exportToFiles(dataOpsCtx, {
-      path: projectRoot,
-      format: 'json',
-      mode: 'full',
-      feat_id: 'feat-a001',
-    });
-
-    const expectedPath = join(
-      projectRoot,
-      '.context',
-      'feat',
-      'feat-a001',
-      'technical',
-      'systems',
-      'sys-feat.c4a.json'
-    );
-    expect(result.success).toBe(true);
-    expect(existsSync(expectedPath)).toBe(true);
-
-    const content = readFileSync(expectedPath, 'utf-8');
-    expect(content.includes('"id": "sys-feat"')).toBe(true);
-  });
 });

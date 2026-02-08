@@ -1,72 +1,18 @@
 import { randomUUID } from 'node:crypto';
 import type { StorageOperations } from '../data-ops/types.js';
 import type { EntityType } from '../adapter.js';
-import type { EntityRow } from './types.js';
 import type { Database } from './dataOpsTypes.js';
-import { rowToEntity } from './helpers.js';
 
 export function createMainEntityOperations(
   db: Database
 ): Pick<
   StorageOperations,
-  | 'getMainEntityForConflict'
-  | 'deleteMainEntity'
   | 'getEntityContentHash'
   | 'insertEntity'
   | 'updateEntity'
   | 'listEntitiesForExport'
   | 'listEntitiesForPlanSync'
-  | 'listMainEntities'
-  | 'insertEntityWithMetadata'
 > {
-  const getMainEntityForConflict: StorageOperations['getMainEntityForConflict'] = (
-    entityId,
-    rootId
-  ) => {
-    const row = db.prepare(
-      `
-        SELECT e.type, e.kind, e.data, COALESCE(m.content_hash, '') AS content_hash
-        FROM entities e
-        JOIN entity_versions v ON e.uuid = v.entity_uuid AND v.version = '0.0.0'
-        JOIN metadata m ON e.uuid = m.entity_uuid
-        WHERE e.id = ? AND e.root_id = ? AND (e.requirement_id IS NULL OR e.requirement_id = '')
-      `
-    ).get(entityId, rootId) as
-      | {
-          type: EntityType;
-          kind: string | null;
-          data: string;
-          content_hash: string;
-        }
-      | undefined;
-    return row ?? null;
-  };
-
-  const deleteMainEntity: StorageOperations['deleteMainEntity'] = (entityId, rootId) => {
-    const rows = db.prepare(
-      `
-        SELECT uuid FROM entities
-        WHERE id = ? AND root_id = ? AND (requirement_id IS NULL OR requirement_id = '')
-      `
-    ).all(entityId, rootId) as Array<{ uuid: string }>;
-
-    db.prepare(
-      `
-        DELETE FROM entities
-        WHERE id = ? AND root_id = ? AND (requirement_id IS NULL OR requirement_id = '')
-      `
-    ).run(entityId, rootId);
-    if (rows.length > 0) {
-      const uuids = rows.map((row) => row.uuid);
-      const placeholders = uuids.map(() => '?').join(', ');
-      db.prepare(
-        `
-          DELETE FROM relations
-          WHERE from_uuid IN (${placeholders}) OR to_uuid IN (${placeholders})
-        `
-      ).run(...uuids, ...uuids);
-    }
-  };
 
   const getEntityContentHash: StorageOperations['getEntityContentHash'] = (params) => {
     if (params.requirementId) {
@@ -209,90 +155,12 @@ export function createMainEntityOperations(
     }>;
   };
 
-  const listMainEntities: StorageOperations['listMainEntities'] = (entityId) => {
-    const rows = db.prepare(
-      `
-        SELECT e.uuid, e.root_id, e.id, e.type, e.kind, e.scope, e.perspective, e.data,
-               e.requirement_id, e.component_id,
-               m.status, m.content_hash, m.created_at, m.updated_at, m.source_repo, m.external_url,
-               m.created_by, m.updated_by
-        FROM entities e
-        JOIN metadata m ON e.uuid = m.entity_uuid
-        WHERE e.id = ? AND (e.requirement_id IS NULL OR e.requirement_id = '')
-      `
-    ).all(entityId) as EntityRow[];
-    return rows.map((row) => rowToEntity(row));
-  };
-
-  const insertEntityWithMetadata: StorageOperations['insertEntityWithMetadata'] = (params) => {
-    const requirementId = params.requirementId;
-    const entity = params.entity;
-    const metadata = entity.metadata;
-    const uuid = entity.uuid ?? randomUUID();
-    const rootId = entity.root_id ?? '';
-    db.prepare(
-      `
-        INSERT INTO entities (
-          uuid, root_id, id, type, kind, scope, perspective, data, requirement_id, component_id, orphaned, orphaned_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL)
-      `
-    ).run(
-      uuid,
-      rootId,
-      entity.id,
-      entity.type,
-      entity.kind ?? null,
-      entity.scope ?? null,
-      entity.perspective ?? null,
-      JSON.stringify(entity.data),
-      requirementId ?? null,
-      entity.component_id ?? null
-    );
-
-    db.prepare(
-      `
-        INSERT INTO metadata (
-          entity_uuid,
-          source_repo,
-          external_url,
-          status,
-          content_hash,
-          created_at,
-          updated_at,
-          created_by,
-          updated_by
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `
-    ).run(
-      uuid,
-      metadata.source_repo ?? null,
-      metadata.external_url ?? null,
-      params.status,
-      metadata.content_hash ?? null,
-      params.createdAt,
-      params.updatedAt,
-      metadata.created_by ?? null,
-      metadata.updated_by ?? null
-    );
-
-    db.prepare(`INSERT INTO entity_versions (entity_uuid, version) VALUES (?, ?)`).run(
-      uuid,
-      '0.0.0'
-    );
-  };
-
   return {
-    getMainEntityForConflict,
-    deleteMainEntity,
     getEntityContentHash,
     insertEntity,
     updateEntity,
     listEntitiesForExport,
     listEntitiesForPlanSync,
-    listMainEntities,
-    insertEntityWithMetadata,
   };
 }
 

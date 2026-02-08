@@ -129,8 +129,6 @@ export const SCHEMA_TYPES = [
   'sor',
   'adr',
   'contract',
-  'feat',
-  'checklist',
   'spec',
 ] as const;
 

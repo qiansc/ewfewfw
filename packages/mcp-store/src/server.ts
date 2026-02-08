@@ -17,10 +17,6 @@ import {
   StoreSyncInputSchema,
   StoreSyncStatusInputSchema,
   StorePlanSyncInputSchema,
-  StoreFeatLifecycleInputSchema,
-  StoreFeatMergeInputSchema,
-  StoreFeatChecklistInputSchema,
-  StoreUpdateWorkflowStepInputSchema,
   StoreReadHistoryInputSchema,
   StoreBackupInputSchema,
   StoreRestoreInputSchema,
@@ -38,10 +34,6 @@ import {
   storeSyncHandler,
   storeSyncStatusHandler,
   storePlanSyncHandler,
-  storeFeatLifecycleHandler,
-  storeFeatMergeHandler,
-  storeFeatChecklistHandler,
-  storeUpdateWorkflowStepHandler,
   storeReadHistoryHandler,
   storeBackupHandler,
   storeRestoreHandler,
@@ -341,126 +333,6 @@ export function createServer(): McpServer {
     async (args) => {
       try {
         const result = await storePlanSyncHandler(args as never);
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify(result, null, 2),
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify(buildErrorResponse(error), null, 2),
-            },
-          ],
-          isError: true,
-        };
-      }
-    }
-  );
-
-  // 注册 c4a_store_feat_lifecycle 工具
-  server.tool(
-    "c4a_store_feat_lifecycle",
-    "Feat 生命周期管理（创建/流转/删除）",
-    StoreFeatLifecycleInputSchema.shape,
-    async (args) => {
-      try {
-        const result = await storeFeatLifecycleHandler(args as never);
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify(result, null, 2),
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify(buildErrorResponse(error), null, 2),
-            },
-          ],
-          isError: true,
-        };
-      }
-    }
-  );
-
-  // 注册 c4a_store_feat_merge 工具
-  server.tool(
-    "c4a_store_feat_merge",
-    "Feat 合并与冲突解决",
-    StoreFeatMergeInputSchema.shape,
-    async (args) => {
-      try {
-        const result = await storeFeatMergeHandler(args as never);
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify(result, null, 2),
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify(buildErrorResponse(error), null, 2),
-            },
-          ],
-          isError: true,
-        };
-      }
-    }
-  );
-
-  // 注册 c4a_store_feat_checklist 工具
-  server.tool(
-    "c4a_store_feat_checklist",
-    "Checklist 管理（生成/获取/更新/清除）",
-    StoreFeatChecklistInputSchema.shape,
-    async (args) => {
-      try {
-        const result = await storeFeatChecklistHandler(args as never);
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify(result, null, 2),
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify(buildErrorResponse(error), null, 2),
-            },
-          ],
-          isError: true,
-        };
-      }
-    }
-  );
-
-  // 注册 c4a_store_update_workflow_step 工具
-  server.tool(
-    "c4a_store_update_workflow_step",
-    "原子更新 workflow 步骤状态，支持 Skills 错误恢复机制",
-    StoreUpdateWorkflowStepInputSchema.shape,
-    async (args) => {
-      try {
-        const result = await storeUpdateWorkflowStepHandler(args as never);
         return {
           content: [
             {
