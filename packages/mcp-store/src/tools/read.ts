@@ -9,7 +9,7 @@ import type {
   StoreReadFormattedResult,
 } from "../schemas.js";
 import { StoreReadInputSchema } from "../schemas.js";
-import { getAdapter, isServerMode, loadConfig } from "@c4a/storage";
+import { getAdapter, isRemoteMode, loadConfig } from "@c4a/storage";
 import { InputError, INPUT_ERROR_CODES } from "@c4a/core/types";
 import YAML from "yaml";
 
@@ -23,7 +23,7 @@ function formatContent(data: Record<string, unknown>, format: "yaml" | "json"): 
 /**
  * c4a_store_read 处理函数
  *
- * 通过 StorageAdapter 接口访问存储，支持 Local/Server 两种模式。
+ * 通过 StorageAdapter 接口访问存储，支持 Local/Remote 两种模式。
  *
  * @param args - 输入参数
  * @returns 读取结果
@@ -93,8 +93,8 @@ export async function storeReadHandler(
         field: "root_id",
         expected: "非空字符串",
         actual: "",
-        suggestion: isServerMode()
-          ? "Server 模式必须显式传入 root_id"
+        suggestion: isRemoteMode()
+          ? "Remote 模式必须显式传入 root_id"
           : "请在 .context/.c4a.yaml 配置 defaultProject 或在参数中传入 root_id",
       },
       "缺少 root_id"

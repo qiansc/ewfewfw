@@ -51,7 +51,6 @@ c4a install <local|server|remote> 安装存储模式
 c4a sync                         同步到知识库
 c4a status                       查看状态
 c4a validate [path]              验证 DSL 文件
-c4a feat render <feat-id>        渲染 Checklist
 c4a template <type>              生成模板
 c4a schema <type|all>            输出 Schema
 c4a server <subcommand>          服务模式命令
@@ -76,12 +75,6 @@ c4a install local
 
 ```bash
 c4a sync
-```
-
-渲染 Checklist：
-
-```bash
-c4a feat render feat-login
 ```
 
 生成模板：

@@ -15,10 +15,6 @@ import {
   storeDeleteHandler,
   storeSyncHandler,
   storePlanSyncHandler,
-  storeFeatLifecycleHandler,
-  storeFeatMergeHandler,
-  storeFeatChecklistHandler,
-  storeUpdateWorkflowStepHandler,
   storeReadHistoryHandler,
   storeBackupHandler,
   storeRestoreHandler,
@@ -286,6 +282,48 @@ describe("store handlers", () => {
     expect(deleted.success).toBe(true);
   });
 
+  test("save handler supports versioned COW", async () => {
+    const entityId = `sys-${randomUUID()}`;
+    const initial = await storeSaveHandler({
+      type: "system",
+      data: { id: entityId, name: "System V0" },
+      id: entityId,
+    });
+    expect(initial.success).toBe(true);
+
+    const versioned = await storeSaveHandler({
+      type: "system",
+      data: { id: entityId, name: "System V1" },
+      id: entityId,
+      uuid: initial.entity.uuid,
+      version: "1.0.0",
+    });
+    expect(versioned.success).toBe(true);
+
+    const readV0 = await storeReadHandler({
+      id: entityId,
+      version: "0.0.0",
+      format: "object",
+    });
+    if (!("entity" in readV0)) {
+      throw new Error("Expected entity response");
+    }
+
+    const readV1 = await storeReadHandler({
+      id: entityId,
+      version: "1.0.0",
+      format: "object",
+    });
+    if (!("entity" in readV1)) {
+      throw new Error("Expected entity response");
+    }
+
+    expect(readV0.entity?.data?.name).toBe("System V0");
+    expect(readV1.entity?.data?.name).toBe("System V1");
+    expect(readV0.entity?.uuid).not.toBe(readV1.entity?.uuid);
+    expect(readV1.entity?.uuid).toBe(versioned.entity.uuid);
+  });
+
   test("sync and plan sync handlers return expected shapes", async () => {
     const localId = `local-${randomUUID()}`;
     const dslPath = join(DSL_DIR, "systems", `${localId}.yaml`);
@@ -334,81 +372,6 @@ describe("store handlers", () => {
     if (plan.executed === false) {
       expect(plan.stats.to_upload).toBe(1);
     }
-  });
-
-  test("feat handlers cover lifecycle, checklist, merge, workflow", async () => {
-    const featId = `feat-${randomUUID()}`;
-    const lifecycle = await storeFeatLifecycleHandler({
-      action: "create",
-      feat_id: featId,
-      sync_checklist: false,
-      force_publish: false,
-      metadata: { title: "feat", description: "", created_by: "tester" },
-    });
-    expect(lifecycle.success).toBe(true);
-    expect(lifecycle.feat_uuid).toBeDefined();
-
-    const store = SQLiteStore.getInstance({ dbPath: DB_PATH });
-    const db = store.getDatabase();
-    const featRow = db.prepare(
-      `
-      SELECT e.uuid, e.data, m.updated_at
-      FROM entities e
-      JOIN metadata m ON e.uuid = m.entity_uuid
-      WHERE e.type = 'feat' AND e.id = ? AND e.root_id = ''
-      LIMIT 1
-    `
-    ).get(featId) as { uuid: string; data: string; updated_at: string } | undefined;
-    if (!featRow) {
-      throw new Error("Missing feat entity");
-    }
-    if (lifecycle.feat_uuid) {
-      expect(lifecycle.feat_uuid).toBe(featRow.uuid);
-    }
-
-    const featEntityId = `feat-sys-${randomUUID()}`;
-    const saved = await storeSaveHandler({
-      type: "system",
-      data: { id: featEntityId, name: "Feat System" },
-      id: featEntityId,
-      requirement_id: lifecycle.feat_uuid ?? featRow.uuid,
-    });
-    expect(saved.success).toBe(true);
-
-    const checklist = await storeFeatChecklistHandler({
-      action: "generate",
-      feat_id: featId,
-      source: "technical_spec",
-    });
-    expect(checklist.success).toBe(true);
-
-    const workflowSteps = [
-      { id: "step-1", status: "pending" },
-    ];
-    const updatedAt = new Date().toISOString();
-    const featData = JSON.parse(featRow.data) as Record<string, unknown>;
-    featData.workflow_steps = JSON.stringify(workflowSteps);
-    db.prepare("UPDATE entities SET data = ? WHERE uuid = ?").run(
-      JSON.stringify(featData),
-      featRow.uuid
-    );
-    db.prepare("UPDATE metadata SET updated_at = ? WHERE entity_uuid = ?").run(
-      updatedAt,
-      featRow.uuid
-    );
-
-    const workflowResult = await storeUpdateWorkflowStepHandler({
-      feat_id: featId,
-      step_id: "step-1",
-      status: "completed",
-    });
-    expect(workflowResult.success).toBe(true);
-
-    const mergeResult = await storeFeatMergeHandler({
-      feat_id: featId,
-      strategy: "auto",
-    });
-    expect(mergeResult.success).toBe(true);
   });
 
   test("history, backup/restore, repair, validate handlers", async () => {

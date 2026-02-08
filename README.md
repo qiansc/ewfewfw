@@ -33,9 +33,9 @@ C4A 定义了 8 种知识实体，覆盖业务、架构、技术三个层面：
 - `uuid`: 物理主键（UUID v4），全局唯一
 - `root_id`: 包边界标识，由工具链从 `package.json` 或 `.c4a.yaml` 注入
 - `versions`: 版本集合（受控字段），不允许通过 DSL 直接修改
-- `requirement_id`: 关联 Feat 的 UUID（可选）
+- `requirement_id`: 可选关联字段（保留兼容旧数据）
 - `component_id`: 关联父 Component（可选）
-- 新增实体类型：`feat` / `checklist` / `spec`（`feat`/`checklist` 不入图谱与向量索引）
+- 新增实体类型：`spec`
 - 移除旧字段（项目/提案相关 legacy 字段）
 
 版本管理通过 MCP 工具完成：`c4a_store_add_version`、`c4a_store_remove_version`、`c4a_store_publish_version`。
@@ -71,7 +71,6 @@ c4a install [mode]       # 安装 (local|server|remote)
 c4a sync                 # 同步知识到数据库
 c4a status               # 查看状态
 c4a validate             # 验证 DSL 文件
-c4a feat render <id>     # 渲染 Checklist
 c4a template <type>      # 生成实体模板
 c4a schema <type|all>    # 输出 JSON Schema
 c4a server <subcommand>  # 服务管理 (Server 模式)
@@ -93,7 +92,6 @@ c4a local <subcommand>   # 本地管理 (Local 模式)
 
 | Skill | 用途 |
 |-------|------|
-| `/c4a:feat` | Feature 管理（创建/修改/切换/流转） |
 | `/c4a:specify` | 功能规格（Functional Spec） |
 | `/c4a:plan` | 技术方案（Technical Spec + 契约 + 验收清单） |
 | `/c4a:analyze` | 一致性检查 |

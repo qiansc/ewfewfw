@@ -365,6 +365,37 @@ Agent 1 ┤
 - Agent 完成后不推荐下一步，由调度者决定
 - 并行 Agent 之间不要有隐式依赖
 
+### Agent 收尾：质量门禁（必须遵守）
+
+**凡涉及代码变更的 Agent，结束前必须通过以下三项检查（缺一不可）：**
+
+```bash
+# 1. 单元测试 — 按变更模块逐一运行
+bun run --filter @c4a/<package> test   # 对每个涉及变更的包执行
+
+# 2. 类型检查 — 全量运行，确保跨包类型一致
+bun run typecheck
+
+# 3. Lint 检查 — 全量运行
+bun run lint
+```
+
+**规则**：
+- 三项检查全部通过后才能勾选任务并结束 Agent
+- 测试必须按**变更模块粒度**运行（如 `bun run --filter @c4a/storage test`），不能仅运行全量 `bun run test` 然后跳过报错的其他包
+- typecheck 和 lint 运行全量命令；若失败项属于本 Agent 修改范围则必须修复，否则记录为「非本 Agent 问题」
+- **禁止跳过任何一项**——没有 lint 就不算完成，没有 typecheck 也不算完成
+
+**Plan 中每个有代码变更的 Agent，验收标准必须包含以下三条（模板）：**
+
+```markdown
+- **验收标准**:
+  - [ ] [test] 涉及变更的包测试全部通过（列出具体包名）
+  - [ ] [compile] `bun run typecheck` 无错误
+  - [ ] [run] `bun run lint` 无错误
+  - [ ] ...（其他业务验收标准）
+```
+
 ### 最后 Agent 收尾：知识更新
 
 最后一个 Agent 完成后，需要询问用户是否更新知识文档：
