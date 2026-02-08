@@ -15,7 +15,7 @@ import { CONTEXT_ROOT_DIR, CONFIG_FILENAME } from './path.js';
 // ============================================================================
 
 /** 运行模式 */
-export type C4AMode = 'local' | 'server' | 'remote';
+export type C4AMode = 'local' | 'remote';
 
 /** ADR 缺失时的行为 */
 export type ADROnMissing = 'error' | 'warning' | 'ignore';
@@ -56,7 +56,7 @@ export interface C4AConfig {
   /** ADR 策略配置 */
   adr_policy?: ADRPolicyConfig;
 
-  /** Server 模式配置 */
+  /** Server 模式配置（兼容旧配置，读取时会映射到 remote） */
   server?: {
     url?: string;
   };
@@ -93,7 +93,7 @@ export async function loadConfig(projectRoot?: string): Promise<C4AConfig> {
   try {
     const content = await readFile(configPath, 'utf-8');
     const config = parseYAML<C4AConfig>(content);
-    return mergeConfig(DEFAULT_CONFIG, config);
+    return mergeConfig(DEFAULT_CONFIG, normalizeConfig(config));
   } catch (error) {
     if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
       return { ...DEFAULT_CONFIG };
@@ -130,6 +130,21 @@ function mergeConfig(base: C4AConfig, override: C4AConfig): C4AConfig {
   };
 }
 
+function normalizeConfig(config: C4AConfig): C4AConfig {
+  const rawMode = (config as { mode?: string }).mode;
+  let remote = config.remote;
+  if (!remote && config.server) {
+    remote = { ...config.server };
+  } else if (remote && !remote.url && config.server?.url) {
+    remote = { ...remote, url: config.server.url };
+  }
+  return {
+    ...config,
+    mode: rawMode === 'server' ? 'remote' : config.mode,
+    remote,
+  };
+}
+
 /**
  * 验证配置
  */
@@ -140,14 +155,10 @@ export function validateConfig(config: C4AConfig): {
   const errors: string[] = [];
 
   if (config.mode) {
-    const validModes: C4AMode[] = ['local', 'server', 'remote'];
+    const validModes: C4AMode[] = ['local', 'remote'];
     if (!validModes.includes(config.mode)) {
       errors.push(`Invalid mode: ${config.mode}`);
     }
-  }
-
-  if (config.mode === 'server' && !config.server?.url) {
-    errors.push('Server mode requires server.url');
   }
 
   if (config.mode === 'remote' && !config.remote?.url) {

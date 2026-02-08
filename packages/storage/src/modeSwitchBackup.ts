@@ -30,7 +30,7 @@ import { EXPORT_VERSION } from './modeSwitchTypes.js';
 import { MigrationError } from './modeSwitchErrors.js';
 import * as converter from '@c4a/core';
 import { readBackupData } from './modeSwitchReadBackup.js';
-import { applyChecklist, buildEntityPayload, transitionFeatStatus } from './modeSwitchMigrationUtils.js';
+import { buildEntityPayload } from './modeSwitchMigrationUtils.js';
 
 type ConvertedEntity = Record<string, unknown> & {
   id?: string;
@@ -521,73 +521,8 @@ export async function migrateLocalToServer(
       for (let i = checkpoint.feats_index ?? 0; i < backup.feats.length; i += 1) {
         checkpoint.phase = 'feats';
         const feat = backup.feats[i];
-        let skipFurther = false;
-        try {
-          const createResult = await serverAdapter.featLifecycle({
-            action: 'create',
-            feat_id: feat.id,
-            metadata: {
-              title: feat.title ?? feat.id,
-              description: feat.description ?? '',
-              created_by: feat.created_by ?? 'unknown',
-            },
-          });
-
-          if (!createResult.success) {
-            if (createResult.error === 'FEAT_EXISTS') {
-              if (conflictPolicy === 'error') {
-                throw new Error(`Conflict detected for feat ${feat.id}`);
-              }
-              if (conflictPolicy === 'override') {
-                await serverAdapter.featLifecycle({ action: 'delete', feat_id: feat.id });
-                await serverAdapter.featLifecycle({
-                  action: 'create',
-                  feat_id: feat.id,
-                  metadata: {
-                    title: feat.title ?? feat.id,
-                    description: feat.description ?? '',
-                    created_by: feat.created_by ?? 'unknown',
-                  },
-                });
-                stats.feats.updated += 1;
-                conflicts.push({
-                  id: `feat:${feat.id}`,
-                  reason: 'feat_exists',
-                  resolution: 'overridden',
-                  target_type: 'feat',
-                  target_status: feat.status,
-                });
-              } else {
-                stats.feats.skipped += 1;
-                conflicts.push({
-                  id: `feat:${feat.id}`,
-                  reason: 'feat_exists',
-                  resolution: 'skipped',
-                  target_type: 'feat',
-                  target_status: feat.status,
-                });
-                skipFurther = true;
-              }
-            } else {
-              throw new Error(createResult.message ?? createResult.error ?? '创建 feat 失败');
-            }
-          } else {
-            stats.feats.created += 1;
-          }
-
-          if (!skipFurther) {
-            if (feat.status && feat.status !== 'draft') {
-              await transitionFeatStatus(serverAdapter, feat.id, feat.status);
-            }
-            await applyChecklist(serverAdapter, feat);
-          }
-        } catch (error) {
-          stats.feats.failed += 1;
-          failures.push({ id: feat.id, phase: 'feats', error: (error as Error).message });
-          if (shouldFailFast(options)) {
-            throw error;
-          }
-        }
+        stats.feats.skipped += 1;
+        failures.push({ id: feat.id, phase: 'feats', error: 'Feat 已移除，跳过迁移' });
         checkpoint.feats_index = i + 1;
         reportMigrationProgress(options, 'feats', i + 1, backup.feats.length);
         if ((i + 1) % saveInterval === 0) {

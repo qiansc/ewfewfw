@@ -39,14 +39,13 @@ describe('normalizeForHash', () => {
     expect(normalized).toEqual({ id: 'test', name: 'Test' });
   });
 
-  test('excludes content_hash and system-managed fields', () => {
+  test('excludes content_hash and metadata fields', () => {
     const obj = {
       id: 'test',
       content_hash: 'abc123',
-      uuid: '550e8400-e29b-41d4-a716-446655440000',
-      root_id: '@acme/payment-service',
-      versions: ['0.0.0'],
       requirement_id: '550e8400-e29b-41d4-a716-446655440001',
+      _id: 'mongo-id',
+      __v: 1,
     };
     const normalized = normalizeForHash(obj);
     expect(normalized).toEqual({ id: 'test' });
@@ -76,10 +75,10 @@ describe('normalizeForHash', () => {
     expect(normalized.items).toHaveLength(2);
   });
 
-  test('converts undefined to null', () => {
+  test('removes null and undefined keys', () => {
     const obj = { a: undefined, b: null };
     const normalized = normalizeForHash(obj);
-    expect(normalized).toEqual({ b: null });
+    expect(normalized).toEqual({});
   });
 });
 

@@ -27,20 +27,6 @@ describe('validateConfig', () => {
     expect(result.errors).toHaveLength(0);
   });
 
-  test('validates valid server config', () => {
-    const config: C4AConfig = {
-      root_id: '@acme/payment-service',
-      version: '1.0.0',
-      mode: 'server',
-      server: {
-        url: 'http://localhost:8055',
-      },
-    };
-    const result = validateConfig(config);
-    expect(result.valid).toBe(true);
-    expect(result.errors).toHaveLength(0);
-  });
-
   test('validates valid remote config', () => {
     const config: C4AConfig = {
       root_id: '@acme/payment-service',
@@ -62,15 +48,6 @@ describe('validateConfig', () => {
     const result = validateConfig(config);
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('Invalid mode: invalid');
-  });
-
-  test('rejects server mode without url', () => {
-    const config: C4AConfig = {
-      mode: 'server',
-    };
-    const result = validateConfig(config);
-    expect(result.valid).toBe(false);
-    expect(result.errors).toContain('Server mode requires server.url');
   });
 
   test('rejects remote mode without url', () => {
@@ -106,6 +83,24 @@ describe('loadConfig', () => {
     writeFileSync(configPath, 'mode: [local', 'utf-8');
 
     await expect(loadConfig(root)).rejects.toBeTruthy();
+
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test('maps legacy server mode to remote', async () => {
+    const root = join(TMP_ROOT, `server-${Date.now()}`);
+    const contextDir = join(root, '.context');
+    mkdirSync(contextDir, { recursive: true });
+    const configPath = join(contextDir, '.c4a.yaml');
+    writeFileSync(
+      configPath,
+      ['mode: server', 'server:', '  url: http://localhost:8055', ''].join('\n'),
+      'utf-8'
+    );
+
+    const config = await loadConfig(root);
+    expect(config.mode).toBe('remote');
+    expect(config.remote?.url).toBe('http://localhost:8055');
 
     rmSync(root, { recursive: true, force: true });
   });

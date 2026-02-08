@@ -31,8 +31,8 @@ describe("loadConfig", () => {
       );
 
       const config = loadConfig(dir);
-      expect(config.mode).toBe("server");
-      expect(config.server?.url).toBe("http://localhost:8055");
+      expect(config.mode).toBe("remote");
+      expect(config.remote?.url).toBe("http://localhost:8055");
     });
   });
 
@@ -75,8 +75,8 @@ describe("loadConfig", () => {
       );
 
       const config = loadConfig(nestedDir);
-      expect(config.mode).toBe("server");
-      expect(config.server?.url).toBe("http://localhost:8055");
+      expect(config.mode).toBe("remote");
+      expect(config.remote?.url).toBe("http://localhost:8055");
     });
   });
 
@@ -88,8 +88,8 @@ describe("loadConfig", () => {
       process.env.C4A_STORAGE_BACKEND_URL = "http://localhost:8055";
       try {
         const config = loadConfig(nestedDir);
-        expect(config.mode).toBe("server");
-        expect(config.server?.url).toBe("http://localhost:8055");
+        expect(config.mode).toBe("remote");
+        expect(config.remote?.url).toBe("http://localhost:8055");
       } finally {
         if (previous === undefined) {
           delete process.env.C4A_STORAGE_BACKEND_URL;

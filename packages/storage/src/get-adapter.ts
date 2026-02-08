@@ -5,7 +5,7 @@
  *
  * 根据配置返回对应的 StorageAdapter 实例：
  * - mode: local → LiteAdapter (SQLite)
- * - mode: server/remote → ServerAdapter (HTTP API)
+ * - mode: remote → ServerAdapter (HTTP API)
  */
 
 import { existsSync, readFileSync } from 'node:fs';
@@ -24,10 +24,10 @@ import type { ADRPolicyConfig } from './adapterCrudTypes.js';
 /**
  * 存储模式
  */
-export type StorageMode = 'local' | 'server' | 'remote';
+export type StorageMode = 'local' | 'remote';
 
 /**
- * Server 模式配置
+ * Server 模式配置（兼容旧配置）
  */
 export interface ServerConfig {
   url: string;
@@ -103,7 +103,7 @@ export function loadConfig(basePath: string = process.cwd()): C4AConfig {
       const fullPath = join(currentPath, configPath);
       if (existsSync(fullPath)) {
         const content = readFileSync(fullPath, 'utf-8');
-        return parseYaml(content) as C4AConfig;
+        return normalizeConfig(parseYaml(content) as C4AConfig);
       }
     }
     const parentPath = dirname(currentPath);
@@ -116,13 +116,28 @@ export function loadConfig(basePath: string = process.cwd()): C4AConfig {
   const backendUrl = process.env.C4A_STORAGE_BACKEND_URL;
   if (backendUrl) {
     return {
-      mode: 'server',
-      server: { url: backendUrl },
+      mode: 'remote',
+      remote: { url: backendUrl },
     };
   }
 
   // 默认配置
   return { mode: 'local' };
+}
+
+function normalizeConfig(config: C4AConfig): C4AConfig {
+  const rawMode = (config as { mode?: string }).mode;
+  let remote = config.remote;
+  if (!remote && config.server) {
+    remote = { ...config.server };
+  } else if (remote && !remote.url && config.server?.url) {
+    remote = { ...remote, url: config.server.url };
+  }
+  return {
+    ...config,
+    mode: rawMode === 'server' ? 'remote' : config.mode,
+    remote,
+  };
 }
 
 // ============================================================
@@ -224,7 +239,7 @@ function buildAdapterConfigKey(params: {
  *
  * 根据配置文件中的 mode 返回对应的 Adapter：
  * - local: LiteAdapter (SQLite)
- * - server/remote: ServerAdapter (HTTP API)
+ * - remote: ServerAdapter (HTTP API)
  *
  * @param options - 可选配置覆盖
  * @returns StorageAdapter 实例
@@ -236,7 +251,7 @@ export async function getAdapter(options?: {
 }): Promise<StorageAdapter> {
   const config = loadConfig(options?.basePath);
   const mode = options?.forceMode || config.mode || 'local';
-  if (mode !== 'local' && mode !== 'server' && mode !== 'remote') {
+  if (mode !== 'local' && mode !== 'remote') {
     throw new Error(`Unknown mode: ${mode}`);
   }
   const featConfig = {
@@ -259,7 +274,7 @@ export async function getAdapter(options?: {
     mode,
     local: localConfig,
     server: mergeEmbeddingConfig(config.server, config.embedding),
-    remote: mergeEmbeddingConfig(config.remote, config.embedding),
+    remote: mergeEmbeddingConfig(config.remote ?? config.server, config.embedding),
   });
 
   // 如果配置改变，需要重新创建实例
@@ -277,9 +292,9 @@ export async function getAdapter(options?: {
     if (mode === 'local') {
       adapterInstance = new LiteAdapter(localConfig);
     } else {
-      const serverConfig = mode === 'server' ? config.server : config.remote;
-      const mergedServerConfig = mergeEmbeddingConfig(serverConfig, config.embedding);
-      const modeLabel = mode === 'server' ? 'server' : 'remote';
+      const remoteConfig = config.remote ?? config.server;
+      const mergedServerConfig = mergeEmbeddingConfig(remoteConfig, config.embedding);
+      const modeLabel = 'remote';
       if (!mergedServerConfig?.url) {
         throw new Error(`${modeLabel} mode requires ${modeLabel}.url in .context/.c4a.yaml`);
       }
@@ -326,10 +341,10 @@ export function isLocalMode(): boolean {
 }
 
 /**
- * 检查是否为 Server 模式
+ * 检查是否为 Remote 模式
  */
-export function isServerMode(): boolean {
-  return currentMode === 'server' || currentMode === 'remote';
+export function isRemoteMode(): boolean {
+  return currentMode === 'remote';
 }
 
 function mergeEmbeddingConfig(

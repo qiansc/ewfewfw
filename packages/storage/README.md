@@ -6,11 +6,8 @@ C4A Storage 层实现，包含 Local/Server Adapter、SQLiteStore 与 Data Ops �
 
 Data Ops 提供以下子模块：
 
-- feat：生命周期、合并、冲突检测
 - reference：引用解析与校验
 - sync：同步/导出/冲突检测
-- transaction：feat 事务、回滚、补偿
-- workflow：Workflow 状态与恢复
 
 ## Server 模式
 
@@ -76,7 +73,6 @@ import {
   InMemoryGraph,
   GraphQueryCache,
   createDataOpsContext,
-  featLifecycle,
   parseReference,
   sync,
 } from '@c4a/storage';
@@ -91,20 +87,6 @@ const ctx = createDataOpsContext({
     defaultProject: 'alpha',
     enableVectorSearch: false,
     repoId: null,
-    feat: {
-      concurrent_warning: true,
-      auto_notify: false,
-    },
-  },
-});
-
-await featLifecycle(ctx, {
-  action: 'create',
-  feat_id: 'feat-1',
-  metadata: {
-    title: 'feat-1',
-    description: 'demo',
-    created_by: 'user',
   },
 });
 

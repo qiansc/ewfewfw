@@ -8,9 +8,7 @@ export type SchemaType =
   | "component"
   | "adr"
   | "process"
-  | "sor"
-  | "feat"
-  | "checklist";
+  | "sor";
 
 const SCHEMA_FILES: Record<SchemaType, string> = {
   system: "@c4a/core/schemas/c4a-system.schema.json",
@@ -19,8 +17,6 @@ const SCHEMA_FILES: Record<SchemaType, string> = {
   adr: "@c4a/core/schemas/c4a-adr.schema.json",
   process: "@c4a/core/schemas/c4a-process.schema.json",
   sor: "@c4a/core/schemas/c4a-sor.schema.json",
-  feat: "@c4a/core/schemas/c4a-feat.schema.json",
-  checklist: "@c4a/core/schemas/c4a-checklist.schema.json",
 };
 
 const require = createRequire(import.meta.url);

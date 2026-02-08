@@ -5,12 +5,22 @@
  */
 
 import type { Database } from 'bun:sqlite';
+import { existsSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { FeatureExtractionPipeline } from '@xenova/transformers';
 import type { VectorSearchHit, VectorStore } from './usearch-store.js';
 
 // 模型配置
 const MODEL_NAME = 'Xenova/all-MiniLM-L6-v2';
 const EMBEDDING_DIMENSION = 384;
+const MODEL_SEGMENTS = MODEL_NAME.split('/');
+const MODEL_FILE_CANDIDATES = [
+  join(...MODEL_SEGMENTS, 'onnx', 'model.onnx'),
+  join(...MODEL_SEGMENTS, 'onnx', 'model_quantized.onnx'),
+  join(...MODEL_SEGMENTS, 'model.onnx'),
+  join(...MODEL_SEGMENTS, 'model_quantized.onnx'),
+];
 
 // 延迟加载的 embedder 实例
 let embedder: FeatureExtractionPipeline | null = null;
@@ -31,8 +41,15 @@ export async function initEmbedder(): Promise<void> {
   isInitializing = true;
   initPromise = (async () => {
     try {
-      const { pipeline } = await import('@xenova/transformers');
-      embedder = await pipeline('feature-extraction', MODEL_NAME);
+      const { pipeline, env } = await import('@xenova/transformers');
+      const localModelPath = resolveLocalModelBasePath();
+      if (localModelPath) {
+        env.localModelPath = localModelPath;
+      }
+      env.allowRemoteModels = false;
+      embedder = await pipeline('feature-extraction', MODEL_NAME, {
+        local_files_only: true,
+      });
     } finally {
       isInitializing = false;
     }
@@ -78,6 +95,35 @@ export function setEmbedderForTest(value: FeatureExtractionPipeline | null): voi
   embedder = value;
   isInitializing = false;
   initPromise = null;
+}
+
+export function resolveLocalModelBasePath(): string | null {
+  const candidates: string[] = [];
+  if (process.env.C4A_MODELS_DIR) {
+    candidates.push(process.env.C4A_MODELS_DIR);
+  }
+
+  if (process.argv[1]) {
+    candidates.push(resolve(dirname(process.argv[1]), 'models'));
+  }
+
+  const moduleDir = dirname(fileURLToPath(import.meta.url));
+  candidates.push(resolve(moduleDir, '../../../cli/dist/models'));
+  candidates.push(resolve(process.cwd(), 'dist/models'));
+  candidates.push(resolve(process.cwd(), 'models'));
+
+  for (const candidate of candidates) {
+    if (hasModelAtBase(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function hasModelAtBase(baseDir: string): boolean {
+  if (!existsSync(baseDir)) return false;
+  return MODEL_FILE_CANDIDATES.some((filePath) => existsSync(resolve(baseDir, filePath)));
 }
 
 // ============================================================
